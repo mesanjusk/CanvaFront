@@ -13,6 +13,9 @@ const CanvasEditor = () => {
   const [idNumber, setIdNumber] = useState('');
   const [fontFamily, setFontFamily] = useState('Arial');
   const [fontSize, setFontSize] = useState(24);
+  const historyRef = useRef([]);
+  const historyIndexRef = useRef(-1);
+  const [, setHistoryIndex] = useState(-1);
 
   // Initialize canvas
   useEffect(() => {
@@ -22,12 +25,26 @@ const CanvasEditor = () => {
       width: 800,
       backgroundColor: '#fff',
     });
+    const saveHistory = () => {
+      const json = newCanvas.toJSON();
+      const nextIndex = historyIndexRef.current + 1;
+      historyRef.current = [...historyRef.current.slice(0, nextIndex), json];
+      historyIndexRef.current = nextIndex;
+      setHistoryIndex(nextIndex);
+    };
+    newCanvas.on('object:added', saveHistory);
+    newCanvas.on('object:modified', saveHistory);
+    newCanvas.on('object:removed', saveHistory);
     newCanvas.on('selection:created', updateControls);
     newCanvas.on('selection:updated', updateControls);
     newCanvas.on('selection:cleared', () => {
       setPosX(0); setPosY(0);
     });
     fabricCanvasRef.current = newCanvas;
+    saveHistory();
+    return () => {
+      newCanvas.dispose();
+    };
   }, []);
 
   function updateControls() {
@@ -104,6 +121,19 @@ const CanvasEditor = () => {
       fill: fillColor,
     });
     canvas.add(circle);
+  };
+
+  const addTriangle = () => {
+    const canvas = fabricCanvasRef.current;
+    if (!canvas) return;
+    const tri = new fabric.Triangle({
+      left: 80,
+      top: 80,
+      width: 80,
+      height: 80,
+      fill: fillColor,
+    });
+    canvas.add(tri);
   };
 
   const addBackgroundImage = (e) => {
@@ -217,6 +247,55 @@ const CanvasEditor = () => {
     if (active) canvas.sendBackwards(active);
   };
 
+  const bringToFront = () => {
+    const canvas = fabricCanvasRef.current;
+    const active = canvas?.getActiveObject();
+    if (active) canvas.bringToFront(active);
+  };
+
+  const sendToBack = () => {
+    const canvas = fabricCanvasRef.current;
+    const active = canvas?.getActiveObject();
+    if (active) canvas.sendToBack(active);
+  };
+
+  const deleteObject = () => {
+    const canvas = fabricCanvasRef.current;
+    const active = canvas?.getActiveObject();
+    if (active) canvas.remove(active);
+  };
+
+  const cloneObject = () => {
+    const canvas = fabricCanvasRef.current;
+    const active = canvas?.getActiveObject();
+    if (active && active.clone) {
+      active.clone((cloned) => {
+        cloned.set({ left: (active.left || 0) + 20, top: (active.top || 0) + 20 });
+        canvas.add(cloned);
+        canvas.setActiveObject(cloned);
+        canvas.requestRenderAll();
+      });
+    }
+  };
+
+  const undo = () => {
+    const canvas = fabricCanvasRef.current;
+    const idx = historyIndexRef.current - 1;
+    if (idx < 0) return;
+    canvas.loadFromJSON(historyRef.current[idx], canvas.renderAll.bind(canvas));
+    historyIndexRef.current = idx;
+    setHistoryIndex(idx);
+  };
+
+  const redo = () => {
+    const canvas = fabricCanvasRef.current;
+    const idx = historyIndexRef.current + 1;
+    if (idx >= historyRef.current.length) return;
+    canvas.loadFromJSON(historyRef.current[idx], canvas.renderAll.bind(canvas));
+    historyIndexRef.current = idx;
+    setHistoryIndex(idx);
+  };
+
   const resetCanvas = () => {
     const canvas = fabricCanvasRef.current;
     if (!canvas) return;
@@ -318,9 +397,14 @@ const CanvasEditor = () => {
         <button onClick={addText} className="p-2 bg-blue-500 text-white rounded text-xs">Add Text</button>
         <button onClick={addRectangle} className="p-2 bg-blue-500 text-white rounded text-xs">Rect</button>
         <button onClick={addCircle} className="p-2 bg-blue-500 text-white rounded text-xs">Circle</button>
+        <button onClick={addTriangle} className="p-2 bg-blue-500 text-white rounded text-xs">Tri</button>
         <button onClick={saveTemplate} className="p-2 bg-green-600 text-white rounded text-xs">Save</button>
         <button onClick={exportImage} className="p-2 bg-orange-500 text-white rounded text-xs">Export</button>
         <button onClick={resetCanvas} className="p-2 bg-gray-700 text-white rounded text-xs">Reset</button>
+        <button onClick={undo} className="p-2 bg-gray-500 text-white rounded text-xs">Undo</button>
+        <button onClick={redo} className="p-2 bg-gray-500 text-white rounded text-xs">Redo</button>
+        <button onClick={cloneObject} className="p-2 bg-blue-500 text-white rounded text-xs">Clone</button>
+        <button onClick={deleteObject} className="p-2 bg-red-600 text-white rounded text-xs">Del</button>
 
         <input type="color" value={fillColor} onChange={applyFillColor} className="h-8 w-8 p-0 border rounded-full" />
         <select value={fontFamily} onChange={changeFont} className="p-2 border rounded text-xs">
@@ -353,7 +437,9 @@ const CanvasEditor = () => {
           />
         </div>
         <button onClick={bringForward} className="p-2 bg-purple-500 text-white rounded text-xs">↑</button>
-            <button onClick={sendBackward} className="p-2 bg-purple-500 text-white rounded text-xs">↓</button>
+        <button onClick={sendBackward} className="p-2 bg-purple-500 text-white rounded text-xs">↓</button>
+        <button onClick={bringToFront} className="p-2 bg-purple-500 text-white rounded text-xs">Top</button>
+        <button onClick={sendToBack} className="p-2 bg-purple-500 text-white rounded text-xs">Bottom</button>
           </div>
         </div>
 

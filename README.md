@@ -20,6 +20,16 @@ npm install
 npm run dev
 ```
 
+## Features
+
+- Add text with custom font and size
+- Draw rectangles, circles and triangles
+- Upload background, photos, logos and signatures
+- Layer objects forward/backward and to top/bottom
+- Clone or delete selected objects
+- Undo/redo canvas changes
+- Export the canvas as an image or save the template
+
 
 ## Expanding the ESLint configuration
 

@@ -13,7 +13,8 @@ function App() {
   const [strokeWidth, setStrokeWidth] = useState(1);
   const [canvasWidth, setCanvasWidth] = useState(800);
   const [canvasHeight, setCanvasHeight] = useState(500);
-  const [imageToCrop, setImageToCrop] = useState(null);
+  const [cropSrc, setCropSrc] = useState(null);
+  const cropCallbackRef = useRef(null);
 
   const addText = () => {
     const canvas = canvasRef.current;
@@ -62,7 +63,10 @@ function App() {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (f) => setImageToCrop(f.target.result);
+    reader.onload = (f) => {
+      cropCallbackRef.current = handleCroppedImage;
+      setCropSrc(f.target.result);
+    };
     reader.readAsDataURL(file);
   };
 
@@ -102,13 +106,16 @@ function App() {
     if (!canvas) return;
     const obj = canvas.getActiveObject();
     if (obj && obj.type === 'image') {
-      const w = parseInt(prompt('Crop width', obj.width), 10);
-      const h = parseInt(prompt('Crop height', obj.height), 10);
-      if (!Number.isNaN(w) && !Number.isNaN(h)) {
-        obj.set({ cropX: 0, cropY: 0, width: w, height: h });
-        obj.setCoords();
-        canvas.requestRenderAll();
-      }
+      cropCallbackRef.current = (dataUrl) => {
+        const { left, top } = obj;
+        canvas.remove(obj);
+        fabric.Image.fromURL(dataUrl, (img) => {
+          img.set({ left, top });
+          canvas.add(img);
+          canvas.setActiveObject(img);
+        });
+      };
+      setCropSrc(obj._element.src);
     }
   };
 
@@ -208,13 +215,17 @@ function App() {
         onAlignMiddle={alignMiddle}
         onAlignBottom={alignBottom}
       />
-      {imageToCrop && (
+      {cropSrc && (
         <ImageCropModal
-          src={imageToCrop}
-          onCancel={() => setImageToCrop(null)}
+          src={cropSrc}
+          onCancel={() => {
+            setCropSrc(null);
+            cropCallbackRef.current = null;
+          }}
           onConfirm={(url) => {
-            handleCroppedImage(url);
-            setImageToCrop(null);
+            cropCallbackRef.current?.(url);
+            setCropSrc(null);
+            cropCallbackRef.current = null;
           }}
         />
       )}

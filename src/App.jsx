@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import Toolbar from './components/Toolbar';
 import CanvasArea from './components/CanvasArea';
 import RightPanel from './components/RightPanel';
+import ImageCropModal from './components/ImageCropModal';
 import { fabric } from 'fabric';
 
 function App() {
@@ -12,6 +13,7 @@ function App() {
   const [strokeWidth, setStrokeWidth] = useState(1);
   const [canvasWidth, setCanvasWidth] = useState(800);
   const [canvasHeight, setCanvasHeight] = useState(500);
+  const [imageToCrop, setImageToCrop] = useState(null);
 
   const addText = () => {
     const canvas = canvasRef.current;
@@ -57,16 +59,19 @@ function App() {
   };
 
   const addImage = (e) => {
-    const canvas = canvasRef.current;
     const file = e.target.files[0];
-    if (!canvas || !file) return;
+    if (!file) return;
     const reader = new FileReader();
-    reader.onload = (f) => {
-      fabric.Image.fromURL(f.target.result, (img) => {
-        canvas.add(img);
-      });
-    };
+    reader.onload = (f) => setImageToCrop(f.target.result);
     reader.readAsDataURL(file);
+  };
+
+  const handleCroppedImage = (dataUrl) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    fabric.Image.fromURL(dataUrl, (img) => {
+      canvas.add(img);
+    });
   };
 
   const bringToFront = () => {
@@ -203,6 +208,16 @@ function App() {
         onAlignMiddle={alignMiddle}
         onAlignBottom={alignBottom}
       />
+      {imageToCrop && (
+        <ImageCropModal
+          src={imageToCrop}
+          onCancel={() => setImageToCrop(null)}
+          onConfirm={(url) => {
+            handleCroppedImage(url);
+            setImageToCrop(null);
+          }}
+        />
+      )}
     </div>
   );
 }

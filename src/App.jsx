@@ -8,6 +8,8 @@ function App() {
   const canvasRef = useRef(null);
   const [fillColor, setFillColor] = useState('#000000');
   const [fontSize, setFontSize] = useState(24);
+  const [strokeColor, setStrokeColor] = useState('#000000');
+  const [strokeWidth, setStrokeWidth] = useState(1);
 
   const addText = () => {
     const canvas = canvasRef.current;
@@ -16,6 +18,8 @@ function App() {
       left: 50,
       top: 50,
       fill: fillColor,
+      stroke: strokeColor,
+      strokeWidth,
       fontSize,
     });
     canvas.add(text);
@@ -30,6 +34,8 @@ function App() {
       width: 100,
       height: 80,
       fill: fillColor,
+      stroke: strokeColor,
+      strokeWidth,
     });
     canvas.add(rect);
   };
@@ -42,6 +48,8 @@ function App() {
       top: 150,
       radius: 40,
       fill: fillColor,
+      stroke: strokeColor,
+      strokeWidth,
     });
     canvas.add(circle);
   };
@@ -65,7 +73,16 @@ function App() {
       <div className="flex flex-1 overflow-hidden">
         <Sidebar onAddText={addText} onAddRect={addRect} onAddCircle={addCircle} onAddImage={addImage} />
         <CanvasArea ref={canvasRef} />
-        <RightPanel fillColor={fillColor} setFillColor={setFillColor} fontSize={fontSize} setFontSize={setFontSize} />
+        <RightPanel
+          fillColor={fillColor}
+          setFillColor={setFillColor}
+          fontSize={fontSize}
+          setFontSize={setFontSize}
+          strokeColor={strokeColor}
+          setStrokeColor={setStrokeColor}
+          strokeWidth={strokeWidth}
+          setStrokeWidth={setStrokeWidth}
+        />
       </div>
     </div>
   );

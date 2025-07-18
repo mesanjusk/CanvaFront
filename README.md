@@ -13,6 +13,7 @@ npm run dev
 
 - Add text, rectangles and circles
 - Upload an image to the canvas
-- Change fill colour and font size of selected objects
+- Change fill colour, stroke colour and stroke width
+- Adjust font size of selected text objects
 
 This code base is meant as a starting point for further development.

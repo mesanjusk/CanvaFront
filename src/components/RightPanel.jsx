@@ -9,8 +9,12 @@ const RightPanel = ({
   setStrokeColor,
   strokeWidth,
   setStrokeWidth,
+  canvasWidth,
+  setCanvasWidth,
+  canvasHeight,
+  setCanvasHeight,
 }) => (
-  <div className="w-40 bg-gray-100 p-2 flex flex-col gap-2">
+  <div className="w-full md:w-40 bg-gray-100 p-2 flex flex-wrap md:flex-col gap-2">
     <label className="text-xs">Fill</label>
     <input
       type="color"
@@ -38,6 +42,20 @@ const RightPanel = ({
       type="number"
       value={fontSize}
       onChange={(e) => setFontSize(parseInt(e.target.value, 10))}
+      className="p-1 border rounded"
+    />
+    <label className="text-xs">Width</label>
+    <input
+      type="number"
+      value={canvasWidth}
+      onChange={(e) => setCanvasWidth(parseInt(e.target.value, 10))}
+      className="p-1 border rounded"
+    />
+    <label className="text-xs">Height</label>
+    <input
+      type="number"
+      value={canvasHeight}
+      onChange={(e) => setCanvasHeight(parseInt(e.target.value, 10))}
       className="p-1 border rounded"
     />
   </div>

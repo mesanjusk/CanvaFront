@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import Sidebar from './components/Sidebar';
+import Toolbar from './components/Toolbar';
 import CanvasArea from './components/CanvasArea';
 import RightPanel from './components/RightPanel';
 import { fabric } from 'fabric';
@@ -10,6 +10,8 @@ function App() {
   const [fontSize, setFontSize] = useState(24);
   const [strokeColor, setStrokeColor] = useState('#000000');
   const [strokeWidth, setStrokeWidth] = useState(1);
+  const [canvasWidth, setCanvasWidth] = useState(800);
+  const [canvasHeight, setCanvasHeight] = useState(500);
 
   const addText = () => {
     const canvas = canvasRef.current;
@@ -67,12 +69,109 @@ function App() {
     reader.readAsDataURL(file);
   };
 
+  const bringToFront = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const obj = canvas.getActiveObject();
+    if (obj) canvas.bringToFront(obj);
+  };
+
+  const sendToBack = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const obj = canvas.getActiveObject();
+    if (obj) canvas.sendToBack(obj);
+  };
+
+  const download = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const link = document.createElement('a');
+    link.href = canvas.toDataURL({ format: 'png' });
+    link.download = 'canvas.png';
+    link.click();
+  };
+
+  const cropImage = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const obj = canvas.getActiveObject();
+    if (obj && obj.type === 'image') {
+      const w = parseInt(prompt('Crop width', obj.width), 10);
+      const h = parseInt(prompt('Crop height', obj.height), 10);
+      if (!Number.isNaN(w) && !Number.isNaN(h)) {
+        obj.set({ cropX: 0, cropY: 0, width: w, height: h });
+        obj.setCoords();
+        canvas.requestRenderAll();
+      }
+    }
+  };
+
+  const alignLeft = () => {
+    const canvas = canvasRef.current;
+    const obj = canvas?.getActiveObject();
+    if (obj) {
+      obj.set({ left: 0 });
+      obj.setCoords();
+      canvas.requestRenderAll();
+    }
+  };
+
+  const alignCenter = () => {
+    const canvas = canvasRef.current;
+    const obj = canvas?.getActiveObject();
+    if (obj) {
+      obj.set({ left: (canvasWidth - obj.getScaledWidth()) / 2 });
+      obj.setCoords();
+      canvas.requestRenderAll();
+    }
+  };
+
+  const alignRight = () => {
+    const canvas = canvasRef.current;
+    const obj = canvas?.getActiveObject();
+    if (obj) {
+      obj.set({ left: canvasWidth - obj.getScaledWidth() });
+      obj.setCoords();
+      canvas.requestRenderAll();
+    }
+  };
+
+  const alignTop = () => {
+    const canvas = canvasRef.current;
+    const obj = canvas?.getActiveObject();
+    if (obj) {
+      obj.set({ top: 0 });
+      obj.setCoords();
+      canvas.requestRenderAll();
+    }
+  };
+
+  const alignMiddle = () => {
+    const canvas = canvasRef.current;
+    const obj = canvas?.getActiveObject();
+    if (obj) {
+      obj.set({ top: (canvasHeight - obj.getScaledHeight()) / 2 });
+      obj.setCoords();
+      canvas.requestRenderAll();
+    }
+  };
+
+  const alignBottom = () => {
+    const canvas = canvasRef.current;
+    const obj = canvas?.getActiveObject();
+    if (obj) {
+      obj.set({ top: canvasHeight - obj.getScaledHeight() });
+      obj.setCoords();
+      canvas.requestRenderAll();
+    }
+  };
+
   return (
-    <div className="h-screen flex flex-col">
+    <div className="h-screen flex flex-col pb-20 md:pb-0">
       <header className="h-12 bg-gray-800 text-white flex items-center px-4">My Canva Clone</header>
       <div className="flex flex-1 overflow-hidden">
-        <Sidebar onAddText={addText} onAddRect={addRect} onAddCircle={addCircle} onAddImage={addImage} />
-        <CanvasArea ref={canvasRef} />
+        <CanvasArea ref={canvasRef} width={canvasWidth} height={canvasHeight} />
         <RightPanel
           fillColor={fillColor}
           setFillColor={setFillColor}
@@ -82,8 +181,28 @@ function App() {
           setStrokeColor={setStrokeColor}
           strokeWidth={strokeWidth}
           setStrokeWidth={setStrokeWidth}
+          canvasWidth={canvasWidth}
+          setCanvasWidth={setCanvasWidth}
+          canvasHeight={canvasHeight}
+          setCanvasHeight={setCanvasHeight}
         />
       </div>
+      <Toolbar
+        onAddText={addText}
+        onAddRect={addRect}
+        onAddCircle={addCircle}
+        onAddImage={addImage}
+        onBringToFront={bringToFront}
+        onSendToBack={sendToBack}
+        onDownload={download}
+        onCropImage={cropImage}
+        onAlignLeft={alignLeft}
+        onAlignCenter={alignCenter}
+        onAlignRight={alignRight}
+        onAlignTop={alignTop}
+        onAlignMiddle={alignMiddle}
+        onAlignBottom={alignBottom}
+      />
     </div>
   );
 }

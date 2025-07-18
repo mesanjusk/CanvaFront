@@ -15,5 +15,9 @@ npm run dev
 - Upload an image to the canvas
 - Change fill colour, stroke colour and stroke width
 - Adjust font size of selected text objects
+- Move objects to front or back
+- Download the canvas as an image
+- Alignment and simple image cropping options
+- Canvas size can be changed
 
 This code base is meant as a starting point for further development.

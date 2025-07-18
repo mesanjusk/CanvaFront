@@ -210,6 +210,15 @@ const CanvasEditor = () => {
     if (active) canvas.sendBackwards(active);
   };
 
+  const resetCanvas = () => {
+    const canvas = fabricCanvasRef.current;
+    if (!canvas) return;
+    canvas.clear();
+    canvas.setBackgroundColor('#fff', canvas.renderAll.bind(canvas));
+    setName('');
+    setIdNumber('');
+  };
+
   const applyFillColor = (e) => {
     const canvas = fabricCanvasRef.current;
     const active = canvas?.getActiveObject();
@@ -237,7 +246,7 @@ const CanvasEditor = () => {
 
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-4 space-y-4 max-w-screen-sm mx-auto">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         <input
           placeholder="Template Name"
@@ -267,6 +276,7 @@ const CanvasEditor = () => {
         <button onClick={addText} className="p-2 bg-blue-500 text-white">Add Text</button>
         <button onClick={saveTemplate} className="p-2 bg-green-500 text-white">Save</button>
         <button onClick={exportImage} className="p-2 bg-orange-500 text-white">Export</button>
+        <button onClick={resetCanvas} className="p-2 bg-gray-500 text-white">Reset</button>
         <input type="color" value={fillColor} onChange={applyFillColor} className="p-1 border" />
         <label className="ml-2 text-sm">X:
           <input

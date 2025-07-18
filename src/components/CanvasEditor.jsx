@@ -277,6 +277,7 @@ const CanvasEditor = () => {
         <button onClick={saveTemplate} className="p-2 bg-green-500 text-white">Save</button>
         <button onClick={exportImage} className="p-2 bg-orange-500 text-white">Export</button>
         <button onClick={resetCanvas} className="p-2 bg-gray-500 text-white">Reset</button>
+        
         <input type="color" value={fillColor} onChange={applyFillColor} className="p-1 border" />
         <label className="ml-2 text-sm">X:
           <input

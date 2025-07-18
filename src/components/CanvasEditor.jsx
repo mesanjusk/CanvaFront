@@ -11,6 +11,8 @@ const CanvasEditor = () => {
   const [fillColor, setFillColor] = useState('#000000');
   const [posX, setPosX] = useState(0);
   const [posY, setPosY] = useState(0);
+  const [name, setName] = useState('');
+  const [idNumber, setIdNumber] = useState('');
 
   useEffect(() => {
     if (fabricCanvasRef.current) {
@@ -56,37 +58,6 @@ const CanvasEditor = () => {
     }
   }
 
- const addImage = (e) => {
-  const canvas = fabricCanvasRef.current;
-  if (!canvas) return;
-
-  const file = e.target.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-
-  reader.onload = (f) => {
-    const dataUrl = f.target.result;
-
-    const imgElement = new Image();
-    imgElement.src = dataUrl;
-
-    imgElement.onload = () => {
-      const imgInstance = new fabric.Image(imgElement, {
-        left: 100,
-        top: 100,
-        scaleX: Math.min(1, 800 / imgElement.width),
-        scaleY: Math.min(1, 500 / imgElement.height),
-      });
-
-      canvas.add(imgInstance);
-      canvas.setActiveObject(imgInstance);
-      canvas.renderAll();
-    };
-  };
-
-  reader.readAsDataURL(file);
-};
 
 
   const saveTemplate = async () => {
@@ -127,8 +98,8 @@ const CanvasEditor = () => {
   };
 
   const addBackgroundImage = (e) => {
-  const canvas = fabricCanvasRef.current;
-  if (!canvas) return;
+    const canvas = fabricCanvasRef.current;
+    if (!canvas) return;
 
   const file = e.target.files[0];
   if (!file) return;
@@ -151,6 +122,55 @@ const CanvasEditor = () => {
   };
   reader.readAsDataURL(file);
 };
+
+  const addImageToPosition = (file, left, top, maxW, maxH) => {
+    const canvas = fabricCanvasRef.current;
+    if (!canvas) return;
+    const reader = new FileReader();
+    reader.onload = (f) => {
+      const dataUrl = f.target.result;
+      const imgEl = new Image();
+      imgEl.src = dataUrl;
+      imgEl.onload = () => {
+        const scale = Math.min(maxW / imgEl.width, maxH / imgEl.height, 1);
+        const imgInstance = new fabric.Image(imgEl, {
+          left,
+          top,
+          scaleX: scale,
+          scaleY: scale,
+        });
+        canvas.add(imgInstance);
+        canvas.setActiveObject(imgInstance);
+        canvas.renderAll();
+      };
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleTemplateUpload = (e) => addBackgroundImage(e);
+
+  const handlePhotoUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) addImageToPosition(file, 20, 60, 120, 150);
+  };
+
+  const handleLogoUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) addImageToPosition(file, 220, 10, 80, 80);
+  };
+
+  const handleSignUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) addImageToPosition(file, 220, 160, 120, 60);
+  };
+
+  const addDetails = () => {
+    const canvas = fabricCanvasRef.current;
+    if (!canvas) return;
+    const nameText = new fabric.Text(name, { left: 20, top: 230, fill: '#000', fontSize: 18 });
+    const idText = new fabric.Text(idNumber, { left: 20, top: 260, fill: '#000', fontSize: 16 });
+    canvas.add(nameText, idText);
+  };
 
   const handleDrop = (e) => {
     e.preventDefault();
@@ -217,22 +237,38 @@ const CanvasEditor = () => {
 
 
   return (
-    <div className="p-4">
-      <input
-        placeholder="Template Name"
-        value={templateName}
-        onChange={(e) => setTemplateName(e.target.value)}
-        className="mb-2 p-2 border"
-      />
-      <div className="mb-2 flex flex-wrap items-center gap-2">
+    <div className="p-4 space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <input
+          placeholder="Template Name"
+          value={templateName}
+          onChange={(e) => setTemplateName(e.target.value)}
+          className="p-2 border"
+        />
+        <input
+          placeholder="Name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="p-2 border"
+        />
+        <input
+          placeholder="ID Number"
+          value={idNumber}
+          onChange={(e) => setIdNumber(e.target.value)}
+          className="p-2 border"
+        />
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="text-sm">Template<input type="file" onChange={handleTemplateUpload} className="block" /></label>
+        <label className="text-sm">Photo<input type="file" onChange={handlePhotoUpload} className="block" /></label>
+        <label className="text-sm">Logo<input type="file" onChange={handleLogoUpload} className="block" /></label>
+        <label className="text-sm">Sign<input type="file" onChange={handleSignUpload} className="block" /></label>
+        <button onClick={addDetails} className="p-2 bg-blue-500 text-white">Add Details</button>
         <button onClick={addText} className="p-2 bg-blue-500 text-white">Add Text</button>
-        <input type="file" onChange={addImage} className="ml-2" />
-        <button onClick={saveTemplate} className="p-2 bg-green-500 text-white">Save Template</button>
-        <button onClick={exportImage} className="p-2 bg-orange-500 text-white">Export Image</button>
-        <button onClick={bringForward} className="p-2 bg-gray-500 text-white">Page Up</button>
-        <button onClick={sendBackward} className="p-2 bg-gray-500 text-white">Page Down</button>
+        <button onClick={saveTemplate} className="p-2 bg-green-500 text-white">Save</button>
+        <button onClick={exportImage} className="p-2 bg-orange-500 text-white">Export</button>
         <input type="color" value={fillColor} onChange={applyFillColor} className="p-1 border" />
-        <label className="ml-2">X:
+        <label className="ml-2 text-sm">X:
           <input
             type="number"
             value={posX}
@@ -240,7 +276,7 @@ const CanvasEditor = () => {
             className="ml-1 w-16 border p-1"
           />
         </label>
-        <label className="ml-2">Y:
+        <label className="ml-2 text-sm">Y:
           <input
             type="number"
             value={posY}
@@ -255,7 +291,7 @@ const CanvasEditor = () => {
       >
         <canvas
           ref={canvasRef}
-          className="border"
+          className="border w-full"
           width={800}
           height={500}
         />

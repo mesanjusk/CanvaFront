@@ -1,11 +1,16 @@
 import React from 'react';
 import CanvasEditor from './components/CanvasEditor';
+import Header from './components/Header';
+import Footer from './components/Footer';
 
 function App() {
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-center mt-4">Mini Canva Editor</h1>
-      <CanvasEditor />
+    <div className="pt-16 pb-10 min-h-screen flex flex-col">
+      <Header />
+      <main className="flex-1 p-4">
+        <CanvasEditor />
+      </main>
+      <Footer />
     </div>
   );
 }

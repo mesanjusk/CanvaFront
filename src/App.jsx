@@ -5,9 +5,10 @@ import Footer from './components/Footer';
 
 function App() {
   return (
-    <div className="pt-16 pb-10 min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-gray-50">
       <Header />
-      <main className="flex-1 p-4">
+      {/* Padding matches Header (h-14) and Footer (h-10) */}
+      <main className="flex-1 pt-14 pb-10 px-2 py-2 md:px-4 md:py-6 w-full max-w-full overflow-auto">
         <CanvasEditor />
       </main>
       <Footer />

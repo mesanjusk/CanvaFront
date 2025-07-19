@@ -28,11 +28,6 @@ const AddCategory = () => {
   const [editPreviewImage, setEditPreviewImage] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
-  useEffect(() => {
-    const user = location.state?.id || localStorage.getItem('User_name');
-    if (!user) navigate('/login');
-    fetchCategories();
-  }, []);
 
  const fetchCategories = async () => {
   try {

@@ -23,17 +23,6 @@ const AddSubcategory = () => {
   const [editImage, setEditImage] = useState(null);
   const [editIsLoading, setEditIsLoading] = useState(false);
 
-  useEffect(() => {
-    const userNameFromState = location.state?.id;
-    const user = userNameFromState || localStorage.getItem('User_name');
-    setLoggedInUser(user);
-    if (user) {
-      fetchCategories();
-      fetchSubcategories();
-    } else {
-      navigate("/login");
-    }
-  }, [navigate]);
 
   const fetchCategories = () => {
     axios

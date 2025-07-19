@@ -29,14 +29,6 @@ const [existingImageURLs, setExistingImageURLs] = useState([]);
   const safeExtract = (res) => Array.isArray(res) ? res : res?.result || [];
 
   useEffect(() => {
-    const userNameFromState = location.state?.id;
-    const user = userNameFromState || localStorage.getItem('User_name');
-    if (user) setLoggedInUser(user);
-    else navigate('/login');
-    setTimeout(() => setLoading(false), 2000);
-  }, [location.state, navigate]);
-
-  useEffect(() => {
     const fetchDropdowns = async () => {
       try {
         const [categoryRes, subcategoryRes, templateRes] = await Promise.all([

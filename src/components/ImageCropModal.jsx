@@ -1,11 +1,6 @@
 import React, { useState, useCallback } from "react";
 import Cropper from "react-easy-crop";
 
-/**
- * Helper to get the cropped image as Data URL
- * src: image source url,
- * croppedAreaPixels: { x, y, width, height }
- */
 function getCroppedImg(src, croppedAreaPixels) {
   return new Promise((resolve, reject) => {
     const image = new window.Image();
@@ -28,13 +23,12 @@ function getCroppedImg(src, croppedAreaPixels) {
         croppedAreaPixels.width,
         croppedAreaPixels.height
       );
+
       canvas.toBlob((blob) => {
         if (!blob) {
           reject(new Error("Canvas is empty"));
           return;
         }
-        const url = URL.createObjectURL(blob);
-        // If you want DataURL instead:
         const reader = new FileReader();
         reader.readAsDataURL(blob);
         reader.onloadend = () => resolve(reader.result);
@@ -44,13 +38,22 @@ function getCroppedImg(src, croppedAreaPixels) {
   });
 }
 
+const aspectOptions = {
+  Free: undefined, // Must be undefined, not null
+  "1:1": 1 / 1,
+  "4:3": 4 / 3,
+  "16:9": 16 / 9,
+  "3:4": 3 / 4,
+};
+
 const ImageCropModal = ({ src, onCancel, onConfirm }) => {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
+  const [aspect, setAspect] = useState(undefined); // undefined for free crop
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
 
-  const onCropComplete = useCallback((croppedArea, croppedAreaPixels) => {
-    setCroppedAreaPixels(croppedAreaPixels);
+  const onCropComplete = useCallback((_, croppedPixels) => {
+    setCroppedAreaPixels(croppedPixels);
   }, []);
 
   const handleConfirm = async () => {
@@ -58,7 +61,7 @@ const ImageCropModal = ({ src, onCancel, onConfirm }) => {
       const croppedImgUrl = await getCroppedImg(src, croppedAreaPixels);
       onConfirm(croppedImgUrl);
     } catch (e) {
-      alert("Crop failed");
+      alert("Crop failed: " + e.message);
     }
   };
 
@@ -66,22 +69,39 @@ const ImageCropModal = ({ src, onCancel, onConfirm }) => {
     <div className="fixed inset-0 z-50 bg-black bg-opacity-40 flex items-center justify-center">
       <div className="bg-white rounded-lg shadow p-6 flex flex-col items-center max-w-lg w-full">
         <h2 className="mb-2 font-semibold">Crop Image</h2>
-        <div
-          className="relative bg-black"
-          style={{ width: 350, height: 350 }}
-        >
+
+        <div className="mb-2">
+          <label className="text-sm mr-2">Aspect Ratio:</label>
+          <select
+            value={aspect ?? "Free"}
+            onChange={(e) => {
+              const selected = e.target.value;
+              setAspect(selected === "Free" ? undefined : Number(selected));
+            }}
+            className="border rounded px-2 py-1"
+          >
+            {Object.entries(aspectOptions).map(([label, value]) => (
+              <option key={label} value={value ?? "Free"}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="relative bg-black" style={{ width: 350, height: 350 }}>
           <Cropper
             image={src}
             crop={crop}
             zoom={zoom}
-            aspect={1}
-            showGrid={false}
+            aspect={aspect} // now supports free crop with `undefined`
             cropShape="rect"
+            showGrid={false}
             onCropChange={setCrop}
             onZoomChange={setZoom}
             onCropComplete={onCropComplete}
           />
         </div>
+
         <div className="flex gap-4 mt-4 items-center">
           <label>
             Zoom:
@@ -102,6 +122,7 @@ const ImageCropModal = ({ src, onCancel, onConfirm }) => {
             Cancel
           </button>
         </div>
+
         <style>{`
           .btn {
             background: #1e293b;

@@ -1,5 +1,9 @@
 import React from "react";
+import { Routes, Route, Navigate } from 'react-router-dom';
 import CanvasEditor from "./components/CanvasEditor";
+import AddTemplate from "./pages/addTemplate";
+import AddCategory from "./pages/addCategory";
+import AddSubcategory from "./pages/addSubcategory";
 
 function App() {
   return (
@@ -8,7 +12,14 @@ function App() {
         Framee
       </header>
       <main className="flex-1 bg-gray-100">
-        <CanvasEditor />
+       
+       <Routes>
+            <Route path="/" element={<CanvasEditor />} />
+            <Route path="/addTemplate" element={<AddTemplate />} />
+            <Route path="/addCategory" element={<AddCategory />} />
+            <Route path="/addSubcategory" element={<AddSubcategory />} />
+        
+          </Routes>
       </main>
     </div>
   );

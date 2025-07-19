@@ -1,30 +1,26 @@
-import React, { useEffect, useRef } from 'react';
-import { fabric } from 'fabric';
+import React, { useEffect, forwardRef } from "react";
+import { fabric } from "fabric";
 
-const CanvasArea = React.forwardRef(({ width, height }, ref) => {
-  const canvasRef = useRef(null);
-
+const CanvasArea = forwardRef(({ width, height }, ref) => {
   useEffect(() => {
-    const canvas = new fabric.Canvas(canvasRef.current, {
-      width,
-      height,
-      backgroundColor: '#fff',
-    });
-    if (ref) ref.current = canvas;
-    return () => canvas.dispose();
-  }, []);
-
-  useEffect(() => {
-    if (ref?.current) {
+    // Only init once
+    if (!ref.current) {
+      const canvas = new fabric.Canvas("fabric-canvas", {
+        backgroundColor: "#fff",
+        width,
+        height,
+        preserveObjectStacking: true,
+      });
+      ref.current = canvas;
+    } else {
       ref.current.setWidth(width);
       ref.current.setHeight(height);
-      ref.current.renderAll();
     }
-  }, [width, height, ref]);
+  }, [ref, width, height]);
 
   return (
-    <div className="flex-1 flex items-center justify-center bg-gray-50">
-      <canvas ref={canvasRef} width={width} height={height} className="border rounded" />
+    <div className="flex-1 flex items-center justify-center bg-gray-200">
+      <canvas id="fabric-canvas" />
     </div>
   );
 });

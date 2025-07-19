@@ -22,7 +22,10 @@ import {
   Square,
   Circle,
   Image as ImageIcon,
-  Settings
+  Settings,
+  Lock,
+  Unlock,
+  Maximize2,
 } from "lucide-react";
 
 import TextEditToolbar from "./TextEditToolbar";
@@ -58,6 +61,7 @@ const CanvasEditor = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [activeObj, setActiveObj] = useState(null);
   const [canvas, setCanvas] = useState(null);
+  const [lockedObjects, setLockedObjects] = useState(new Set());
 
   useEffect(() => {
     if (canvasRef.current) {
@@ -77,6 +81,11 @@ const CanvasEditor = () => {
   const handleDelete = () => {
     if (canvas && activeObj) {
       canvas.remove(activeObj);
+      setLockedObjects((prev) => {
+        const updated = new Set(prev);
+        updated.delete(activeObj);
+        return updated;
+      });
       canvas.discardActiveObject();
       setActiveObj(null);
       canvas.requestRenderAll();
@@ -85,23 +94,57 @@ const CanvasEditor = () => {
 
   const handleReset = () => {
     if (canvas) {
-      canvas.getObjects().forEach(obj => canvas.remove(obj));
+      canvas.getObjects().forEach((obj) => canvas.remove(obj));
+      setLockedObjects(new Set());
       canvas.discardActiveObject();
       setActiveObj(null);
       canvas.requestRenderAll();
     }
   };
 
+  const toggleLock = (obj) => {
+    if (!obj || !canvas) return;
+    const isLocked = lockedObjects.has(obj);
+
+    obj.set({
+      selectable: !isLocked,
+      evented: !isLocked,
+      hasControls: !isLocked,
+      lockMovementX: isLocked ? false : true,
+      lockMovementY: isLocked ? false : true,
+      editable: obj.type === "i-text" ? !isLocked : undefined,
+    });
+
+    const updatedSet = new Set(lockedObjects);
+    isLocked ? updatedSet.delete(obj) : updatedSet.add(obj);
+    setLockedObjects(updatedSet);
+
+    canvas.discardActiveObject();
+    canvas.requestRenderAll();
+  };
+
+  const fitCanvasToObject = () => {
+    if (canvas && activeObj) {
+      const bounds = activeObj.getBoundingRect();
+      setCanvasWidth(bounds.width + 100);
+      setCanvasHeight(bounds.height + 100);
+      canvas.setWidth(bounds.width + 100);
+      canvas.setHeight(bounds.height + 100);
+      canvas.centerObject(activeObj);
+      canvas.requestRenderAll();
+    }
+  };
+
+  const isLocked = activeObj && lockedObjects.has(activeObj);
+
   return (
     <div className="min-h-screen w-full bg-gray-100 flex flex-col">
-      {/* Top Toolbar Row */}
+      {/* Top Toolbar */}
       <div className="w-full flex justify-between items-center px-4 py-2 bg-white border-b shadow z-20">
-        <div className="flex gap-2 items-center">
-          <button title="Add Text" onClick={addText} className="p-2 rounded bg-white shadow hover:bg-blue-100"><Type size={20} /></button>
-          <button title="Add Rectangle" onClick={addRect} className="p-2 rounded bg-white shadow hover:bg-blue-100"><Square size={20} /></button>
-          <button title="Add Circle" onClick={addCircle} className="p-2 rounded bg-white shadow hover:bg-blue-100"><Circle size={20} /></button>
-
-          {/* Upload Image: hidden input + trigger label */}
+        <div className="flex gap-2 items-center overflow-x-auto">
+          <button title="Add Text" onClick={addText} className="p-2 rounded bg-white shadow hover:bg-blue-100"><Type size={28} /></button>
+          <button title="Add Rectangle" onClick={addRect} className="p-2 rounded bg-white shadow hover:bg-blue-100"><Square size={28} /></button>
+          <button title="Add Circle" onClick={addCircle} className="p-2 rounded bg-white shadow hover:bg-blue-100"><Circle size={28} /></button>
           <input
             type="file"
             accept="image/*"
@@ -112,48 +155,55 @@ const CanvasEditor = () => {
               if (file) {
                 const reader = new FileReader();
                 reader.onload = () => {
-                  addImage(reader.result); // ✅ now works with updated hook
+                  addImage(reader.result);
                 };
                 reader.readAsDataURL(file);
               }
             }}
           />
-
           <label htmlFor="upload-image" className="p-2 rounded bg-white shadow hover:bg-blue-100 cursor-pointer" title="Upload Image">
-            <ImageIcon size={20} />
+            <ImageIcon size={28} />
           </label>
         </div>
 
-        <div>
-          <button title="Download" onClick={download} className="p-3 rounded-full bg-green-600 text-white shadow hover:bg-green-700">
-            <Download size={20} />
-          </button>
+        <div className="flex gap-2 items-center">
+          <button title="Reset Canvas" onClick={handleReset} className="p-2 rounded-full bg-yellow-500 text-white shadow hover:bg-yellow-600"><RefreshCw size={22} /></button>
+          <button title="Download" onClick={download} className="p-2 rounded-full bg-green-600 text-white shadow hover:bg-green-700"><Download size={22} /></button>
         </div>
       </div>
 
-      {/* Canvas Area */}
-      <div className="flex-1 flex items-center justify-center bg-gray-50 relative">
-        <CanvasArea ref={canvasRef} width={canvasWidth} height={canvasHeight} />
+      {/* Canvas Area (Mobile Fit + Padding + Scroll) */}
+      <div className="flex-1 overflow-auto bg-gray-50 p-4">
+        <div className="mx-auto w-max max-w-full">
+          <CanvasArea ref={canvasRef} width={canvasWidth} height={canvasHeight} />
+        </div>
       </div>
 
-      {/* Bottom Toolbar */}
-      <div className="fixed bottom-0 w-full bg-white border-t shadow z-30 px-4 py-2 flex justify-center gap-4 flex-wrap">
-        <button onClick={alignLeft} title="Align Left"><AlignLeft /></button>
-        <button onClick={alignCenter} title="Align Center"><AlignCenter /></button>
-        <button onClick={alignRight} title="Align Right"><AlignRight /></button>
-        <button onClick={alignTop} title="Align Top"><AlignStartVertical /></button>
-        <button onClick={alignMiddle} title="Align Middle"><AlignVerticalSpaceAround /></button>
-        <button onClick={alignBottom} title="Align Bottom"><AlignEndVertical /></button>
-        <button onClick={bringToFront} title="Bring to Front"><ArrowUpFromLine /></button>
-        <button onClick={sendToBack} title="Send to Back"><ArrowDownToLine /></button>
-        <button onClick={cropImage} title="Crop Image"><Crop /></button>
-        <button onClick={handleDelete} title="Delete" disabled={!activeObj}><Trash2 /></button>
-        <button onClick={handleReset} title="Reset"><RefreshCw /></button>
-        <button onClick={() => setShowSettings(true)} title="Settings"><Settings /></button>
+      {/* Bottom Toolbar - Scrollable */}
+      <div className="fixed bottom-0 w-full bg-white border-t shadow z-30 px-2 py-2 overflow-x-auto scrollbar-thin flex justify-start items-center gap-3">
+        <button onClick={alignLeft} title="Align Left"><AlignLeft size={22} /></button>
+        <button onClick={alignCenter} title="Align Center"><AlignCenter size={22} /></button>
+        <button onClick={alignRight} title="Align Right"><AlignRight size={22} /></button>
+        <button onClick={alignTop} title="Align Top"><AlignStartVertical size={22} /></button>
+        <button onClick={alignMiddle} title="Align Middle"><AlignVerticalSpaceAround size={22} /></button>
+        <button onClick={alignBottom} title="Align Bottom"><AlignEndVertical size={22} /></button>
+        <button onClick={bringToFront} title="Bring to Front"><ArrowUpFromLine size={22} /></button>
+        <button onClick={sendToBack} title="Send to Back"><ArrowDownToLine size={22} /></button>
+        {activeObj && (
+          <>
+            <button onClick={cropImage} title="Crop Image"><Crop size={22} /></button>
+            <button onClick={handleDelete} title="Delete"><Trash2 size={22} /></button>
+            <button onClick={() => toggleLock(activeObj)} title={isLocked ? "Unlock" : "Lock"}>
+              {isLocked ? <Unlock size={22} /> : <Lock size={22} />}
+            </button>
+            <button onClick={() => setShowSettings(true)} title="Settings"><Settings size={22} /></button>
+            <button onClick={fitCanvasToObject} title="Fit Canvas to Object"><Maximize2 size={22} /></button>
+          </>
+        )}
       </div>
 
-      {/* Edit Toolbars */}
-      {activeObj && activeObj.type === "i-text" && (
+      {/* Text/Shape Toolbar */}
+      {activeObj?.type === "i-text" && (
         <div className="fixed bottom-20 left-1/2 -translate-x-1/2 w-full max-w-5xl z-50">
           <TextEditToolbar
             obj={activeObj}
@@ -195,7 +245,7 @@ const CanvasEditor = () => {
         />
       )}
 
-      {/* Mobile Settings Drawer */}
+      {/* Settings Panel */}
       <Drawer isOpen={showSettings} onClose={() => setShowSettings(false)}>
         <RightPanel
           fillColor={fillColor}

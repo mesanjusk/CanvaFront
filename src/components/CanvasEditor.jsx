@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useState } from "react";
 import { useCanvasTools } from "../hooks/useCanvasTools";
 import Toolbar from "./Toolbar";
 import CanvasArea from "./CanvasArea";
 import RightPanel from "./RightPanel";
 import ImageCropModal from "./ImageCropModal";
+import Drawer from "./Drawer"; // <-- Make sure you have this component
 
 const CanvasEditor = () => {
   const {
@@ -32,24 +33,28 @@ const CanvasEditor = () => {
     alignBottom,
   } = useCanvasTools({ width: 500, height: 500 });
 
+  const [showSettings, setShowSettings] = useState(false);
+
   return (
     <div className="flex flex-col h-full pb-20 md:pb-0">
       <div className="flex flex-1 overflow-hidden">
         <CanvasArea ref={canvasRef} width={canvasWidth} height={canvasHeight} />
-        <RightPanel
-          fillColor={fillColor}
-          setFillColor={setFillColor}
-          fontSize={fontSize}
-          setFontSize={setFontSize}
-          strokeColor={strokeColor}
-          setStrokeColor={setStrokeColor}
-          strokeWidth={strokeWidth}
-          setStrokeWidth={setStrokeWidth}
-          canvasWidth={canvasWidth}
-          setCanvasWidth={setCanvasWidth}
-          canvasHeight={canvasHeight}
-          setCanvasHeight={setCanvasHeight}
-        />
+        <div className="hidden md:block">
+          <RightPanel
+            fillColor={fillColor}
+            setFillColor={setFillColor}
+            fontSize={fontSize}
+            setFontSize={setFontSize}
+            strokeColor={strokeColor}
+            setStrokeColor={setStrokeColor}
+            strokeWidth={strokeWidth}
+            setStrokeWidth={setStrokeWidth}
+            canvasWidth={canvasWidth}
+            setCanvasWidth={setCanvasWidth}
+            canvasHeight={canvasHeight}
+            setCanvasHeight={setCanvasHeight}
+          />
+        </div>
       </div>
       <Toolbar
         onAddText={addText}
@@ -66,6 +71,7 @@ const CanvasEditor = () => {
         onAlignTop={alignTop}
         onAlignMiddle={alignMiddle}
         onAlignBottom={alignBottom}
+        onOpenSettings={() => setShowSettings(true)}
       />
       {cropSrc && (
         <ImageCropModal
@@ -81,6 +87,22 @@ const CanvasEditor = () => {
           }}
         />
       )}
+      <Drawer isOpen={showSettings} onClose={() => setShowSettings(false)}>
+        <RightPanel
+          fillColor={fillColor}
+          setFillColor={setFillColor}
+          fontSize={fontSize}
+          setFontSize={setFontSize}
+          strokeColor={strokeColor}
+          setStrokeColor={setStrokeColor}
+          strokeWidth={strokeWidth}
+          setStrokeWidth={setStrokeWidth}
+          canvasWidth={canvasWidth}
+          setCanvasWidth={setCanvasWidth}
+          canvasHeight={canvasHeight}
+          setCanvasHeight={setCanvasHeight}
+        />
+      </Drawer>
     </div>
   );
 };

@@ -15,6 +15,7 @@ const Toolbar = ({
   onAlignTop,
   onAlignMiddle,
   onAlignBottom,
+   onOpenSettings,
 }) => (
   <div className="fixed bottom-0 left-0 w-full bg-white shadow-md py-2 flex flex-wrap gap-2 justify-center z-50">
     <button onClick={onAddText} className="btn">Text</button>
@@ -34,6 +35,7 @@ const Toolbar = ({
     <button onClick={onAlignTop} className="btn">Align Top</button>
     <button onClick={onAlignMiddle} className="btn">Align Middle</button>
     <button onClick={onAlignBottom} className="btn">Align Bottom</button>
+     <button onClick={onOpenSettings} className="btn md:hidden">Properties</button>
     <style>{`
       .btn {
         background: #1e293b;

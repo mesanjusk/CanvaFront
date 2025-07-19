@@ -1,18 +1,19 @@
-import React, { useEffect, forwardRef } from "react";
+import React, { useEffect, useRef, forwardRef } from "react";
 import { fabric } from "fabric";
 
 const CanvasArea = forwardRef(({ width, height }, ref) => {
+  const canvasEl = useRef(null); // DOM reference to <canvas>
+
   useEffect(() => {
-    // Only init once
-    if (!ref.current) {
-      const canvas = new fabric.Canvas("fabric-canvas", {
+    if (canvasEl.current && !ref.current) {
+      const canvas = new fabric.Canvas(canvasEl.current, {
         backgroundColor: "#fff",
         width,
         height,
         preserveObjectStacking: true,
       });
       ref.current = canvas;
-    } else {
+    } else if (ref.current) {
       ref.current.setWidth(width);
       ref.current.setHeight(height);
     }
@@ -20,7 +21,7 @@ const CanvasArea = forwardRef(({ width, height }, ref) => {
 
   return (
     <div className="flex-1 flex items-center justify-center bg-gray-200">
-      <canvas id="fabric-canvas" />
+      <canvas ref={canvasEl} />
     </div>
   );
 });

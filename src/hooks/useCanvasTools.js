@@ -12,7 +12,6 @@ export function useCanvasTools({ width, height }) {
   const [cropSrc, setCropSrc] = useState(null);
   const cropCallbackRef = useRef(null);
 
-  // Handlers
   const addText = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -24,7 +23,8 @@ export function useCanvasTools({ width, height }) {
       strokeWidth,
       fontSize,
     });
-    canvas.add(text);
+    canvas.add(text).setActiveObject(text);
+    canvas.requestRenderAll();
   };
 
   const addRect = () => {
@@ -39,7 +39,8 @@ export function useCanvasTools({ width, height }) {
       stroke: strokeColor,
       strokeWidth,
     });
-    canvas.add(rect);
+    canvas.add(rect).setActiveObject(rect);
+    canvas.requestRenderAll();
   };
 
   const addCircle = () => {
@@ -53,39 +54,47 @@ export function useCanvasTools({ width, height }) {
       stroke: strokeColor,
       strokeWidth,
     });
-    canvas.add(circle);
+    canvas.add(circle).setActiveObject(circle);
+    canvas.requestRenderAll();
   };
 
-  const addImage = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (f) => {
-      cropCallbackRef.current = handleCroppedImage;
-      setCropSrc(f.target.result);
-    };
-    reader.readAsDataURL(file);
+  const addImage = (url) => {
+    const canvas = canvasRef.current;
+    if (!canvas || !url) return;
+
+    fabric.Image.fromURL(
+      url,
+      (img) => {
+        const maxWidth = 300;
+        const scale = Math.min(1, maxWidth / img.width);
+        img.set({
+          left: canvas.width / 2 - (img.width * scale) / 2,
+          top: canvas.height / 2 - (img.height * scale) / 2,
+          scaleX: scale,
+          scaleY: scale,
+          selectable: true,
+        });
+        canvas.add(img);
+        canvas.setActiveObject(img);
+        canvas.requestRenderAll();
+      },
+      { crossOrigin: "anonymous" }
+    );
   };
 
   const handleCroppedImage = (dataUrl) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    fabric.Image.fromURL(dataUrl, (img) => {
-      canvas.add(img);
-    });
+    addImage(dataUrl);
   };
 
   const bringToFront = () => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    const obj = canvas.getActiveObject();
+    const obj = canvas?.getActiveObject();
     if (obj) canvas.bringToFront(obj);
   };
 
   const sendToBack = () => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    const obj = canvas.getActiveObject();
+    const obj = canvas?.getActiveObject();
     if (obj) canvas.sendToBack(obj);
   };
 
@@ -100,8 +109,7 @@ export function useCanvasTools({ width, height }) {
 
   const cropImage = () => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    const obj = canvas.getActiveObject();
+    const obj = canvas?.getActiveObject();
     if (obj && obj.type === "image") {
       cropCallbackRef.current = (dataUrl) => {
         const { left, top } = obj;
@@ -110,70 +118,79 @@ export function useCanvasTools({ width, height }) {
           img.set({ left, top });
           canvas.add(img);
           canvas.setActiveObject(img);
+          canvas.requestRenderAll();
         });
       };
       setCropSrc(obj._element.src);
     }
   };
 
-  const alignLeft = () => {
+  // 🔁 Align Helpers — works with single or multiple selections
+  const getSelectedObjects = () => {
     const canvas = canvasRef.current;
     const obj = canvas?.getActiveObject();
-    if (obj) {
+    if (!obj) return [];
+    return obj.type === "activeSelection" ? obj._objects : [obj];
+  };
+
+  const alignLeft = () => {
+    const canvas = canvasRef.current;
+    const objects = getSelectedObjects();
+    objects.forEach((obj) => {
       obj.set({ left: 0 });
       obj.setCoords();
-      canvas.requestRenderAll();
-    }
+    });
+    canvas.requestRenderAll();
   };
 
   const alignCenter = () => {
     const canvas = canvasRef.current;
-    const obj = canvas?.getActiveObject();
-    if (obj) {
+    const objects = getSelectedObjects();
+    objects.forEach((obj) => {
       obj.set({ left: (canvasWidth - obj.getScaledWidth()) / 2 });
       obj.setCoords();
-      canvas.requestRenderAll();
-    }
+    });
+    canvas.requestRenderAll();
   };
 
   const alignRight = () => {
     const canvas = canvasRef.current;
-    const obj = canvas?.getActiveObject();
-    if (obj) {
+    const objects = getSelectedObjects();
+    objects.forEach((obj) => {
       obj.set({ left: canvasWidth - obj.getScaledWidth() });
       obj.setCoords();
-      canvas.requestRenderAll();
-    }
+    });
+    canvas.requestRenderAll();
   };
 
   const alignTop = () => {
     const canvas = canvasRef.current;
-    const obj = canvas?.getActiveObject();
-    if (obj) {
+    const objects = getSelectedObjects();
+    objects.forEach((obj) => {
       obj.set({ top: 0 });
       obj.setCoords();
-      canvas.requestRenderAll();
-    }
+    });
+    canvas.requestRenderAll();
   };
 
   const alignMiddle = () => {
     const canvas = canvasRef.current;
-    const obj = canvas?.getActiveObject();
-    if (obj) {
+    const objects = getSelectedObjects();
+    objects.forEach((obj) => {
       obj.set({ top: (canvasHeight - obj.getScaledHeight()) / 2 });
       obj.setCoords();
-      canvas.requestRenderAll();
-    }
+    });
+    canvas.requestRenderAll();
   };
 
   const alignBottom = () => {
     const canvas = canvasRef.current;
-    const obj = canvas?.getActiveObject();
-    if (obj) {
+    const objects = getSelectedObjects();
+    objects.forEach((obj) => {
       obj.set({ top: canvasHeight - obj.getScaledHeight() });
       obj.setCoords();
-      canvas.requestRenderAll();
-    }
+    });
+    canvas.requestRenderAll();
   };
 
   return {

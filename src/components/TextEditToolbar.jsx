@@ -3,16 +3,16 @@ import {
   Bold,
   Italic,
   Underline,
-  Type,
   X,
 } from "lucide-react";
 
-// Helper: safely update fabric text props and trigger canvas render
+// Update object in canvas and re-render
 const updateObj = (obj, canvas, props) => {
   obj.set(props);
   canvas.requestRenderAll();
 };
 
+// Fonts (including Hindi)
 const fonts = [
   "Arial",
   "Times New Roman",
@@ -21,6 +21,11 @@ const fonts = [
   "Comic Sans MS",
   "Impact",
   "Verdana",
+  "Kalam",
+  "Baloo 2",
+  "Hind",
+  "Noto Sans Devanagari",
+  "Tiro Devanagari Hindi",
 ];
 
 const TextEditToolbar = ({ obj, canvas, fillColor, setFillColor, fontSize, setFontSize }) => {
@@ -33,10 +38,10 @@ const TextEditToolbar = ({ obj, canvas, fillColor, setFillColor, fontSize, setFo
   }, [obj]);
 
   return (
-    <div className="w-full px-3 py-2 border-t bg-white flex flex-wrap gap-2 items-center">
+    <div className="px-4 py-3 bg-white shadow-md rounded-md border flex flex-wrap gap-3 items-center justify-center">
       <input
         value={text}
-        onChange={e => {
+        onChange={(e) => {
           setText(e.target.value);
           updateObj(obj, canvas, { text: e.target.value });
         }}
@@ -45,14 +50,16 @@ const TextEditToolbar = ({ obj, canvas, fillColor, setFillColor, fontSize, setFo
       />
       <select
         value={font}
-        onChange={e => {
+        onChange={(e) => {
           setFont(e.target.value);
           updateObj(obj, canvas, { fontFamily: e.target.value });
         }}
         className="border rounded px-2 py-1"
       >
-        {fonts.map(f => (
-          <option key={f} value={f}>{f}</option>
+        {fonts.map((f) => (
+          <option key={f} value={f} style={{ fontFamily: f }}>
+            {f}
+          </option>
         ))}
       </select>
       <input
@@ -60,18 +67,21 @@ const TextEditToolbar = ({ obj, canvas, fillColor, setFillColor, fontSize, setFo
         min={8}
         max={100}
         value={obj.fontSize}
-        onChange={e => {
-          setFontSize(Number(e.target.value));
-          updateObj(obj, canvas, { fontSize: Number(e.target.value) });
+        onChange={(e) => {
+          const size = Number(e.target.value);
+          setFontSize(size);
+          updateObj(obj, canvas, { fontSize: size });
         }}
         className="border rounded px-2 py-1 w-16"
+        title="Font Size"
       />
       <input
         type="color"
         value={obj.fill}
-        onChange={e => {
-          setFillColor(e.target.value);
-          updateObj(obj, canvas, { fill: e.target.value });
+        onChange={(e) => {
+          const color = e.target.value;
+          setFillColor(color);
+          updateObj(obj, canvas, { fill: color });
         }}
         className="w-8 h-8 border-none"
         title="Text Color"
@@ -120,6 +130,7 @@ const TextEditToolbar = ({ obj, canvas, fillColor, setFillColor, fontSize, setFo
       >
         <X size={18} />
       </button>
+
       <style>{`
         .icon-btn {
           background: none;

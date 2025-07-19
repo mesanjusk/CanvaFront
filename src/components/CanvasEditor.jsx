@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 
 import TextEditToolbar from "./TextEditToolbar";
-import ShapeEditToolbar from "./ShapeEditToolbar"; // Optional for shape editing
+import ShapeEditToolbar from "./ShapeEditToolbar";
 
 const CanvasEditor = () => {
   const {
@@ -93,32 +93,46 @@ const CanvasEditor = () => {
   };
 
   return (
-    <div className="relative h-full w-full bg-gray-100">
-      {/* Left Toolbar */}
-      <div className="absolute top-20 left-4 z-20 flex flex-col gap-4">
-        <button title="Add Text" onClick={addText} className="p-2 rounded-full bg-white shadow hover:bg-blue-100">
-          <Type size={20} />
-        </button>
-        <button title="Add Rectangle" onClick={addRect} className="p-2 rounded-full bg-white shadow hover:bg-blue-100">
-          <Square size={20} />
-        </button>
-        <button title="Add Circle" onClick={addCircle} className="p-2 rounded-full bg-white shadow hover:bg-blue-100">
-          <Circle size={20} />
-        </button>
-        <button title="Add Image" onClick={addImage} className="p-2 rounded-full bg-white shadow hover:bg-blue-100">
-          <ImageIcon size={20} />
-        </button>
+    <div className="min-h-screen w-full bg-gray-100 flex flex-col">
+      {/* Top Toolbar Row */}
+      <div className="w-full flex justify-between items-center px-4 py-2 bg-white border-b shadow z-20">
+        <div className="flex gap-2 items-center">
+          <button title="Add Text" onClick={addText} className="p-2 rounded bg-white shadow hover:bg-blue-100"><Type size={20} /></button>
+          <button title="Add Rectangle" onClick={addRect} className="p-2 rounded bg-white shadow hover:bg-blue-100"><Square size={20} /></button>
+          <button title="Add Circle" onClick={addCircle} className="p-2 rounded bg-white shadow hover:bg-blue-100"><Circle size={20} /></button>
+
+          {/* Upload Image: hidden input + trigger label */}
+          <input
+            type="file"
+            accept="image/*"
+            id="upload-image"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              const file = e.target.files[0];
+              if (file) {
+                const reader = new FileReader();
+                reader.onload = () => {
+                  addImage(reader.result); // ✅ now works with updated hook
+                };
+                reader.readAsDataURL(file);
+              }
+            }}
+          />
+
+          <label htmlFor="upload-image" className="p-2 rounded bg-white shadow hover:bg-blue-100 cursor-pointer" title="Upload Image">
+            <ImageIcon size={20} />
+          </label>
+        </div>
+
+        <div>
+          <button title="Download" onClick={download} className="p-3 rounded-full bg-green-600 text-white shadow hover:bg-green-700">
+            <Download size={20} />
+          </button>
+        </div>
       </div>
 
-      {/* Right Toolbar (Download) */}
-      <div className="absolute top-20 right-4 z-20">
-        <button title="Download" onClick={download} className="p-3 rounded-full bg-green-600 text-white shadow hover:bg-green-700">
-          <Download size={24} />
-        </button>
-      </div>
-
-      {/* Main Canvas */}
-      <div className="flex items-center justify-center h-full">
+      {/* Canvas Area */}
+      <div className="flex-1 flex items-center justify-center bg-gray-50 relative">
         <CanvasArea ref={canvasRef} width={canvasWidth} height={canvasHeight} />
       </div>
 
@@ -140,15 +154,18 @@ const CanvasEditor = () => {
 
       {/* Edit Toolbars */}
       {activeObj && activeObj.type === "i-text" && (
-        <TextEditToolbar
-          obj={activeObj}
-          canvas={canvas}
-          fillColor={fillColor}
-          setFillColor={setFillColor}
-          fontSize={fontSize}
-          setFontSize={setFontSize}
-        />
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 w-full max-w-5xl z-50">
+          <TextEditToolbar
+            obj={activeObj}
+            canvas={canvas}
+            fillColor={fillColor}
+            setFillColor={setFillColor}
+            fontSize={fontSize}
+            setFontSize={setFontSize}
+          />
+        </div>
       )}
+
       {activeObj && ["rect", "circle", "image"].includes(activeObj.type) && (
         <ShapeEditToolbar
           obj={activeObj}

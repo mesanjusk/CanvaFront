@@ -1,3 +1,4 @@
+// [Imports unchanged]
 import React, { useState, useEffect } from "react";
 import { useCanvasTools } from "../hooks/useCanvasTools";
 import CanvasArea from "./CanvasArea";
@@ -56,7 +57,7 @@ const CanvasEditor = () => {
     alignTop,
     alignMiddle,
     alignBottom,
-  } = useCanvasTools({ width: 500, height: 500 });
+  } = useCanvasTools({ width: 400, height: 550 });
 
   const [showSettings, setShowSettings] = useState(false);
   const [activeObj, setActiveObj] = useState(null);
@@ -155,12 +156,16 @@ const CanvasEditor = () => {
               if (file) {
                 const reader = new FileReader();
                 reader.onload = () => {
-                  addImage(reader.result);
+                  setCropSrc(reader.result); // open crop modal
+                  cropCallbackRef.current = (croppedUrl) => {
+                    addImage(croppedUrl); // after crop, add to canvas
+                  };
                 };
                 reader.readAsDataURL(file);
               }
             }}
           />
+
           <label htmlFor="upload-image" className="p-2 rounded bg-white shadow hover:bg-blue-100 cursor-pointer" title="Upload Image">
             <ImageIcon size={28} />
           </label>
@@ -172,39 +177,42 @@ const CanvasEditor = () => {
         </div>
       </div>
 
-      {/* Canvas Area (Mobile Fit + Padding + Scroll) */}
+      {/* Canvas Area */}
       <div className="flex-1 overflow-auto bg-gray-50 p-4">
         <div className="mx-auto w-max max-w-full">
           <CanvasArea ref={canvasRef} width={canvasWidth} height={canvasHeight} />
         </div>
       </div>
 
-      {/* Bottom Toolbar - Scrollable */}
-      <div className="fixed bottom-0 w-full bg-white border-t shadow z-30 px-2 py-2 overflow-x-auto scrollbar-thin flex justify-start items-center gap-3">
-        <button onClick={alignLeft} title="Align Left"><AlignLeft size={22} /></button>
-        <button onClick={alignCenter} title="Align Center"><AlignCenter size={22} /></button>
-        <button onClick={alignRight} title="Align Right"><AlignRight size={22} /></button>
-        <button onClick={alignTop} title="Align Top"><AlignStartVertical size={22} /></button>
-        <button onClick={alignMiddle} title="Align Middle"><AlignVerticalSpaceAround size={22} /></button>
-        <button onClick={alignBottom} title="Align Bottom"><AlignEndVertical size={22} /></button>
-        <button onClick={bringToFront} title="Bring to Front"><ArrowUpFromLine size={22} /></button>
-        <button onClick={sendToBack} title="Send to Back"><ArrowDownToLine size={22} /></button>
-        {activeObj && (
-          <>
-            <button onClick={cropImage} title="Crop Image"><Crop size={22} /></button>
-            <button onClick={handleDelete} title="Delete"><Trash2 size={22} /></button>
-            <button onClick={() => toggleLock(activeObj)} title={isLocked ? "Unlock" : "Lock"}>
-              {isLocked ? <Unlock size={22} /> : <Lock size={22} />}
-            </button>
-            <button onClick={() => setShowSettings(true)} title="Settings"><Settings size={22} /></button>
-            <button onClick={fitCanvasToObject} title="Fit Canvas to Object"><Maximize2 size={22} /></button>
-          </>
-        )}
+      {/* Floating Object Toolbar */}
+      {activeObj && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-white shadow-lg rounded px-3 py-2 flex gap-3 items-center">
+          <button onClick={cropImage} title="Crop"><Crop size={24} /></button>
+          <button onClick={handleDelete} title="Delete"><Trash2 size={24} /></button>
+          <button onClick={() => toggleLock(activeObj)} title={isLocked ? "Unlock" : "Lock"}>
+            {isLocked ? <Unlock size={24} /> : <Lock size={24} />}
+          </button>
+          <button onClick={() => setShowSettings(true)} title="Settings"><Settings size={24} /></button>
+          <button onClick={fitCanvasToObject} title="Fit Canvas"><Maximize2 size={24} /></button>
+        </div>
+      )}
+
+
+      {/* Bottom Toolbar */}
+      <div className="fixed bottom-0 w-full bg-white border-t shadow z-30 px-2 py-2 overflow-x-auto scrollbar-thin flex justify-start items-center gap-4">
+        <button onClick={alignLeft} title="Align Left"><AlignLeft size={28} /></button>
+        <button onClick={alignCenter} title="Align Center"><AlignCenter size={28} /></button>
+        <button onClick={alignRight} title="Align Right"><AlignRight size={28} /></button>
+        <button onClick={alignTop} title="Align Top"><AlignStartVertical size={28} /></button>
+        <button onClick={alignMiddle} title="Align Middle"><AlignVerticalSpaceAround size={28} /></button>
+        <button onClick={alignBottom} title="Align Bottom"><AlignEndVertical size={28} /></button>
+        <button onClick={bringToFront} title="Bring to Front"><ArrowUpFromLine size={28} /></button>
+        <button onClick={sendToBack} title="Send to Back"><ArrowDownToLine size={28} /></button>
       </div>
 
-      {/* Text/Shape Toolbar */}
+      {/* Toolbars */}
       {activeObj?.type === "i-text" && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 w-full max-w-5xl z-50">
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 w-full max-w-5xl z-50">
           <TextEditToolbar
             obj={activeObj}
             canvas={canvas}
@@ -245,7 +253,7 @@ const CanvasEditor = () => {
         />
       )}
 
-      {/* Settings Panel */}
+      {/* Settings Drawer */}
       <Drawer isOpen={showSettings} onClose={() => setShowSettings(false)}>
         <RightPanel
           fillColor={fillColor}

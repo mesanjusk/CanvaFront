@@ -1,12 +1,32 @@
 import React, { useState, useEffect } from "react";
 import { useCanvasTools } from "../hooks/useCanvasTools";
-import Toolbar from "./Toolbar";
 import CanvasArea from "./CanvasArea";
 import RightPanel from "./RightPanel";
 import ImageCropModal from "./ImageCropModal";
 import Drawer from "./Drawer";
-import { Trash2, RefreshCw } from "lucide-react";
+
+import {
+  Trash2,
+  RefreshCw,
+  Download,
+  Crop,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignStartVertical,
+  AlignEndVertical,
+  AlignVerticalSpaceAround,
+  Type,
+  Square,
+  Circle,
+  Image as ImageIcon,
+  Settings
+} from "lucide-react";
+
 import TextEditToolbar from "./TextEditToolbar";
+import ShapeEditToolbar from "./ShapeEditToolbar"; // Optional for shape editing
 
 const CanvasEditor = () => {
   const {
@@ -39,15 +59,10 @@ const CanvasEditor = () => {
   const [activeObj, setActiveObj] = useState(null);
   const [canvas, setCanvas] = useState(null);
 
-  // Get the fabric canvas instance
   useEffect(() => {
     if (canvasRef.current) {
       setCanvas(canvasRef.current);
-
-      // Listen for object selection changes
-      const handler = () => {
-        setActiveObj(canvasRef.current.getActiveObject());
-      };
+      const handler = () => setActiveObj(canvasRef.current.getActiveObject());
       canvasRef.current.on("selection:created", handler);
       canvasRef.current.on("selection:updated", handler);
       canvasRef.current.on("selection:cleared", () => setActiveObj(null));
@@ -59,7 +74,6 @@ const CanvasEditor = () => {
     }
   }, [canvasRef]);
 
-  // Delete selected object
   const handleDelete = () => {
     if (canvas && activeObj) {
       canvas.remove(activeObj);
@@ -69,7 +83,6 @@ const CanvasEditor = () => {
     }
   };
 
-  // Reset/canvas clear
   const handleReset = () => {
     if (canvas) {
       canvas.getObjects().forEach(obj => canvas.remove(obj));
@@ -80,69 +93,52 @@ const CanvasEditor = () => {
   };
 
   return (
-    <div className="flex flex-col h-full pb-20 md:pb-0">
-      {/* --- Toolbar at top --- */}
-      <div className="w-full flex items-center justify-between px-3 py-2 border-b bg-white z-20">
-        <Toolbar
-          onAddText={addText}
-          onAddRect={addRect}
-          onAddCircle={addCircle}
-          onAddImage={addImage}
-          onBringToFront={bringToFront}
-          onSendToBack={sendToBack}
-          onDownload={download}
-          onCropImage={cropImage}
-          onAlignLeft={alignLeft}
-          onAlignCenter={alignCenter}
-          onAlignRight={alignRight}
-          onAlignTop={alignTop}
-          onAlignMiddle={alignMiddle}
-          onAlignBottom={alignBottom}
-          onOpenSettings={() => setShowSettings(true)}
-        />
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleDelete}
-            title="Delete selected"
-            disabled={!activeObj}
-            className={`p-2 rounded-full ${activeObj ? "hover:bg-gray-100" : "opacity-50 cursor-not-allowed"}`}
-          >
-            <Trash2 size={20} />
-          </button>
-          <button
-            onClick={handleReset}
-            title="Reset Canvas"
-            className="p-2 rounded-full hover:bg-gray-100"
-          >
-            <RefreshCw size={20} />
-          </button>
-        </div>
+    <div className="relative h-full w-full bg-gray-100">
+      {/* Left Toolbar */}
+      <div className="absolute top-20 left-4 z-20 flex flex-col gap-4">
+        <button title="Add Text" onClick={addText} className="p-2 rounded-full bg-white shadow hover:bg-blue-100">
+          <Type size={20} />
+        </button>
+        <button title="Add Rectangle" onClick={addRect} className="p-2 rounded-full bg-white shadow hover:bg-blue-100">
+          <Square size={20} />
+        </button>
+        <button title="Add Circle" onClick={addCircle} className="p-2 rounded-full bg-white shadow hover:bg-blue-100">
+          <Circle size={20} />
+        </button>
+        <button title="Add Image" onClick={addImage} className="p-2 rounded-full bg-white shadow hover:bg-blue-100">
+          <ImageIcon size={20} />
+        </button>
       </div>
 
-      {/* --- Canvas area --- */}
-      <div className="flex flex-1 bg-gray-50 overflow-hidden relative">
-        <div className="flex-1 flex items-center justify-center min-h-0 min-w-0">
-          <CanvasArea ref={canvasRef} width={canvasWidth} height={canvasHeight} />
-        </div>
-        <div className="hidden md:block">
-          <RightPanel
-            fillColor={fillColor}
-            setFillColor={setFillColor}
-            fontSize={fontSize}
-            setFontSize={setFontSize}
-            strokeColor={strokeColor}
-            setStrokeColor={setStrokeColor}
-            strokeWidth={strokeWidth}
-            setStrokeWidth={setStrokeWidth}
-            canvasWidth={canvasWidth}
-            setCanvasWidth={setCanvasWidth}
-            canvasHeight={canvasHeight}
-            setCanvasHeight={setCanvasHeight}
-          />
-        </div>
+      {/* Right Toolbar (Download) */}
+      <div className="absolute top-20 right-4 z-20">
+        <button title="Download" onClick={download} className="p-3 rounded-full bg-green-600 text-white shadow hover:bg-green-700">
+          <Download size={24} />
+        </button>
       </div>
 
-      {/* --- Text edit toolbar below canvas if IText selected --- */}
+      {/* Main Canvas */}
+      <div className="flex items-center justify-center h-full">
+        <CanvasArea ref={canvasRef} width={canvasWidth} height={canvasHeight} />
+      </div>
+
+      {/* Bottom Toolbar */}
+      <div className="fixed bottom-0 w-full bg-white border-t shadow z-30 px-4 py-2 flex justify-center gap-4 flex-wrap">
+        <button onClick={alignLeft} title="Align Left"><AlignLeft /></button>
+        <button onClick={alignCenter} title="Align Center"><AlignCenter /></button>
+        <button onClick={alignRight} title="Align Right"><AlignRight /></button>
+        <button onClick={alignTop} title="Align Top"><AlignStartVertical /></button>
+        <button onClick={alignMiddle} title="Align Middle"><AlignVerticalSpaceAround /></button>
+        <button onClick={alignBottom} title="Align Bottom"><AlignEndVertical /></button>
+        <button onClick={bringToFront} title="Bring to Front"><ArrowUpFromLine /></button>
+        <button onClick={sendToBack} title="Send to Back"><ArrowDownToLine /></button>
+        <button onClick={cropImage} title="Crop Image"><Crop /></button>
+        <button onClick={handleDelete} title="Delete" disabled={!activeObj}><Trash2 /></button>
+        <button onClick={handleReset} title="Reset"><RefreshCw /></button>
+        <button onClick={() => setShowSettings(true)} title="Settings"><Settings /></button>
+      </div>
+
+      {/* Edit Toolbars */}
       {activeObj && activeObj.type === "i-text" && (
         <TextEditToolbar
           obj={activeObj}
@@ -153,8 +149,20 @@ const CanvasEditor = () => {
           setFontSize={setFontSize}
         />
       )}
+      {activeObj && ["rect", "circle", "image"].includes(activeObj.type) && (
+        <ShapeEditToolbar
+          obj={activeObj}
+          canvas={canvas}
+          fillColor={fillColor}
+          setFillColor={setFillColor}
+          strokeColor={strokeColor}
+          setStrokeColor={setStrokeColor}
+          strokeWidth={strokeWidth}
+          setStrokeWidth={setStrokeWidth}
+        />
+      )}
 
-      {/* --- Image Crop Modal --- */}
+      {/* Crop Modal */}
       {cropSrc && (
         <ImageCropModal
           src={cropSrc}
@@ -170,7 +178,7 @@ const CanvasEditor = () => {
         />
       )}
 
-      {/* --- Drawer for mobile settings --- */}
+      {/* Mobile Settings Drawer */}
       <Drawer isOpen={showSettings} onClose={() => setShowSettings(false)}>
         <RightPanel
           fillColor={fillColor}

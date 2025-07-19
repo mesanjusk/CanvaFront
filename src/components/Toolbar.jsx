@@ -1,4 +1,19 @@
-import React from "react";
+import React, { useRef } from "react";
+import {
+  Type,
+  Image as ImageIcon,
+  Square,
+  Circle,
+  ArrowUp,
+  ArrowDown,
+  Download,
+  Crop,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignVerticalSpaceAround,
+  Settings,
+} from "lucide-react";
 
 const Toolbar = ({
   onAddText,
@@ -15,44 +30,87 @@ const Toolbar = ({
   onAlignTop,
   onAlignMiddle,
   onAlignBottom,
-   onOpenSettings,
-}) => (
-  <div className="fixed bottom-0 left-0 w-full bg-white shadow-md py-2 flex flex-wrap gap-2 justify-center z-50">
-    <button onClick={onAddText} className="btn">Text</button>
-    <button onClick={onAddRect} className="btn">Rectangle</button>
-    <button onClick={onAddCircle} className="btn">Circle</button>
-    <label className="btn cursor-pointer">
-      Image
-      <input type="file" accept="image/*" className="hidden" onChange={onAddImage} />
-    </label>
-    <button onClick={onBringToFront} className="btn">Front</button>
-    <button onClick={onSendToBack} className="btn">Back</button>
-    <button onClick={onDownload} className="btn">Download</button>
-    <button onClick={onCropImage} className="btn">Crop</button>
-    <button onClick={onAlignLeft} className="btn">Align Left</button>
-    <button onClick={onAlignCenter} className="btn">Align Center</button>
-    <button onClick={onAlignRight} className="btn">Align Right</button>
-    <button onClick={onAlignTop} className="btn">Align Top</button>
-    <button onClick={onAlignMiddle} className="btn">Align Middle</button>
-    <button onClick={onAlignBottom} className="btn">Align Bottom</button>
-     <button onClick={onOpenSettings} className="btn md:hidden">Properties</button>
-    <style>{`
-      .btn {
-        background: #1e293b;
-        color: #fff;
-        border: none;
-        border-radius: 0.5rem;
-        padding: 0.5rem 1rem;
-        margin: 0 2px;
-        font-size: 1rem;
-        transition: background 0.2s;
-        cursor: pointer;
-      }
-      .btn:hover {
-        background: #475569;
-      }
-    `}</style>
-  </div>
-);
+  onOpenSettings,
+}) => {
+  const fileInput = useRef();
+
+  return (
+    <div className="flex flex-wrap gap-2 items-center">
+      <button onClick={onAddText} title="Add Text" className="icon-btn">
+        <Type size={20} />
+      </button>
+      <button onClick={onAddRect} title="Add Rectangle" className="icon-btn">
+        <Square size={20} />
+      </button>
+      <button onClick={onAddCircle} title="Add Circle" className="icon-btn">
+        <Circle size={20} />
+      </button>
+      <button
+        onClick={() => fileInput.current.click()}
+        title="Add Image"
+        className="icon-btn"
+      >
+        <ImageIcon size={20} />
+        <input
+          ref={fileInput}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={onAddImage}
+        />
+      </button>
+      <button onClick={onBringToFront} title="Bring To Front" className="icon-btn">
+        <ArrowUp size={20} />
+      </button>
+      <button onClick={onSendToBack} title="Send To Back" className="icon-btn">
+        <ArrowDown size={20} />
+      </button>
+      <button onClick={onDownload} title="Download" className="icon-btn">
+        <Download size={20} />
+      </button>
+      <button onClick={onCropImage} title="Crop Selected Image" className="icon-btn">
+        <Crop size={20} />
+      </button>
+      <button onClick={onAlignLeft} title="Align Left" className="icon-btn">
+        <AlignLeft size={20} />
+      </button>
+      <button onClick={onAlignCenter} title="Align Center Horizontally" className="icon-btn">
+        <AlignCenter size={20} />
+      </button>
+      <button onClick={onAlignRight} title="Align Right" className="icon-btn">
+        <AlignRight size={20} />
+      </button>
+      <button onClick={onAlignTop} title="Align Top" className="icon-btn">
+        <ArrowUp size={20} />
+      </button>
+      <button onClick={onAlignMiddle} title="Align Center Vertically" className="icon-btn">
+        <AlignVerticalSpaceAround size={20} />
+      </button>
+      <button onClick={onAlignBottom} title="Align Bottom" className="icon-btn">
+        <ArrowDown size={20} />
+      </button>
+      <button onClick={onOpenSettings} title="Settings" className="icon-btn md:hidden">
+        <Settings size={20} />
+      </button>
+      <style>{`
+        .icon-btn {
+          background: none;
+          border: none;
+          color: #1e293b;
+          border-radius: 0.4rem;
+          padding: 0.4rem;
+          cursor: pointer;
+          transition: background 0.2s;
+        }
+        .icon-btn:hover {
+          background: #f1f5f9;
+        }
+        .icon-btn:active {
+          background: #e2e8f0;
+        }
+      `}</style>
+    </div>
+  );
+};
 
 export default Toolbar;

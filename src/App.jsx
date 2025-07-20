@@ -4,6 +4,7 @@ import CanvasEditor from "./components/CanvasEditor";
 import AddTemplate from "./pages/addTemplate";
 import AddCategory from "./pages/addCategory";
 import AddSubcategory from "./pages/addSubcategory";
+import TemplateManager from "./pages/TemplateManager"; // 🆕 import
 
 function App() {
   return (
@@ -12,14 +13,13 @@ function App() {
         Framee
       </header>
       <main className="flex-1 bg-gray-100">
-       
-       <Routes>
-            <Route path="/" element={<CanvasEditor />} />
-            <Route path="/addTemplate" element={<AddTemplate />} />
-            <Route path="/addCategory" element={<AddCategory />} />
-            <Route path="/addSubcategory" element={<AddSubcategory />} />
-        
-          </Routes>
+        <Routes>
+          <Route path="/" element={<CanvasEditor />} />
+          <Route path="/addTemplate" element={<AddTemplate />} />
+          <Route path="/addCategory" element={<AddCategory />} />
+          <Route path="/addSubcategory" element={<AddSubcategory />} />
+          <Route path="/templateManager" element={<TemplateManager />} /> {/* 🆕 route */}
+        </Routes>
       </main>
     </div>
   );

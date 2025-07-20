@@ -2,6 +2,7 @@
 import React from "react";
 import { Crop, Trash2, Lock, Unlock, Settings, Maximize2, Group, RefreshCw } from "lucide-react";
 import IconButton from "./IconButton";
+import FontSelector from "./FontSelector";
 
 const FloatingObjectToolbar = ({
   activeObj,
@@ -13,7 +14,8 @@ const FloatingObjectToolbar = ({
   isLocked,
   multipleSelected,
   groupObjects,
-  ungroupObjects
+  ungroupObjects,
+  canvas
 }) => {
   return (
     <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-white shadow-lg rounded px-3 py-2 flex gap-3 items-center">
@@ -26,6 +28,7 @@ const FloatingObjectToolbar = ({
       <IconButton onClick={fitCanvasToObject} title="Fit Canvas"><Maximize2 size={24} /></IconButton>
       {multipleSelected && <IconButton onClick={groupObjects} title="Group"><Group size={24} /></IconButton>}
       {activeObj?.type === "group" && <IconButton onClick={ungroupObjects} title="Ungroup"><RefreshCw size={24} /></IconButton>}
+      <FontSelector activeObj={activeObj} canvas={canvas} />
     </div>
   );
 };

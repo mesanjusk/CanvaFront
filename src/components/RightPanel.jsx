@@ -32,7 +32,8 @@ const RightPanel = ({
   strokeColor, setStrokeColor,
   strokeWidth, setStrokeWidth,
   canvasWidth, setCanvasWidth,
-  canvasHeight, setCanvasHeight
+  canvasHeight, setCanvasHeight,
+  setBackgroundImage
 }) => (
   <aside className="w-56 bg-white shadow-lg p-4 border-l flex flex-col gap-2">
     <h2 className="font-semibold mb-4">Properties</h2>
@@ -43,6 +44,22 @@ const RightPanel = ({
     <hr className="my-2"/>
     <NumberInput label="Width" value={canvasWidth} onChange={setCanvasWidth} min={100} max={2000} />
     <NumberInput label="Height" value={canvasHeight} onChange={setCanvasHeight} min={100} max={2000} />
+    {setBackgroundImage && (
+      <div className="flex items-center gap-2">
+        <label className="w-20">Background</label>
+        <input
+          type="file"
+          accept="image/*"
+          onChange={(e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = () => setBackgroundImage(reader.result);
+            reader.readAsDataURL(file);
+          }}
+        />
+      </div>
+    )}
   </aside>
 );
 

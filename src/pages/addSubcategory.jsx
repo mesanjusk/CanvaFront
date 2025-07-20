@@ -4,40 +4,49 @@ import { useNavigate } from "react-router-dom";
 
 const AddSubcategory = () => {
   const navigate = useNavigate();
+
   const [name, setName] = useState('');
   const [image, setImage] = useState(null);
   const [categoryId, setCategoryId] = useState('');
   const [categories, setCategories] = useState([]);
-  const [status, setStatus] = useState('');
   const [subcategories, setSubcategories] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [loggedInUser, setLoggedInUser] = useState(null);
+  const [status, setStatus] = useState('');
 
   const [modalOpen, setModalOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-
   const [viewImageModal, setViewImageModal] = useState({ open: false, imageUrl: '' });
+
   const [editModal, setEditModal] = useState({ open: false, subcategory: null });
   const [editName, setEditName] = useState('');
   const [editCategoryId, setEditCategoryId] = useState('');
   const [editImage, setEditImage] = useState(null);
   const [editIsLoading, setEditIsLoading] = useState(false);
 
+  // ✅ Fetch categories and subcategories on mount
+  useEffect(() => {
+    fetchCategories();
+    fetchSubcategories();
+  }, []);
 
   const fetchCategories = () => {
     axios
       .get('https://canvaback.onrender.com/api/category/with-usage')
-      .then((res) => setCategories(res.data))
+      .then((res) => {
+        const data = Array.isArray(res.data)
+          ? res.data
+          : Array.isArray(res.data.result)
+          ? res.data.result
+          : [];
+        setCategories(data);
+      })
       .catch((err) => console.error('Error fetching categories:', err));
   };
 
   const fetchSubcategories = () => {
     axios
       .get('https://canvaback.onrender.com/api/subcategory')
-        .then((res) => {
-      console.log("Subcategories response:", res.data);  // <- 🔍 ADD THIS
-      setSubcategories(res.data);
-    })
+      .then((res) => setSubcategories(res.data))
       .catch((err) => console.error('Error fetching subcategories:', err));
   };
 
@@ -74,8 +83,7 @@ const AddSubcategory = () => {
   };
 
   const handleDelete = async (id) => {
-    const confirmed = window.confirm('Are you sure you want to delete this subcategory?');
-    if (!confirmed) return;
+    if (!window.confirm('Are you sure you want to delete this subcategory?')) return;
     try {
       await axios.delete(`https://canvaback.onrender.com/api/subcategory/${id}`);
       fetchSubcategories();
@@ -84,13 +92,8 @@ const AddSubcategory = () => {
     }
   };
 
-  const openImageModal = (imageUrl) => {
-    setViewImageModal({ open: true, imageUrl });
-  };
-
-  const closeImageModal = () => {
-    setViewImageModal({ open: false, imageUrl: '' });
-  };
+  const openImageModal = (imageUrl) => setViewImageModal({ open: true, imageUrl });
+  const closeImageModal = () => setViewImageModal({ open: false, imageUrl: '' });
 
   const openEditModal = (sub) => {
     setEditModal({ open: true, subcategory: sub });
@@ -119,12 +122,13 @@ const AddSubcategory = () => {
     const formData = new FormData();
     formData.append('name', editName);
     formData.append('categoryId', editCategoryId);
-    if (editImage) {
-      formData.append('image', editImage);
-    }
+    if (editImage) formData.append('image', editImage);
 
     try {
-      await axios.put(`https://canvaback.onrender.com/api/subcategory/${editModal.subcategory._id}`, formData);
+      await axios.put(
+        `https://canvaback.onrender.com/api/subcategory/${editModal.subcategory._id}`,
+        formData
+      );
       fetchSubcategories();
       closeEditModal();
     } catch (error) {
@@ -211,7 +215,7 @@ const AddSubcategory = () => {
         </table>
       </div>
 
-      {/* New Subcategory Modal */}
+      {/* Create Modal */}
       {modalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-md w-full max-w-lg relative">
@@ -222,7 +226,7 @@ const AddSubcategory = () => {
               &times;
             </button>
             <h3 className="text-xl font-semibold mb-4">New Subcategory</h3>
-            <form onSubmit={handleSubmit} encType="multipart/form-data" className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <input
                 type="text"
                 value={name}
@@ -239,7 +243,9 @@ const AddSubcategory = () => {
               >
                 <option value="">-- Select a Category --</option>
                 {categories.map((cat) => (
-                  <option key={cat._id} value={cat.category_uuid}>{cat.name}</option>
+                  <option key={cat._id} value={cat.category_uuid}>
+                    {cat.name}
+                  </option>
                 ))}
               </select>
               <input
@@ -261,6 +267,7 @@ const AddSubcategory = () => {
         </div>
       )}
 
+      {/* Image Modal */}
       {viewImageModal.open && (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50" onClick={closeImageModal}>
           <img
@@ -283,7 +290,7 @@ const AddSubcategory = () => {
         <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50" onClick={closeEditModal}>
           <div className="bg-white p-6 rounded shadow-lg space-y-4 max-w-md w-full" onClick={e => e.stopPropagation()}>
             <h3 className="text-xl font-semibold">Edit Subcategory</h3>
-            <form onSubmit={handleEditSubmit} encType="multipart/form-data" className="space-y-4">
+            <form onSubmit={handleEditSubmit} className="space-y-4">
               <input
                 type="text"
                 value={editName}
@@ -299,7 +306,9 @@ const AddSubcategory = () => {
               >
                 <option value="">-- Select a Category --</option>
                 {categories.map((cat) => (
-                  <option key={cat._id} value={cat.category_uuid}>{cat.name}</option>
+                  <option key={cat._id} value={cat.category_uuid}>
+                    {cat.name}
+                  </option>
                 ))}
               </select>
               <input

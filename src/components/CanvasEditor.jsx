@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useCanvasEditor } from "../hooks/useCanvasEditor";
 import { useCanvasTools } from "../hooks/useCanvasTools";
 import CanvasArea from "./CanvasArea";
@@ -22,10 +22,11 @@ import {
 
 import TextEditToolbar from "./TextEditToolbar";
 import ShapeEditToolbar from "./ShapeEditToolbar";
-import { fabric } from "fabric";
+import axios from "axios";
+import { useParams } from "react-router-dom";
 
 const CanvasEditor = () => {
-  const {
+  const { templateId } = useParams();  const {
     canvasRef,
     fillColor, setFillColor,
     fontSize, setFontSize,
@@ -68,6 +69,22 @@ const CanvasEditor = () => {
     saveHistory,
     resetHistory,
   } = useCanvasEditor(canvasRef, canvasWidth, canvasHeight);
+
+  useEffect(() => {
+    if (templateId && canvas) {
+      axios
+        .get(`https://canvaback.onrender.com/api/template/${templateId}`)
+        .then((res) => {
+          const json = res.data.canvasJson || res.data;
+          canvas.loadFromJSON(json, () => {
+            canvas.renderAll();
+            saveHistory();
+          });
+        })
+        .catch((err) => console.error("Error loading template", err));
+    }
+  }, [templateId, canvas]);
+
 
   return (
     <div className="min-h-screen w-full bg-gray-100 flex flex-col">

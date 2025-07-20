@@ -2,6 +2,9 @@ import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { fabric } from "fabric";
 
+const LOCAL_KEY = "localTemplates";
+
+
 const TemplateManager = () => {
   const canvasRef = useRef(null);
   const [canvas, setCanvas] = useState(null);
@@ -59,10 +62,13 @@ const TemplateManager = () => {
         ? res.data.templates
         : [];
 
-      setTemplates(data);
+      const mapped = data.map((t) => ({ ...t, id: t._id }));
+      setTemplates(mapped);
+      localStorage.setItem(LOCAL_KEY, JSON.stringify(mapped));
     } catch (err) {
       console.error("Error fetching templates:", err);
-      setTemplates([]);
+      const local = JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]");
+      setTemplates(local);
     }
   };
 
@@ -121,7 +127,29 @@ const TemplateManager = () => {
         JSON.stringify(canvasRef.current.toJSON())
       );
 
-      await axios.post("/api/template/save", formData);
+      try {
+        await axios.post("/api/template/save", formData);
+      } catch (e) {
+        console.warn("API save failed, storing locally", e);
+      }
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        const local = JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]");
+        const newTemplate = {
+          id: Date.now().toString(),
+          title,
+          category,
+          subcategory,
+          price,
+          image: reader.result,
+          canvasJson: canvasRef.current.toJSON(),
+          createdAt: new Date().toISOString(),
+        };
+        localStorage.setItem(LOCAL_KEY, JSON.stringify([...local, newTemplate]));
+        setTemplates([...local, newTemplate]);
+      };
+      reader.readAsDataURL(imageFile);
       alert("Template saved!");
       setTitle("");
       setCategory("");
@@ -231,9 +259,9 @@ const TemplateManager = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {templates.map((tpl) => (
               <div
-                key={tpl._id}
+                key={tpl.id}
                 className="bg-gray-100 p-3 rounded shadow hover:bg-gray-200 cursor-pointer"
-                onClick={() => loadTemplate(tpl._id)}
+                onClick={() => loadTemplate(tpl.id)}
               >
                 <div className="font-medium">{tpl.title}</div>
                 <div className="text-xs text-gray-500">

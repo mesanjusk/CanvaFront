@@ -25,6 +25,8 @@ import ShapeEditToolbar from "./ShapeEditToolbar";
 import axios from "axios";
 import { useParams } from "react-router-dom";
 
+const LOCAL_KEY = "localTemplates";
+
 const CanvasEditor = () => {
   const { templateId } = useParams();  const {
     canvasRef,
@@ -81,7 +83,17 @@ const CanvasEditor = () => {
             saveHistory();
           });
         })
-        .catch((err) => console.error("Error loading template", err));
+       .catch((err) => {
+          console.error("Error loading template", err);
+          const local = JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]");
+          const tpl = local.find((t) => t.id === templateId);
+          if (tpl) {
+            canvas.loadFromJSON(tpl.canvasJson, () => {
+              canvas.renderAll();
+              saveHistory();
+            });
+          }
+        });
     }
   }, [templateId, canvas]);
 

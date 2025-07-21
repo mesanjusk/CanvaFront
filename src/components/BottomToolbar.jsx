@@ -13,7 +13,7 @@ const BottomToolbar = ({
   bringToFront, sendToBack
 }) => {
   return (
-    <div className="fixed bottom-0 w-full bg-white border-t shadow z-30 px-2 py-2 overflow-x-auto scrollbar-thin flex justify-start items-center gap-4">
+    <div className="fixed bottom-0 w-full bg-white border-t shadow z-30 px-2 py-2 overflow-x-auto scrollbar-thin flex justify-start items-center gap-1">
       <IconButton onClick={alignLeft} title="Align Left"><AlignLeft size={28} /></IconButton>
       <IconButton onClick={alignCenter} title="Align Center"><AlignCenter size={28} /></IconButton>
       <IconButton onClick={alignRight} title="Align Right"><AlignRight size={28} /></IconButton>

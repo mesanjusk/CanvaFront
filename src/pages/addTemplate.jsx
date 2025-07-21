@@ -153,7 +153,7 @@ formData.append("canvasJson", JSON.stringify(json));
         });
         toast.success("Template updated");
       } else {
-        await axios.post("http://localhost:5000/api/template/save", formData, {
+        await axios.post("https://canvaback.onrender.com/api/template/save", formData, {
           headers: { "Content-Type": "multipart/form-data" },
           onUploadProgress: (e) => setUploadProgress(Math.round((e.loaded * 100) / e.total))
         });

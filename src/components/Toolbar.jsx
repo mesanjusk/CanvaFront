@@ -35,7 +35,7 @@ const Toolbar = ({
   const fileInput = useRef();
 
   return (
-    <div className="flex flex-wrap gap-2 items-center">
+    <div className="flex flex-wrap gap-1 items-center">
       <button onClick={onAddText} title="Add Text" className="icon-btn">
         <Type size={20} />
       </button>

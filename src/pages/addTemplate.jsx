@@ -4,9 +4,11 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import imageCompression from 'browser-image-compression';
 import toast, { Toaster } from 'react-hot-toast';
 
-const AddTemplate = ({ canvasRef }) => {
+const AddTemplate = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const canvasRef = useRef(null);
+  const fabricCanvasRef = useRef(null);
   const [existingImageURLs, setExistingImageURLs] = useState([]);
   const [form, setForm] = useState({ title: '', category: '', subcategory: '', price: '' });
   const [image, setImage] = useState();
@@ -24,6 +26,31 @@ const AddTemplate = ({ canvasRef }) => {
   const fileInputRef = useRef(null);
 
   const safeExtract = (res) => Array.isArray(res) ? res : res?.result || [];
+
+   useEffect(() => {
+  if (fabricCanvasRef.current) {
+    fabricCanvasRef.current.dispose();
+  }
+
+  const newCanvas = new fabric.Canvas(canvasRef.current, {
+    height: 500,
+    width: 800,
+    backgroundColor: '#fff',
+  });
+
+  const rect = new fabric.Rect({
+    left: 100,
+    top: 100,
+    fill: 'red',
+    width: 100,
+    height: 100,
+  });
+
+  newCanvas.add(rect); 
+
+  fabricCanvasRef.current = newCanvas;
+}, []);
+
 
   useEffect(() => {
     const fetchDropdowns = async () => {
@@ -45,16 +72,17 @@ const AddTemplate = ({ canvasRef }) => {
     fetchDropdowns();
   }, []);
 
-  const getCanvasJson = () => {
-    try {
-      if (canvasRef?.current) {
-        return canvasRef.current.toJSON();
-      }
-    } catch (e) {
-      console.warn('Canvas not available');
-    }
+ const getCanvasJson = () => {
+  try {
+    const storedJson = localStorage.getItem("canvasJson");
+    return storedJson ? JSON.parse(storedJson) : {};
+    
+  } catch (err) {
+    console.error("Error parsing canvas JSON:", err);
     return {};
-  };
+  }
+};
+
 
   const handleInputChange = (field) => (e) => {
     const value = e?.target?.value ?? e;
@@ -107,7 +135,12 @@ const AddTemplate = ({ canvasRef }) => {
     });
 
     if (image) formData.append("image", image);
-    formData.append("canvasJson", JSON.stringify(getCanvasJson()));
+   const canvas = fabricCanvasRef.current;
+    if (!canvas) return;
+
+    const json = canvas.toJSON();
+formData.append("canvasJson", JSON.stringify(json));
+
 
     if (editingId && existingImageURLs.length > 0) {
       formData.append("existingImages", JSON.stringify(existingImageURLs));
@@ -120,11 +153,12 @@ const AddTemplate = ({ canvasRef }) => {
         });
         toast.success("Template updated");
       } else {
-        await axios.post("https://canvaback.onrender.com/api/template/save", formData, {
+        await axios.post("http://localhost:5000/api/template/save", formData, {
           headers: { "Content-Type": "multipart/form-data" },
           onUploadProgress: (e) => setUploadProgress(Math.round((e.loaded * 100) / e.total))
         });
         toast.success("Template created");
+        localStorage.removeItem("canvasJson");
       }
 
       setForm({ title: '', category: '', subcategory: '', price: '' });

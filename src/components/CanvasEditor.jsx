@@ -72,30 +72,51 @@ const CanvasEditor = () => {
     resetHistory,
   } = useCanvasEditor(canvasRef, canvasWidth, canvasHeight);
 
-  useEffect(() => {
-    if (templateId && canvas) {
-      axios
-        .get(`https://canvaback.onrender.com/api/template/${templateId}`)
-        .then((res) => {
-          const json = res.data.canvasJson || res.data;
-          canvas.loadFromJSON(json, () => {
-            canvas.renderAll();
-            saveHistory();
-          });
-        })
-       .catch((err) => {
-          console.error("Error loading template", err);
-          const local = JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]");
-          const tpl = local.find((t) => t.id === templateId);
-          if (tpl) {
-            canvas.loadFromJSON(tpl.canvasJson, () => {
-              canvas.renderAll();
-              saveHistory();
-            });
-          }
-        });
-    }
-  }, [templateId, canvas]);
+  
+
+useEffect(() => {
+  if (templateId && canvas) {
+    axios
+      .get(`https://canvaback.onrender.com/api/template/${templateId}`)
+      .then((res) => {
+        const image = res.data.image;
+
+        if (image) {
+          const targetWidth = 400;
+          const targetHeight = 550;
+
+          fabric.Image.fromURL(
+            image,
+            (img) => {
+              canvas.setWidth(targetWidth);
+              canvas.setHeight(targetHeight);
+
+              canvas.setBackgroundImage(
+                img,
+                () => {
+                  canvas.renderAll();
+                  console.log("✅ Image loaded and displayed");
+                },
+                {
+                  scaleX: targetWidth / img.width,
+                  scaleY: targetHeight / img.height,
+                  crossOrigin: "anonymous",
+                }
+              );
+            },
+            {
+              crossOrigin: "anonymous",
+            }
+          );
+        } else {
+          console.warn("No image found in template");
+        }
+      })
+      .catch((err) => {
+        console.error("Error loading image from template", err);
+      });
+  }
+}, [templateId, canvas]);
 
 
   return (
@@ -287,6 +308,7 @@ const CanvasEditor = () => {
         bringToFront={bringToFront}
         sendToBack={sendToBack}
       />
+   
     </div>
   );
 };

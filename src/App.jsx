@@ -6,6 +6,8 @@ import AddCategory from "./pages/addCategory";
 import AddSubcategory from "./pages/addSubcategory";
 import TemplateManager from "./pages/TemplateManager"; // 🆕 import
 import TemplateGallery from "./pages/TemplateGallery";
+import Students from './pages/Students';
+import Signup from "./components/Signup";
 
 function App() {
   return (
@@ -22,7 +24,9 @@ function App() {
           <Route path="/addTemplate" element={<AddTemplate />} />
           <Route path="/addCategory" element={<AddCategory />} />
           <Route path="/addSubcategory" element={<AddSubcategory />} />
-          <Route path="/templateManager" element={<TemplateManager />} /> {/* 🆕 route */}
+          <Route path="/templateManager" element={<TemplateManager />} /> 
+          <Route path="/students" element={<Students />} />
+          <Route path="/signup" element={<Signup />} />
         </Routes>
       </main>
     </div>

@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useCanvasEditor } from "../hooks/useCanvasEditor";
 import { useCanvasTools } from "../hooks/useCanvasTools";
 import CanvasArea from "./CanvasArea";
@@ -28,7 +28,11 @@ import { useParams } from "react-router-dom";
 const LOCAL_KEY = "localTemplates";
 
 const CanvasEditor = () => {
-  const { templateId } = useParams();  const {
+  const { templateId } = useParams();
+  const [students, setStudents] = useState([]);
+  const [selectedStudent, setSelectedStudent] = useState(null);
+
+  const {
     canvasRef,
     fillColor, setFillColor,
     fontSize, setFontSize,
@@ -72,55 +76,136 @@ const CanvasEditor = () => {
     resetHistory,
   } = useCanvasEditor(canvasRef, canvasWidth, canvasHeight);
 
-  
+  // 🔁 Fetch all students on mount
+  useEffect(() => {
+    axios
+      .get("https://canvaback.onrender.com/api/students")
+      .then((res) => setStudents(res.data.data))
+      .catch((err) => console.error("Failed to fetch students", err));
+  }, []);
+
+  const handleStudentSelect = (uuid) => {
+  const student = students.find((s) => s.uuid === uuid);
+  setSelectedStudent(student);
+};
 
 useEffect(() => {
-  if (templateId && canvas) {
-    axios
-      .get(`https://canvaback.onrender.com/api/template/${templateId}`)
-      .then((res) => {
-        const image = res.data.image;
+  const renderTemplateAndStudent = async () => {
+    if (!canvas) return;
+
+    canvas.clear(); // Clear everything
+
+    // Load and add template background
+    if (templateId) {
+      try {
+        const res = await axios.get(`https://canvaback.onrender.com/api/template/${templateId}`);
+        const { image, title } = res.data;
 
         if (image) {
           const targetWidth = 400;
           const targetHeight = 550;
 
-          fabric.Image.fromURL(
-            image,
-            (img) => {
-              canvas.setWidth(targetWidth);
-              canvas.setHeight(targetHeight);
+          canvas.setWidth(targetWidth);
+          canvas.setHeight(targetHeight);
 
-              canvas.setBackgroundImage(
-                img,
-                () => {
-                  canvas.renderAll();
-                  console.log("✅ Image loaded and displayed");
-                },
-                {
-                  scaleX: targetWidth / img.width,
-                  scaleY: targetHeight / img.height,
-                  crossOrigin: "anonymous",
-                }
-              );
-            },
-            {
-              crossOrigin: "anonymous",
-            }
-          );
-        } else {
-          console.warn("No image found in template");
+          await new Promise((resolve) => {
+            fabric.Image.fromURL(
+              image,
+              (img) => {
+                const scaleX = targetWidth / img.width;
+                const scaleY = targetHeight / img.height;
+                const scale = Math.min(scaleX, scaleY);
+
+                img.scale(scale);
+                img.set({
+                  left: (targetWidth - img.getScaledWidth()) / 2,
+                  top: (targetHeight - img.getScaledHeight()) / 2,
+                  selectable: false,
+                  evented: false,
+                });
+
+                canvas.add(img);
+                img.sendToBack();
+                resolve();
+              },
+              { crossOrigin: "anonymous" }
+            );
+          });
+
+          if (title) {
+            const titleText = new fabric.Text(title, {
+              left: targetWidth / 2,
+              top: 20,
+              fontSize: 24,
+              fill: "#333",
+              originX: "center",
+              selectable: false,
+              evented: false,
+            });
+            canvas.add(titleText);
+          }
         }
-      })
-      .catch((err) => {
-        console.error("Error loading image from template", err);
+      } catch (err) {
+        console.error("Error loading template:", err);
+      }
+    }
+
+    // Add student name and photo
+    if (selectedStudent) {
+      const fullName = `${selectedStudent.firstName} ${selectedStudent.middleName || ""} ${selectedStudent.lastName || ""}`.trim();
+
+      const nameText = new fabric.Text(fullName, {
+        left: 50,
+        top: 100,
+        fontSize: 22,
+        fill: "#000",
       });
-  }
-}, [templateId, canvas]);
+      canvas.add(nameText);
+
+      if (selectedStudent.photo && selectedStudent.photo[0]) {
+        fabric.Image.fromURL(
+          selectedStudent.photo[0],
+          (img) => {
+            img.set({
+              left: 50,
+              top: 150,
+              scaleX: 0.2,
+              scaleY: 0.2,
+            });
+            canvas.add(img);
+            canvas.renderAll();
+          },
+          { crossOrigin: "anonymous" }
+        );
+      } else {
+        canvas.renderAll();
+      }
+    } else {
+      canvas.renderAll();
+    }
+  };
+
+  renderTemplateAndStudent();
+}, [templateId, selectedStudent, canvas]);
 
 
   return (
     <div className="min-h-screen w-full bg-gray-100 flex flex-col">
+      <div className="p-4">
+        <label className="block mb-2 font-semibold">Select Student:</label>
+        <select onChange={(e) => handleStudentSelect(e.target.value)}>
+  <option value="">Select a student</option>
+  {students.map((student) => (
+    <option key={student.uuid} value={student.uuid}>
+      {student.firstName} {student.lastName}
+    </option>
+  ))}
+</select>
+
+
+      </div>
+
+      {/* Toolbar */}
       <div className="w-full flex justify-between items-center px-4 py-2 bg-white border-b shadow z-20">
         <div className="flex gap-2 items-center overflow-x-auto">
           <button title="Add Text" onClick={addText} className="p-2 rounded bg-white shadow hover:bg-blue-100"><Type size={28} /></button>
@@ -162,12 +247,14 @@ useEffect(() => {
         </div>
       </div>
 
+      {/* Canvas Area */}
       <div className="flex-1 overflow-auto bg-gray-50 p-4">
         <div className="mx-auto w-max max-w-full">
           <CanvasArea ref={canvasRef} width={canvasWidth} height={canvasHeight} />
         </div>
       </div>
 
+      {/* Object Toolbars */}
       {activeObj && (
         <FloatingObjectToolbar
           activeObj={activeObj}
@@ -230,6 +317,7 @@ useEffect(() => {
         />
       )}
 
+      {/* Text & Shape Toolbars */}
       {activeObj?.type === "i-text" && (
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 w-full max-w-5xl z-50">
           <TextEditToolbar
@@ -256,6 +344,7 @@ useEffect(() => {
         />
       )}
 
+      {/* Crop Image Modal */}
       {cropSrc && (
         <ImageCropModal
           src={cropSrc}
@@ -271,7 +360,20 @@ useEffect(() => {
         />
       )}
 
+      {/* Drawer Settings */}
       <Drawer isOpen={showSettings} onClose={() => setShowSettings(false)}>
+        
+         {selectedStudent && selectedStudent.photo && (
+    <div className="p-4">
+      <h3 className="text-lg font-bold mb-2">Selected Student Photo</h3>
+      <img
+        src={selectedStudent.photo[0]}
+        
+        className="w-32 h-32 object-cover rounded"
+      />
+    </div>
+  )}
+
         <RightPanel
           fillColor={fillColor}
           setFillColor={setFillColor}
@@ -308,7 +410,6 @@ useEffect(() => {
         bringToFront={bringToFront}
         sendToBack={sendToBack}
       />
-   
     </div>
   );
 };

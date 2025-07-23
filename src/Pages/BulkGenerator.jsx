@@ -139,10 +139,8 @@ const BulkGenerator = () => {
       : baseSize;
 
     const perPage = cols * rowsPerPage;
-    const cellW = cardSize.width ||
-      (pageSize.width - margins.left - margins.right - spacing.horizontal * (cols - 1)) / cols;
-    const cellH = cardSize.height ||
-      (pageSize.height - margins.top - spacing.vertical * (rowsPerPage - 1)) / rowsPerPage;
+    const cellW = cardSize.width || (pageSize.width - margins.left - margins.right - spacing.horizontal * (cols - 1)) / cols;
+    const cellH = cardSize.height || (pageSize.height - margins.top - spacing.vertical * (rowsPerPage - 1)) / rowsPerPage;
 
     const images = [];
     for (let i = 0; i < rows.length; i++) {
@@ -197,6 +195,7 @@ const BulkGenerator = () => {
       }
     }
   };
+
 
   return (
     <div className="p-4 space-y-4">
@@ -318,3 +317,4 @@ const BulkGenerator = () => {
 };
 
 export default BulkGenerator;
+

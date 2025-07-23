@@ -38,6 +38,10 @@ const BulkGenerator = () => {
   const [custom, setCustom] = useState({ width: A4.width, height: A4.height });
   const [cols, setCols] = useState(2);
   const [rowsPerPage, setRowsPerPage] = useState(2);
+  const [orientation, setOrientation] = useState('portrait');
+  const [margins, setMargins] = useState({ left: 0, right: 0, top: 0 });
+  const [spacing, setSpacing] = useState({ horizontal: 0, vertical: 0 });
+  const [cardSize, setCardSize] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
     const c = new fabric.Canvas('bulk-canvas', {
@@ -129,10 +133,16 @@ const BulkGenerator = () => {
 
   const downloadLayout = async (format) => {
     if (!canvas || !selected || rows.length === 0) return;
-    const pageSize = size === 'A4' ? A4 : size === 'A3' ? A3 : custom;
+    const baseSize = size === 'A4' ? A4 : size === 'A3' ? A3 : custom;
+    const pageSize = orientation === 'landscape'
+      ? { width: baseSize.height, height: baseSize.width }
+      : baseSize;
+
     const perPage = cols * rowsPerPage;
-    const cellW = pageSize.width / cols;
-    const cellH = pageSize.height / rowsPerPage;
+    const cellW = cardSize.width ||
+      (pageSize.width - margins.left - margins.right - spacing.horizontal * (cols - 1)) / cols;
+    const cellH = cardSize.height ||
+      (pageSize.height - margins.top - spacing.vertical * (rowsPerPage - 1)) / rowsPerPage;
 
     const images = [];
     for (let i = 0; i < rows.length; i++) {
@@ -149,20 +159,38 @@ const BulkGenerator = () => {
     }
 
     if (format === 'pdf') {
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [pageSize.width, pageSize.height] });
+      const pdf = new jsPDF({ orientation, unit: 'px', format: [pageSize.width, pageSize.height] });
       images.forEach((img, i) => {
         if (i && i % perPage === 0) pdf.addPage();
         const pos = i % perPage;
-        const x = (pos % cols) * cellW;
-        const y = Math.floor(pos / cols) * cellH;
+        const x = margins.left + (pos % cols) * (cellW + spacing.horizontal);
+        const y = margins.top + Math.floor(pos / cols) * (cellH + spacing.vertical);
         pdf.addImage(img, 'PNG', x, y, cellW, cellH);
       });
       pdf.save('bulk_layout.pdf');
     } else {
       let pageIndex = 0;
       for (let i = 0; i < images.length; i += perPage) {
+        const pageCanvas = document.createElement('canvas');
+        pageCanvas.width = pageSize.width;
+        pageCanvas.height = pageSize.height;
+        const ctx = pageCanvas.getContext('2d');
+        for (let j = 0; j < perPage && i + j < images.length; j++) {
+          const pos = j;
+          const imgSrc = images[i + j];
+          await new Promise(res => {
+            const img = new Image();
+            img.onload = () => {
+              const x = margins.left + (pos % cols) * (cellW + spacing.horizontal);
+              const y = margins.top + Math.floor(pos / cols) * (cellH + spacing.vertical);
+              ctx.drawImage(img, x, y, cellW, cellH);
+              res();
+            };
+            img.src = imgSrc;
+          });
+        }
         const a = document.createElement('a');
-        a.href = images[i];
+        a.href = pageCanvas.toDataURL(`image/${format === 'jpg' ? 'jpeg' : 'png'}`);
         a.download = `page_${pageIndex + 1}.${format}`;
         a.click();
         pageIndex++;
@@ -186,34 +214,33 @@ const BulkGenerator = () => {
           <option value="custom">Custom</option>
         </select>
 
-        <input
-          type="number"
-          min={1}
-          value={cols}
-          onChange={e => setCols(Number(e.target.value) || 1)}
-          className="border p-2 w-20 rounded"
-          placeholder="Columns"
-        />
-        <input
-          type="number"
-          min={1}
-          value={rowsPerPage}
-          onChange={e => setRowsPerPage(Number(e.target.value) || 1)}
-          className="border p-2 w-20 rounded"
-          placeholder="Rows"
-        />
+        <select value={orientation} onChange={e => setOrientation(e.target.value)} className="border p-2 rounded">
+          <option value="portrait">Portrait</option>
+          <option value="landscape">Landscape</option>
+        </select>
+
+        <input type="number" min={1} value={cols} onChange={e => setCols(Number(e.target.value) || 1)} className="border p-2 w-20 rounded" placeholder="Columns" />
+        <input type="number" min={1} value={rowsPerPage} onChange={e => setRowsPerPage(Number(e.target.value) || 1)} className="border p-2 w-20 rounded" placeholder="Rows" />
 
         {size === 'custom' && (
           <>
-            <input type="number" value={custom.width} onChange={e => setCustom({ ...custom, width: Number(e.target.value) })} className="border p-2 w-24" />
-            <input type="number" value={custom.height} onChange={e => setCustom({ ...custom, height: Number(e.target.value) })} className="border p-2 w-24" />
+            <input type="number" value={custom.width} onChange={e => setCustom({ ...custom, width: Number(e.target.value) })} className="border p-2 w-24" placeholder="Page Width" />
+            <input type="number" value={custom.height} onChange={e => setCustom({ ...custom, height: Number(e.target.value) })} className="border p-2 w-24" placeholder="Page Height" />
           </>
         )}
 
+        <input type="number" value={margins.left} onChange={e => setMargins({ ...margins, left: Number(e.target.value) })} className="border p-2 w-24" placeholder="Left Margin" />
+        <input type="number" value={margins.right} onChange={e => setMargins({ ...margins, right: Number(e.target.value) })} className="border p-2 w-24" placeholder="Right Margin" />
+        <input type="number" value={margins.top} onChange={e => setMargins({ ...margins, top: Number(e.target.value) })} className="border p-2 w-24" placeholder="Top Margin" />
+
+        <input type="number" value={spacing.horizontal} onChange={e => setSpacing({ ...spacing, horizontal: Number(e.target.value) })} className="border p-2 w-24" placeholder="H Separation" />
+        <input type="number" value={spacing.vertical} onChange={e => setSpacing({ ...spacing, vertical: Number(e.target.value) })} className="border p-2 w-24" placeholder="V Separation" />
+
+        <input type="number" value={cardSize.width} onChange={e => setCardSize({ ...cardSize, width: Number(e.target.value) })} className="border p-2 w-24" placeholder="Card Width" />
+        <input type="number" value={cardSize.height} onChange={e => setCardSize({ ...cardSize, height: Number(e.target.value) })} className="border p-2 w-24" placeholder="Card Height" />
+
         <input type="file" accept=".xlsx,.csv" onChange={handleFile} className="border p-2" />
-        <button onClick={loadStudents} className="bg-blue-600 text-white px-3 py-2 rounded">
-          Load Students
-        </button>
+        <button onClick={loadStudents} className="bg-blue-600 text-white px-3 py-2 rounded">Load Students</button>
       </div>
 
       {rows.length > 0 && (

@@ -4,6 +4,9 @@ import * as XLSX from 'xlsx';
 import { fabric } from 'fabric';
 import { jsPDF } from 'jspdf';
 import BASE_URL from '../config';
+import SidebarSection from '../components/bulk/SidebarSection';
+import ZoomControls from '../components/bulk/ZoomControls';
+import PresetControls from '../components/bulk/PresetControls';
 
 const A4 = { width: 2480, height: 3508 };
 const A3 = { width: 3508, height: 4961 };
@@ -43,6 +46,29 @@ const BulkGenerator = () => {
   const [margins, setMargins] = useState({ left: 0, right: 0, top: 0 });
   const [spacing, setSpacing] = useState({ horizontal: 0, vertical: 0 });
   const [cardSize, setCardSize] = useState({ width: 0, height: 0 });
+  const [previewZoom, setPreviewZoom] = useState(1);
+
+  const currentLayout = {
+    size,
+    custom,
+    orientation,
+    cols,
+    rowsPerPage,
+    margins,
+    spacing,
+    cardSize,
+  };
+
+  const applyLayout = (layout) => {
+    setSize(layout.size);
+    setCustom(layout.custom);
+    setOrientation(layout.orientation);
+    setCols(layout.cols);
+    setRowsPerPage(layout.rowsPerPage);
+    setMargins(layout.margins);
+    setSpacing(layout.spacing);
+    setCardSize(layout.cardSize);
+  };
 
   useEffect(() => {
     const c = new fabric.Canvas('bulk-canvas', {
@@ -82,7 +108,8 @@ const BulkGenerator = () => {
       : baseSize;
 
     const previewCanvas = previewRef.current;
-    const scale = Math.min(600 / pageSize.width, 800 / pageSize.height, 1);
+    const baseScale = Math.min(600 / pageSize.width, 800 / pageSize.height, 1);
+    const scale = baseScale * previewZoom;
     previewCanvas.width = pageSize.width * scale;
     previewCanvas.height = pageSize.height * scale;
     const ctx = previewCanvas.getContext('2d');
@@ -124,7 +151,7 @@ const BulkGenerator = () => {
 
   useEffect(() => {
     renderPreview();
-  }, [canvas, size, custom, orientation, margins, spacing, cols, rowsPerPage, cardSize, index]);
+  }, [canvas, size, custom, orientation, margins, spacing, cols, rowsPerPage, cardSize, index, previewZoom]);
 
   const handleFile = (e) => {
     const file = e.target.files[0];
@@ -243,11 +270,11 @@ const BulkGenerator = () => {
 
 
   return (
-    <div className="p-4 flex flex-col md:flex-row gap-6 h-full">
-      <div className="md:w-72 w-full space-y-4 bg-gray-50 p-4 rounded shadow md:overflow-auto md:max-h-[calc(100vh-2rem)]">
+    <div className="p-4 h-full flex flex-col md:flex-row gap-6 overflow-hidden">
+      <aside className="w-full md:w-72 flex-shrink-0 overflow-y-auto max-h-screen bg-gray-50 p-4 rounded shadow space-y-4">
         <h1 className="text-2xl font-bold">Bulk Generator</h1>
 
-        <div className="flex flex-wrap md:flex-col gap-4 items-start">
+        <SidebarSection title="Template">
           <div className="flex flex-col">
             <label className="text-sm font-medium">Template</label>
             <select
@@ -261,7 +288,9 @@ const BulkGenerator = () => {
               ))}
             </select>
           </div>
+        </SidebarSection>
 
+        <SidebarSection title="Page Settings">
           <div className="flex flex-col">
             <label className="text-sm font-medium">Page Size</label>
             <select
@@ -274,7 +303,6 @@ const BulkGenerator = () => {
               <option value="custom">Custom</option>
             </select>
           </div>
-
           <div className="flex flex-col">
             <label className="text-sm font-medium">Orientation</label>
             <select
@@ -286,7 +314,21 @@ const BulkGenerator = () => {
               <option value="landscape">Landscape</option>
             </select>
           </div>
+          {size === 'custom' && (
+            <>
+              <div className="flex flex-col">
+                <label className="text-sm font-medium">Page Width</label>
+                <input type="number" value={custom.width} onChange={e => setCustom({ ...custom, width: Number(e.target.value) })} className="border p-2 w-24 rounded" />
+              </div>
+              <div className="flex flex-col">
+                <label className="text-sm font-medium">Page Height</label>
+                <input type="number" value={custom.height} onChange={e => setCustom({ ...custom, height: Number(e.target.value) })} className="border p-2 w-24 rounded" />
+              </div>
+            </>
+          )}
+        </SidebarSection>
 
+        <SidebarSection title="Layout">
           <div className="flex flex-col">
             <label className="text-sm font-medium">Columns</label>
             <input
@@ -297,7 +339,6 @@ const BulkGenerator = () => {
               className="border p-2 w-20 rounded"
             />
           </div>
-
           <div className="flex flex-col">
             <label className="text-sm font-medium">Rows per Page</label>
             <input
@@ -308,68 +349,51 @@ const BulkGenerator = () => {
               className="border p-2 w-20 rounded"
             />
           </div>
+          <div className="flex flex-col">
+            <label className="text-sm font-medium">Left Margin</label>
+            <input type="number" value={margins.left} onChange={e => setMargins({ ...margins, left: Number(e.target.value) })} className="border p-2 w-24 rounded" />
+          </div>
+          <div className="flex flex-col">
+            <label className="text-sm font-medium">Right Margin</label>
+            <input type="number" value={margins.right} onChange={e => setMargins({ ...margins, right: Number(e.target.value) })} className="border p-2 w-24 rounded" />
+          </div>
+          <div className="flex flex-col">
+            <label className="text-sm font-medium">Top Margin</label>
+            <input type="number" value={margins.top} onChange={e => setMargins({ ...margins, top: Number(e.target.value) })} className="border p-2 w-24 rounded" />
+          </div>
+          <div className="flex flex-col">
+            <label className="text-sm font-medium">Horizontal Spacing</label>
+            <input type="number" value={spacing.horizontal} onChange={e => setSpacing({ ...spacing, horizontal: Number(e.target.value) })} className="border p-2 w-24 rounded" />
+          </div>
+          <div className="flex flex-col">
+            <label className="text-sm font-medium">Vertical Spacing</label>
+            <input type="number" value={spacing.vertical} onChange={e => setSpacing({ ...spacing, vertical: Number(e.target.value) })} className="border p-2 w-24 rounded" />
+          </div>
+          <div className="flex flex-col">
+            <label className="text-sm font-medium">Card Width</label>
+            <input type="number" value={cardSize.width} onChange={e => setCardSize({ ...cardSize, width: Number(e.target.value) })} className="border p-2 w-24 rounded" />
+          </div>
+          <div className="flex flex-col">
+            <label className="text-sm font-medium">Card Height</label>
+            <input type="number" value={cardSize.height} onChange={e => setCardSize({ ...cardSize, height: Number(e.target.value) })} className="border p-2 w-24 rounded" />
+          </div>
+        </SidebarSection>
 
-  {size === 'custom' && (
-    <>
-      <div className="flex flex-col">
-        <label className="text-sm font-medium">Page Width</label>
-        <input type="number" value={custom.width} onChange={e => setCustom({ ...custom, width: Number(e.target.value) })} className="border p-2 w-24 rounded" />
-      </div>
-      <div className="flex flex-col">
-        <label className="text-sm font-medium">Page Height</label>
-        <input type="number" value={custom.height} onChange={e => setCustom({ ...custom, height: Number(e.target.value) })} className="border p-2 w-24 rounded" />
-      </div>
-    </>
-  )}
+        <SidebarSection title="Data">
+          <div className="flex flex-col">
+            <label className="text-sm font-medium">Upload File</label>
+            <input type="file" accept=".xlsx,.csv" onChange={handleFile} className="border p-2 rounded" />
+          </div>
+          <div className="flex flex-col">
+            <label className="text-sm font-medium invisible">Load</label>
+            <button onClick={loadStudents} className="bg-blue-600 text-white px-3 py-2 rounded">Load Students</button>
+          </div>
+        </SidebarSection>
 
-  <div className="flex flex-col">
-    <label className="text-sm font-medium">Left Margin</label>
-    <input type="number" value={margins.left} onChange={e => setMargins({ ...margins, left: Number(e.target.value) })} className="border p-2 w-24 rounded" />
-  </div>
+        <PresetControls layout={currentLayout} applyLayout={applyLayout} />
+      </aside>
 
-  <div className="flex flex-col">
-    <label className="text-sm font-medium">Right Margin</label>
-    <input type="number" value={margins.right} onChange={e => setMargins({ ...margins, right: Number(e.target.value) })} className="border p-2 w-24 rounded" />
-  </div>
-
-  <div className="flex flex-col">
-    <label className="text-sm font-medium">Top Margin</label>
-    <input type="number" value={margins.top} onChange={e => setMargins({ ...margins, top: Number(e.target.value) })} className="border p-2 w-24 rounded" />
-  </div>
-
-  <div className="flex flex-col">
-    <label className="text-sm font-medium">Horizontal Spacing</label>
-    <input type="number" value={spacing.horizontal} onChange={e => setSpacing({ ...spacing, horizontal: Number(e.target.value) })} className="border p-2 w-24 rounded" />
-  </div>
-
-  <div className="flex flex-col">
-    <label className="text-sm font-medium">Vertical Spacing</label>
-    <input type="number" value={spacing.vertical} onChange={e => setSpacing({ ...spacing, vertical: Number(e.target.value) })} className="border p-2 w-24 rounded" />
-  </div>
-
-  <div className="flex flex-col">
-    <label className="text-sm font-medium">Card Width</label>
-    <input type="number" value={cardSize.width} onChange={e => setCardSize({ ...cardSize, width: Number(e.target.value) })} className="border p-2 w-24 rounded" />
-  </div>
-
-  <div className="flex flex-col">
-    <label className="text-sm font-medium">Card Height</label>
-    <input type="number" value={cardSize.height} onChange={e => setCardSize({ ...cardSize, height: Number(e.target.value) })} className="border p-2 w-24 rounded" />
-  </div>
-
-  <div className="flex flex-col">
-    <label className="text-sm font-medium">Upload File</label>
-    <input type="file" accept=".xlsx,.csv" onChange={handleFile} className="border p-2 rounded" />
-  </div>
-
-  <div className="flex flex-col">
-    <label className="text-sm font-medium invisible">Load</label>
-    <button onClick={loadStudents} className="bg-blue-600 text-white px-3 py-2 rounded">Load Students</button>
-  </div>
-        </div>
-      </div>
-
-      <div className="flex-1 space-y-4 mt-4 md:mt-0 md:overflow-auto md:max-h-[calc(100vh-2rem)]">
+      <div className="flex-1 overflow-y-auto space-y-4 mt-4 md:mt-0">
         {rows.length > 0 && (
           <div className="flex items-center flex-wrap gap-2">
             <button onClick={() => setIndex(i => Math.max(i - 1, 0))} className="px-2 py-1 bg-gray-200 rounded">Prev</button>
@@ -383,15 +407,12 @@ const BulkGenerator = () => {
           </div>
         )}
 
-         <div className="mt-4 flex flex-wrap md:flex-nowrap gap-4 justify-center">
-          <div className="border bg-white shadow inline-block md:w-1/2">
-            <canvas id="bulk-canvas" className="max-w-full h-auto" />
-          </div>
-          
+        <div className="mt-4 flex flex-wrap md:flex-nowrap gap-4 justify-center">
           <div className="border bg-white shadow inline-block md:w-1/2">
             <canvas id="bulk-canvas" className="max-w-full h-auto" />
           </div>
           <div className="border bg-white shadow inline-block">
+            <ZoomControls zoom={previewZoom} setZoom={setPreviewZoom} />
             <canvas ref={previewRef} className="max-w-full h-auto" />
           </div>
         </div>

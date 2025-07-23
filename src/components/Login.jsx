@@ -2,7 +2,6 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import toast, { Toaster } from 'react-hot-toast';
-import BASE_URL from '../config';
 import { getInstituteId } from '../utils/instituteUtils';
 import { fetchBranding } from '../utils/brandingUtils';
 import { fetchAndStoreMasters } from '../utils/masterUtils';
@@ -44,7 +43,7 @@ const Login = () => {
     const insti = getInstituteId(searchParams);
     try {
       // Make sure backend uses bcrypt.compare for hashed password check!
-      const { data } = await axios.post(`${BASE_URL}/api/auth/user/login`, { username, password });
+      const { data } = await axios.post(`https://canvaback.onrender.com/api/auth/user/login`, { username, password });
       if (data.message !== 'success') {
         toast.error(data.message || 'Invalid credentials');
         setLoading(false);

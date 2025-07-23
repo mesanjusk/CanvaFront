@@ -1,6 +1,5 @@
 import React, { createContext, useEffect, useState } from 'react';
 import axios from 'axios';
-import BASE_URL from '../config';
 
 export const BrandingContext = createContext();
 
@@ -44,7 +43,7 @@ const BrandingProvider = ({ children }) => {
       const insti = getInstituteId();
 
       try {
-        const res = await axios.get(`http://localhost:5000/api/branding${insti ? `?i=${insti}` : ''}`);
+       const res = await axios.get(`https://canvaback.onrender.com/api/branding${insti ? `?i=${insti}` : ''}`);
         const data = res.data || {};
 
         const final = {

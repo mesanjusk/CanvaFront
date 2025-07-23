@@ -32,7 +32,6 @@ export const storeUserData = ({ id, name, role, username }) => {
     name,
     role: role || 'admin',
     username,
-    institute_uuid
   };
 
   localStorage.setItem('user', JSON.stringify(userObj));

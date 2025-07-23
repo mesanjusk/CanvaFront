@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 
 export const fetchBranding = async (insti, setBranding) => {
   try {
-    const res = await axios.get(`${BASE_URL}/api/branding?i=${insti || 'default'}`);
+    const res = await axios.get(`https://canvaback.onrender.com/api/branding?i=${insti || 'default'}`);
     const data = res.data;
     const themeColor = data.theme?.color || '#5b5b5b';
 

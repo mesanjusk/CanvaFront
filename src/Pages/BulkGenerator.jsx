@@ -72,7 +72,7 @@ const BulkGenerator = () => {
       : base;
     canvas.setWidth(s.width);
     canvas.setHeight(s.height);
-    }, [canvas, size, custom, orientation]);
+  }, [canvas, size, custom, orientation]);
 
      const renderPreview = () => {
     if (!canvas || !previewRef.current) return;
@@ -121,6 +121,10 @@ const BulkGenerator = () => {
   useEffect(() => {
     loadCurrent();
   }, [selected, rows, index, canvas]);
+
+  useEffect(() => {
+    renderPreview();
+  }, [canvas, size, custom, orientation, margins, spacing, cols, rowsPerPage, cardSize, index]);
 
   const handleFile = (e) => {
     const file = e.target.files[0];
@@ -239,44 +243,71 @@ const BulkGenerator = () => {
 
 
   return (
-    <div className="p-4 space-y-4">
-      <h1 className="text-2xl font-bold mb-2">Bulk Generator</h1>
+    <div className="p-4 md:flex gap-6">
+      <div className="md:w-64 w-full space-y-4">
+        <h1 className="text-2xl font-bold">Bulk Generator</h1>
 
-     <div className="flex flex-wrap gap-4 items-center">
-  <div className="flex flex-col">
-    <label className="text-sm font-medium">Template</label>
-    <select value={selected || ''} onChange={e => setSelected(e.target.value)} className="border p-2 rounded w-48">
-      <option value="">Select Template</option>
-      {templates.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
-    </select>
-  </div>
+        <div className="flex flex-wrap md:flex-col gap-4 items-start">
+          <div className="flex flex-col">
+            <label className="text-sm font-medium">Template</label>
+            <select
+              value={selected || ''}
+              onChange={e => setSelected(e.target.value)}
+              className="border p-2 rounded w-48"
+            >
+              <option value="">Select Template</option>
+              {templates.map(t => (
+                <option key={t.id} value={t.id}>{t.title}</option>
+              ))}
+            </select>
+          </div>
 
-  <div className="flex flex-col">
-    <label className="text-sm font-medium">Page Size</label>
-    <select value={size} onChange={e => setSize(e.target.value)} className="border p-2 rounded w-32">
-      <option value="A4">A4</option>
-      <option value="A3">A3</option>
-      <option value="custom">Custom</option>
-    </select>
-  </div>
+          <div className="flex flex-col">
+            <label className="text-sm font-medium">Page Size</label>
+            <select
+              value={size}
+              onChange={e => setSize(e.target.value)}
+              className="border p-2 rounded w-32"
+            >
+              <option value="A4">A4</option>
+              <option value="A3">A3</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
 
-  <div className="flex flex-col">
-    <label className="text-sm font-medium">Orientation</label>
-    <select value={orientation} onChange={e => setOrientation(e.target.value)} className="border p-2 rounded w-32">
-      <option value="portrait">Portrait</option>
-      <option value="landscape">Landscape</option>
-    </select>
-  </div>
+          <div className="flex flex-col">
+            <label className="text-sm font-medium">Orientation</label>
+            <select
+              value={orientation}
+              onChange={e => setOrientation(e.target.value)}
+              className="border p-2 rounded w-32"
+            >
+              <option value="portrait">Portrait</option>
+              <option value="landscape">Landscape</option>
+            </select>
+          </div>
 
-  <div className="flex flex-col">
-    <label className="text-sm font-medium">Columns</label>
-    <input type="number" min={1} value={cols} onChange={e => setCols(Number(e.target.value) || 1)} className="border p-2 w-20 rounded" />
-  </div>
+          <div className="flex flex-col">
+            <label className="text-sm font-medium">Columns</label>
+            <input
+              type="number"
+              min={1}
+              value={cols}
+              onChange={e => setCols(Number(e.target.value) || 1)}
+              className="border p-2 w-20 rounded"
+            />
+          </div>
 
-  <div className="flex flex-col">
-    <label className="text-sm font-medium">Rows per Page</label>
-    <input type="number" min={1} value={rowsPerPage} onChange={e => setRowsPerPage(Number(e.target.value) || 1)} className="border p-2 w-20 rounded" />
-  </div>
+          <div className="flex flex-col">
+            <label className="text-sm font-medium">Rows per Page</label>
+            <input
+              type="number"
+              min={1}
+              value={rowsPerPage}
+              onChange={e => setRowsPerPage(Number(e.target.value) || 1)}
+              className="border p-2 w-20 rounded"
+            />
+          </div>
 
   {size === 'custom' && (
     <>
@@ -335,27 +366,30 @@ const BulkGenerator = () => {
     <label className="text-sm font-medium invisible">Load</label>
     <button onClick={loadStudents} className="bg-blue-600 text-white px-3 py-2 rounded">Load Students</button>
   </div>
-</div>
-
-      {rows.length > 0 && (
-        <div className="flex items-center gap-2 mt-4">
-          <button onClick={() => setIndex(i => Math.max(i - 1, 0))} className="px-2 py-1 bg-gray-200 rounded">Prev</button>
-          <span>{index + 1} / {rows.length}</span>
-          <button onClick={() => setIndex(i => Math.min(i + 1, rows.length - 1))} className="px-2 py-1 bg-gray-200 rounded">Next</button>
-          <button onClick={downloadCurrent} className="px-2 py-1 bg-green-600 text-white rounded">Download</button>
-          <button onClick={downloadAll} className="px-2 py-1 bg-blue-600 text-white rounded">Export All</button>
-          <button onClick={() => downloadLayout('pdf')} className="px-2 py-1 bg-purple-600 text-white rounded">Layout PDF</button>
-          <button onClick={() => downloadLayout('png')} className="px-2 py-1 bg-purple-600 text-white rounded">Layout PNG</button>
-          <button onClick={() => downloadLayout('jpg')} className="px-2 py-1 bg-purple-600 text-white rounded">Layout JPG</button>
         </div>
-      )}
+      </div>
 
-      <div className="mt-4 flex flex-wrap gap-4">
-        <div className="border inline-block">
-          <canvas id="bulk-canvas" />
-        </div>
-        <div className="border inline-block">
-          <canvas ref={previewRef} />
+      <div className="flex-1 space-y-4 mt-4 md:mt-0">
+        {rows.length > 0 && (
+          <div className="flex items-center flex-wrap gap-2">
+            <button onClick={() => setIndex(i => Math.max(i - 1, 0))} className="px-2 py-1 bg-gray-200 rounded">Prev</button>
+            <span>{index + 1} / {rows.length}</span>
+            <button onClick={() => setIndex(i => Math.min(i + 1, rows.length - 1))} className="px-2 py-1 bg-gray-200 rounded">Next</button>
+            <button onClick={downloadCurrent} className="px-2 py-1 bg-green-600 text-white rounded">Download</button>
+            <button onClick={downloadAll} className="px-2 py-1 bg-blue-600 text-white rounded">Export All</button>
+            <button onClick={() => downloadLayout('pdf')} className="px-2 py-1 bg-purple-600 text-white rounded">Layout PDF</button>
+            <button onClick={() => downloadLayout('png')} className="px-2 py-1 bg-purple-600 text-white rounded">Layout PNG</button>
+            <button onClick={() => downloadLayout('jpg')} className="px-2 py-1 bg-purple-600 text-white rounded">Layout JPG</button>
+          </div>
+        )}
+
+        <div className="mt-4 flex flex-wrap gap-4 justify-center">
+          <div className="border inline-block">
+            <canvas id="bulk-canvas" className="max-w-full h-auto" />
+          </div>
+          <div className="border inline-block">
+            <canvas ref={previewRef} className="max-w-full h-auto" />
+          </div>
         </div>
       </div>
     </div>

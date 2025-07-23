@@ -44,7 +44,7 @@ import TemplateManager from './pages/TemplateManager';
 import AddTemplate from './pages/addTemplate';
 import AddCategory from './pages/addCategory';
 import AddSubcategory from './pages/addSubcategory';
-import BulkGenerator from './pages/BulkGenerator';
+import BulkGenerator from './Pages/BulkGenerator';
 
 export default function App() {
   return (

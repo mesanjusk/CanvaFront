@@ -29,6 +29,7 @@ const fillPlaceholders = (json, row) => {
 
 const BulkGenerator = () => {
   const canvasRef = useRef(null);
+  const previewRef = useRef(null);
   const [canvas, setCanvas] = useState(null);
   const [templates, setTemplates] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -73,11 +74,48 @@ const BulkGenerator = () => {
     canvas.setHeight(s.height);
     }, [canvas, size, custom, orientation]);
 
+     const renderPreview = () => {
+    if (!canvas || !previewRef.current) return;
+    const baseSize = size === 'A4' ? A4 : size === 'A3' ? A3 : custom;
+    const pageSize = orientation === 'landscape'
+      ? { width: baseSize.height, height: baseSize.width }
+      : baseSize;
+
+    const previewCanvas = previewRef.current;
+    const scale = Math.min(600 / pageSize.width, 800 / pageSize.height, 1);
+    previewCanvas.width = pageSize.width * scale;
+    previewCanvas.height = pageSize.height * scale;
+    const ctx = previewCanvas.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
+
+    const cellW = cardSize.width || (pageSize.width - margins.left - margins.right - spacing.horizontal * (cols - 1)) / cols;
+    const cellH = cardSize.height || (pageSize.height - margins.top - spacing.vertical * (rowsPerPage - 1)) / rowsPerPage;
+
+    const img = new Image();
+    img.onload = () => {
+      for (let i = 0; i < cols * rowsPerPage; i++) {
+        const x = margins.left + (i % cols) * (cellW + spacing.horizontal);
+        const y = margins.top + Math.floor(i / cols) * (cellH + spacing.vertical);
+        ctx.drawImage(img, x * scale, y * scale, cellW * scale, cellH * scale);
+        ctx.strokeStyle = '#000';
+        ctx.strokeRect(x * scale, y * scale, cellW * scale, cellH * scale);
+      }
+    };
+    img.src = canvas.toDataURL({ format: 'png' });
+  };
+
   const loadCurrent = async () => {
     if (!canvas || !selected || !rows[index]) return;
     const { data } = await axios.get(`https://canvaback.onrender.com/api/template/${selected}`);
     const json = fillPlaceholders(data.canvasJson, rows[index]);
-    canvas.loadFromJSON(json, () => canvas.renderAll());
+     await new Promise(res =>
+      canvas.loadFromJSON(json, () => {
+        canvas.renderAll();
+        res();
+      })
+    );
+    renderPreview();
   };
 
   useEffect(() => {

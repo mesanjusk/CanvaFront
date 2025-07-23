@@ -74,7 +74,7 @@ const BulkGenerator = () => {
     canvas.setHeight(s.height);
   }, [canvas, size, custom, orientation]);
 
-     const renderPreview = () => {
+  const renderPreview = () => {
     if (!canvas || !previewRef.current) return;
     const baseSize = size === 'A4' ? A4 : size === 'A3' ? A3 : custom;
     const pageSize = orientation === 'landscape'
@@ -109,7 +109,7 @@ const BulkGenerator = () => {
     if (!canvas || !selected || !rows[index]) return;
     const { data } = await axios.get(`https://canvaback.onrender.com/api/template/${selected}`);
     const json = fillPlaceholders(data.canvasJson, rows[index]);
-     await new Promise(res =>
+    await new Promise(res =>
       canvas.loadFromJSON(json, () => {
         canvas.renderAll();
         res();
@@ -120,7 +120,7 @@ const BulkGenerator = () => {
 
   useEffect(() => {
     loadCurrent();
-  }, [selected, rows, index, canvas]);
+  }, [selected, rows, index, canvas, size, custom, orientation]);
 
   useEffect(() => {
     renderPreview();
@@ -243,8 +243,8 @@ const BulkGenerator = () => {
 
 
   return (
-    <div className="p-4 md:flex gap-6">
-      <div className="md:w-64 w-full space-y-4">
+    <div className="p-4 md:flex gap-6 h-full">
+      <div className="md:w-64 w-full space-y-4 bg-gray-50 p-4 rounded shadow overflow-auto max-h-[calc(100vh-2rem)]">
         <h1 className="text-2xl font-bold">Bulk Generator</h1>
 
         <div className="flex flex-wrap md:flex-col gap-4 items-start">
@@ -384,10 +384,10 @@ const BulkGenerator = () => {
         )}
 
         <div className="mt-4 flex flex-wrap gap-4 justify-center">
-          <div className="border inline-block">
+          <div className="border bg-white shadow inline-block">
             <canvas id="bulk-canvas" className="max-w-full h-auto" />
           </div>
-          <div className="border inline-block">
+          <div className="border bg-white shadow inline-block">
             <canvas ref={previewRef} className="max-w-full h-auto" />
           </div>
         </div>

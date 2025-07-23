@@ -8,7 +8,7 @@ import TemplateManager from "./pages/TemplateManager"; // 🆕 import
 import TemplateGallery from "./pages/TemplateGallery";
 import Students from './pages/Students';
 import Signup from "./components/Signup";
-import BulkGenerator from "./pages/BulkGenerator";
+import BulkGenerator from "./Pages/BulkGenerator";
 
 function App() {
   return (

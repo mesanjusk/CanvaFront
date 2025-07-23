@@ -10,6 +10,7 @@ import UndoRedoControls from "./UndoRedoControls";
 import LayerPanel from "./LayerPanel";
 import BottomToolbar from "./BottomToolbar";
 import FloatingObjectToolbar from "./FloatingObjectToolbar";
+import { getStoredUser, getStoredInstituteUUID} from '../utils/storageUtils';
 
 import {
   RefreshCw,
@@ -31,6 +32,22 @@ const CanvasEditor = () => {
   const { templateId } = useParams();
   const [students, setStudents] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null);
+  const [instituteInfo, setInstituteInfo] = useState(null);
+
+
+ useEffect(() => {
+  const institute_uuid = getStoredInstituteUUID();
+  if (institute_uuid) {
+    axios
+      .get(`https://canvaback.onrender.com/api/institute/${institute_uuid}`)
+      .then((res) => {
+        console.log("Institute Info:", res.data.result); // ✅ Shows actual data
+        setInstituteInfo(res.data.result); // ✅ Fix: use .result
+      })
+      .catch((err) => console.error("Failed to fetch institute info", err));
+  }
+}, []);
+
 
   const {
     canvasRef,
@@ -96,101 +113,151 @@ useEffect(() => {
     canvas.clear(); // Clear everything
 
     // Load and add template background
-    if (templateId) {
-      try {
-        const res = await axios.get(`https://canvaback.onrender.com/api/template/${templateId}`);
-        const { image, title } = res.data;
+   // Load and add template background
+if (templateId) {
+  try {
+    const res = await axios.get(`https://canvaback.onrender.com/api/template/${templateId}`);
+    const { image, title } = res.data;
 
-        if (image) {
-          const targetWidth = 400;
-          const targetHeight = 550;
+    if (image) {
+      const targetWidth = 400;
+      const targetHeight = 550;
 
-          canvas.setWidth(targetWidth);
-          canvas.setHeight(targetHeight);
+      canvas.setWidth(targetWidth);
+      canvas.setHeight(targetHeight);
 
-          await new Promise((resolve) => {
-            fabric.Image.fromURL(
-              image,
-              (img) => {
-                const scaleX = targetWidth / img.width;
-                const scaleY = targetHeight / img.height;
-                const scale = Math.min(scaleX, scaleY);
-
-                img.scale(scale);
-                img.set({
-                  left: (targetWidth - img.getScaledWidth()) / 2,
-                  top: (targetHeight - img.getScaledHeight()) / 2,
-                  selectable: false,
-                  evented: false,
-                });
-
-                canvas.add(img);
-                img.sendToBack();
-                resolve();
-              },
-              { crossOrigin: "anonymous" }
-            );
-          });
-
-          if (title) {
-            const titleText = new fabric.Text(title, {
-              left: targetWidth / 2,
-              top: 20,
-              fontSize: 24,
-              fill: "#333",
-              originX: "center",
-              selectable: false,
-              evented: false,
-            });
-            canvas.add(titleText);
-          }
-        }
-      } catch (err) {
-        console.error("Error loading template:", err);
-      }
-    }
-
-    // Add student name and photo
-    if (selectedStudent) {
-      const fullName = `${selectedStudent.firstName} ${selectedStudent.middleName || ""} ${selectedStudent.lastName || ""}`.trim();
-
-      const nameText = new fabric.Text(fullName, {
-        left: 50,
-        top: 100,
-        fontSize: 22,
-        fill: "#000",
-      });
-      canvas.add(nameText);
-
-      if (selectedStudent.photo && selectedStudent.photo[0]) {
+      await new Promise((resolve) => {
         fabric.Image.fromURL(
-          selectedStudent.photo[0],
+          image,
           (img) => {
+            const scaleX = targetWidth / img.width;
+            const scaleY = targetHeight / img.height;
+            const scale = Math.min(scaleX, scaleY);
+
+            img.scale(scale);
             img.set({
-              left: 50,
-              top: 150,
-              scaleX: 0.2,
-              scaleY: 0.2,
+              left: (targetWidth - img.getScaledWidth()) / 2,
+              top: (targetHeight - img.getScaledHeight()) / 2,
+              selectable: true,        
+              hasControls: true,        
             });
+
             canvas.add(img);
-            canvas.renderAll();
+            img.sendToBack();
+            resolve();
           },
           { crossOrigin: "anonymous" }
         );
-      } else {
-        canvas.renderAll();
+      });
+
+      if (title) {
+        const titleText = new fabric.Text(title, {
+          left: targetWidth / 2,
+          top: 20,
+          fontSize: 24,
+          fill: "#333",
+          originX: "center",
+          selectable: true,       // ✅ make title movable
+          hasControls: true,
+        });
+        canvas.add(titleText);
       }
-    } else {
-      canvas.renderAll();
     }
+  } catch (err) {
+    console.error("Error loading template:", err);
+  }
+}
+
+// Add student name and photo
+if (selectedStudent) {
+  const fullName = `${selectedStudent.firstName} ${selectedStudent.middleName || ""} ${selectedStudent.lastName || ""}`.trim();
+
+  const nameText = new fabric.Text(fullName, {
+    left: 50,
+    top: 100,
+    fontSize: 22,
+    fill: "#000",
+    selectable: true,       // ✅ allow moving
+    hasControls: true,
+  });
+  canvas.add(nameText);
+
+  if (selectedStudent.photo && selectedStudent.photo[0]) {
+    fabric.Image.fromURL(
+      selectedStudent.photo[0],
+      (img) => {
+        img.set({
+          left: 50,
+          top: 150,
+          scaleX: 0.2,
+          scaleY: 0.2,
+          selectable: true,   // ✅ movable
+          hasControls: true,
+        });
+        canvas.add(img);
+        canvas.renderAll();
+      },
+      { crossOrigin: "anonymous" }
+    );
+  } else {
+    canvas.renderAll();
+  }
+} else {
+  canvas.renderAll();
+}
+
+// Add logo (movable)
+if (instituteInfo?.logo) {
+  await new Promise((resolve) => {
+    fabric.Image.fromURL(instituteInfo.logo, (img) => {
+      img.set({
+        left: 20,
+        top: 20,
+        scaleX: 0.2,
+        scaleY: 0.2,
+        selectable: true,     // ✅ allow dragging
+        hasControls: true,
+      });
+      canvas.add(img);
+      img.bringToFront();
+      resolve();
+    }, { crossOrigin: 'anonymous' });
+  });
+}
+
+// Add signature (movable)
+if (instituteInfo?.signature) {
+  await new Promise((resolve) => {
+    fabric.Image.fromURL(instituteInfo.signature, (img) => {
+      img.set({
+        left: canvas.width - 100,
+        top: canvas.height - 80,
+        scaleX: 0.2,
+        scaleY: 0.2,
+        selectable: true,    // ✅ draggable
+        hasControls: true,
+      });
+      canvas.add(img);
+      img.bringToFront();
+      resolve();
+    }, { crossOrigin: 'anonymous' });
+  });
+}
+
   };
 
   renderTemplateAndStudent();
-}, [templateId, selectedStudent, canvas]);
+}, [templateId, selectedStudent, canvas, instituteInfo]);
 
 
   return (
-    <div className="min-h-screen w-full bg-gray-100 flex flex-col">
+     <div className="h-screen flex flex-col">
+      <header className="h-12 bg-gray-800 text-white flex items-center px-4 gap-4">
+        <a href="/" className="font-bold">Framee</a>
+        <a href="/templates" className="underline">Templates</a>
+      </header>
+      <main className="flex-1 bg-gray-100">
+        <div className="min-h-screen w-full bg-gray-100 flex flex-col">
       <div className="p-4">
         <label className="block mb-2 font-semibold">Select Student:</label>
         <select onChange={(e) => handleStudentSelect(e.target.value)}>
@@ -362,6 +429,21 @@ useEffect(() => {
 
       {/* Drawer Settings */}
       <Drawer isOpen={showSettings} onClose={() => setShowSettings(false)}>
+
+        {instituteInfo?.logo && (
+  <div className="p-4">
+    <h3 className="text-lg font-bold mb-2">Institute Logo</h3>
+    <img src={instituteInfo.logo} className="w-32 h-32 object-contain" />
+  </div>
+)}
+
+{instituteInfo?.sign && (
+  <div className="p-4">
+    <h3 className="text-lg font-bold mb-2">Signature</h3>
+    <img src={instituteInfo.signature} className="w-32 h-20 object-contain" />
+  </div>
+)}
+
         
          {selectedStudent && selectedStudent.photo && (
     <div className="p-4">
@@ -411,6 +493,10 @@ useEffect(() => {
         sendToBack={sendToBack}
       />
     </div>
+       
+      </main>
+    </div>
+   
   );
 };
 

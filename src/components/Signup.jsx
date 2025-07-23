@@ -55,37 +55,29 @@ const [signatureFile, setSignatureFile] = useState(null);
       return;
     }
 
-    const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-    setServerOtp(generatedOtp); // Save it for comparison later
+   const res = await axios.post(`https://canvaback.onrender.com/api/institute/send-message`, {
+  mobile: `91${form.institute_call_number}`,
+  type: 'signup',
+  userName: form.center_head_name,
+});
 
-    const message = `Your OTP for Institute registration is ${generatedOtp}`;
+if (res.data.success) {
+ setServerOtp(String(res.data.otp));
+  setOtpSent(true);
+  toast.success('OTP sent to your mobile');
+} else {
+  toast.error('Failed to send OTP');
+}
 
-    try {
-      const res = await axios.post(`https://canvaback.onrender.com/api/institute/send-message`, {
-        mobile: `91${form.institute_call_number}`,
-        message,
-        type: 'signup',
-        userName: form.center_head_name,
-      });
-
-      if (res.data.success) {
-        setOtpSent(true);
-        toast.success('OTP sent to your mobile');
-      } else {
-        toast.error('Failed to send OTP');
-      }
-    } catch (err) {
-      console.error('OTP Send Error:', err);
-      toast.error('Error sending OTP');
-    }
   };
 
   const handleSignup = async (e) => {
     e.preventDefault();
-    if (!otp || otp !== serverOtp) {
-      toast.error('Invalid OTP');
-      return;
-    }
+    if (!otp || otp.trim() !== String(serverOtp)) {
+  toast.error('Invalid OTP');
+  return;
+}
+
 
      const formData = new FormData();
   formData.append('institute_title', form.institute_title);

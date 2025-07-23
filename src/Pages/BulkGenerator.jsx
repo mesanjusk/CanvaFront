@@ -350,8 +350,13 @@ const BulkGenerator = () => {
         </div>
       )}
 
-      <div className="mt-4 border inline-block">
-        <canvas id="bulk-canvas" />
+      <div className="mt-4 flex flex-wrap gap-4">
+        <div className="border inline-block">
+          <canvas id="bulk-canvas" />
+        </div>
+        <div className="border inline-block">
+          <canvas ref={previewRef} />
+        </div>
       </div>
     </div>
   );

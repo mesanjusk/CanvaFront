@@ -8,6 +8,7 @@ import TemplateManager from "./pages/TemplateManager"; // 🆕 import
 import TemplateGallery from "./pages/TemplateGallery";
 import Students from './pages/Students';
 import Signup from "./components/Signup";
+import BulkGenerator from "./pages/BulkGenerator";
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
           <Route path="/addCategory" element={<AddCategory />} />
           <Route path="/addSubcategory" element={<AddSubcategory />} />
           <Route path="/templateManager" element={<TemplateManager />} /> 
+          <Route path="/bulk" element={<BulkGenerator />} />
           <Route path="/students" element={<Students />} />
           <Route path="/signup" element={<Signup />} />
         </Routes>

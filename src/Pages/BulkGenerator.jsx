@@ -3,6 +3,7 @@ import axios from 'axios';
 import * as XLSX from 'xlsx';
 import { fabric } from 'fabric';
 import { jsPDF } from 'jspdf';
+import BASE_URL from '../config';
 
 const A4 = { width: 2480, height: 3508 };
 const A3 = { width: 3508, height: 4961 };
@@ -35,7 +36,8 @@ const BulkGenerator = () => {
   const [index, setIndex] = useState(0);
   const [size, setSize] = useState('A4');
   const [custom, setCustom] = useState({ width: A4.width, height: A4.height });
-  const [perPage, setPerPage] = useState(4);
+  const [cols, setCols] = useState(2);
+  const [rowsPerPage, setRowsPerPage] = useState(2);
 
   useEffect(() => {
     const c = new fabric.Canvas('bulk-canvas', {
@@ -62,8 +64,7 @@ const BulkGenerator = () => {
     const s = size === 'A4' ? A4 : size === 'A3' ? A3 : custom;
     canvas.setWidth(s.width);
     canvas.setHeight(s.height);
-    canvas.renderAll();
-  }, [size, custom, canvas]);
+  }, [canvas, size, custom]);
 
   const loadCurrent = async () => {
     if (!canvas || !selected || !rows[index]) return;
@@ -88,6 +89,17 @@ const BulkGenerator = () => {
       setIndex(0);
     };
     reader.readAsBinaryString(file);
+  };
+
+  const loadStudents = async () => {
+    try {
+      const res = await axios.get(`${BASE_URL}/api/students`);
+      const data = Array.isArray(res.data?.data) ? res.data.data : [];
+      setRows(data);
+      setIndex(0);
+    } catch (e) {
+      console.error('Failed to load students', e);
+    }
   };
 
   const downloadCurrent = () => {
@@ -118,8 +130,7 @@ const BulkGenerator = () => {
   const downloadLayout = async (format) => {
     if (!canvas || !selected || rows.length === 0) return;
     const pageSize = size === 'A4' ? A4 : size === 'A3' ? A3 : custom;
-    const cols = 2;
-    const rowsPerPage = perPage === 8 ? 4 : 2;
+    const perPage = cols * rowsPerPage;
     const cellW = pageSize.width / cols;
     const cellH = pageSize.height / rowsPerPage;
 
@@ -148,32 +159,13 @@ const BulkGenerator = () => {
       });
       pdf.save('bulk_layout.pdf');
     } else {
-      const off = document.createElement('canvas');
-      off.width = pageSize.width;
-      off.height = pageSize.height;
-      const ctx = off.getContext('2d');
-      ctx.fillStyle = '#fff';
       let pageIndex = 0;
-      for (let i = 0; i < images.length; i++) {
-        if (i % perPage === 0) ctx.clearRect(0, 0, off.width, off.height);
-        const pos = i % perPage;
-        const x = (pos % cols) * cellW;
-        const y = Math.floor(pos / cols) * cellH;
-        const img = await new Promise(res => {
-          const im = new Image();
-          im.onload = () => res(im);
-          im.src = images[i];
-        });
-        ctx.drawImage(img, x, y, cellW, cellH);
-        const isLast = i === images.length - 1;
-        if (pos === perPage - 1 || isLast) {
-          const url = off.toDataURL(`image/${format}`);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `page_${pageIndex + 1}.${format}`;
-          a.click();
-          pageIndex++;
-        }
+      for (let i = 0; i < images.length; i += perPage) {
+        const a = document.createElement('a');
+        a.href = images[i];
+        a.download = `page_${pageIndex + 1}.${format}`;
+        a.click();
+        pageIndex++;
       }
     }
   };
@@ -194,10 +186,22 @@ const BulkGenerator = () => {
           <option value="custom">Custom</option>
         </select>
 
-        <select value={perPage} onChange={e => setPerPage(Number(e.target.value))} className="border p-2 rounded">
-          <option value={4}>4 per page</option>
-          <option value={8}>8 per page</option>
-        </select>
+        <input
+          type="number"
+          min={1}
+          value={cols}
+          onChange={e => setCols(Number(e.target.value) || 1)}
+          className="border p-2 w-20 rounded"
+          placeholder="Columns"
+        />
+        <input
+          type="number"
+          min={1}
+          value={rowsPerPage}
+          onChange={e => setRowsPerPage(Number(e.target.value) || 1)}
+          className="border p-2 w-20 rounded"
+          placeholder="Rows"
+        />
 
         {size === 'custom' && (
           <>
@@ -207,6 +211,9 @@ const BulkGenerator = () => {
         )}
 
         <input type="file" accept=".xlsx,.csv" onChange={handleFile} className="border p-2" />
+        <button onClick={loadStudents} className="bg-blue-600 text-white px-3 py-2 rounded">
+          Load Students
+        </button>
       </div>
 
       {rows.length > 0 && (

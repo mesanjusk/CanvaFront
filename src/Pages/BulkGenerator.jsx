@@ -65,10 +65,13 @@ const BulkGenerator = () => {
 
   useEffect(() => {
     if (!canvas) return;
-    const s = size === 'A4' ? A4 : size === 'A3' ? A3 : custom;
+    const base = size === 'A4' ? A4 : size === 'A3' ? A3 : custom;
+    const s = orientation === 'landscape'
+      ? { width: base.height, height: base.width }
+      : base;
     canvas.setWidth(s.width);
     canvas.setHeight(s.height);
-  }, [canvas, size, custom]);
+    }, [canvas, size, custom, orientation]);
 
   const loadCurrent = async () => {
     if (!canvas || !selected || !rows[index]) return;

@@ -243,8 +243,8 @@ const BulkGenerator = () => {
 
 
   return (
-    <div className="p-4 md:flex gap-6 h-full">
-      <div className="md:w-64 w-full space-y-4 bg-gray-50 p-4 rounded shadow overflow-auto max-h-[calc(100vh-2rem)]">
+    <div className="p-4 flex flex-col md:flex-row gap-6 h-full">
+      <div className="md:w-72 w-full space-y-4 bg-gray-50 p-4 rounded shadow md:overflow-auto md:max-h-[calc(100vh-2rem)]">
         <h1 className="text-2xl font-bold">Bulk Generator</h1>
 
         <div className="flex flex-wrap md:flex-col gap-4 items-start">
@@ -369,7 +369,7 @@ const BulkGenerator = () => {
         </div>
       </div>
 
-      <div className="flex-1 space-y-4 mt-4 md:mt-0">
+      <div className="flex-1 space-y-4 mt-4 md:mt-0 md:overflow-auto md:max-h-[calc(100vh-2rem)]">
         {rows.length > 0 && (
           <div className="flex items-center flex-wrap gap-2">
             <button onClick={() => setIndex(i => Math.max(i - 1, 0))} className="px-2 py-1 bg-gray-200 rounded">Prev</button>
@@ -383,8 +383,12 @@ const BulkGenerator = () => {
           </div>
         )}
 
-        <div className="mt-4 flex flex-wrap gap-4 justify-center">
-          <div className="border bg-white shadow inline-block">
+         <div className="mt-4 flex flex-wrap md:flex-nowrap gap-4 justify-center">
+          <div className="border bg-white shadow inline-block md:w-1/2">
+            <canvas id="bulk-canvas" className="max-w-full h-auto" />
+          </div>
+          
+          <div className="border bg-white shadow inline-block md:w-1/2">
             <canvas id="bulk-canvas" className="max-w-full h-auto" />
           </div>
           <div className="border bg-white shadow inline-block">

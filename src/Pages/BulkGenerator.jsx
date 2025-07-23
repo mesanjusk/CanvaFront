@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import { fabric } from 'fabric';
+import { jsPDF } from 'jspdf';
 
 const A4 = { width: 2480, height: 3508 };
 const A3 = { width: 3508, height: 4961 };
@@ -34,6 +35,7 @@ const BulkGenerator = () => {
   const [index, setIndex] = useState(0);
   const [size, setSize] = useState('A4');
   const [custom, setCustom] = useState({ width: A4.width, height: A4.height });
+  const [perPage, setPerPage] = useState(4);
 
   useEffect(() => {
     const c = new fabric.Canvas('bulk-canvas', {
@@ -67,9 +69,7 @@ const BulkGenerator = () => {
     if (!canvas || !selected || !rows[index]) return;
     const { data } = await axios.get(`https://canvaback.onrender.com/api/template/${selected}`);
     const json = fillPlaceholders(data.canvasJson, rows[index]);
-    canvas.loadFromJSON(json, () => {
-      canvas.renderAll();
-    });
+    canvas.loadFromJSON(json, () => canvas.renderAll());
   };
 
   useEffect(() => {
@@ -115,6 +115,69 @@ const BulkGenerator = () => {
     }
   };
 
+  const downloadLayout = async (format) => {
+    if (!canvas || !selected || rows.length === 0) return;
+    const pageSize = size === 'A4' ? A4 : size === 'A3' ? A3 : custom;
+    const cols = 2;
+    const rowsPerPage = perPage === 8 ? 4 : 2;
+    const cellW = pageSize.width / cols;
+    const cellH = pageSize.height / rowsPerPage;
+
+    const images = [];
+    for (let i = 0; i < rows.length; i++) {
+      const { data } = await axios.get(`https://canvaback.onrender.com/api/template/${selected}`);
+      const json = fillPlaceholders(data.canvasJson, rows[i]);
+      await new Promise(resolve =>
+        canvas.loadFromJSON(json, () => {
+          canvas.renderAll();
+          const url = canvas.toDataURL({ format: format === 'jpg' ? 'jpeg' : 'png' });
+          images.push(url);
+          resolve();
+        })
+      );
+    }
+
+    if (format === 'pdf') {
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [pageSize.width, pageSize.height] });
+      images.forEach((img, i) => {
+        if (i && i % perPage === 0) pdf.addPage();
+        const pos = i % perPage;
+        const x = (pos % cols) * cellW;
+        const y = Math.floor(pos / cols) * cellH;
+        pdf.addImage(img, 'PNG', x, y, cellW, cellH);
+      });
+      pdf.save('bulk_layout.pdf');
+    } else {
+      const off = document.createElement('canvas');
+      off.width = pageSize.width;
+      off.height = pageSize.height;
+      const ctx = off.getContext('2d');
+      ctx.fillStyle = '#fff';
+      let pageIndex = 0;
+      for (let i = 0; i < images.length; i++) {
+        if (i % perPage === 0) ctx.clearRect(0, 0, off.width, off.height);
+        const pos = i % perPage;
+        const x = (pos % cols) * cellW;
+        const y = Math.floor(pos / cols) * cellH;
+        const img = await new Promise(res => {
+          const im = new Image();
+          im.onload = () => res(im);
+          im.src = images[i];
+        });
+        ctx.drawImage(img, x, y, cellW, cellH);
+        const isLast = i === images.length - 1;
+        if (pos === perPage - 1 || isLast) {
+          const url = off.toDataURL(`image/${format}`);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `page_${pageIndex + 1}.${format}`;
+          a.click();
+          pageIndex++;
+        }
+      }
+    }
+  };
+
   return (
     <div className="p-4 space-y-4">
       <h1 className="text-2xl font-bold mb-2">Bulk Generator</h1>
@@ -129,6 +192,11 @@ const BulkGenerator = () => {
           <option value="A4">A4</option>
           <option value="A3">A3</option>
           <option value="custom">Custom</option>
+        </select>
+
+        <select value={perPage} onChange={e => setPerPage(Number(e.target.value))} className="border p-2 rounded">
+          <option value={4}>4 per page</option>
+          <option value={8}>8 per page</option>
         </select>
 
         {size === 'custom' && (
@@ -148,6 +216,9 @@ const BulkGenerator = () => {
           <button onClick={() => setIndex(i => Math.min(i + 1, rows.length - 1))} className="px-2 py-1 bg-gray-200 rounded">Next</button>
           <button onClick={downloadCurrent} className="px-2 py-1 bg-green-600 text-white rounded">Download</button>
           <button onClick={downloadAll} className="px-2 py-1 bg-blue-600 text-white rounded">Export All</button>
+          <button onClick={() => downloadLayout('pdf')} className="px-2 py-1 bg-purple-600 text-white rounded">Layout PDF</button>
+          <button onClick={() => downloadLayout('png')} className="px-2 py-1 bg-purple-600 text-white rounded">Layout PNG</button>
+          <button onClick={() => downloadLayout('jpg')} className="px-2 py-1 bg-purple-600 text-white rounded">Layout JPG</button>
         </div>
       )}
 

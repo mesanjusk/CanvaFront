@@ -36,6 +36,7 @@ const BulkGenerator = () => {
   const [canvas, setCanvas] = useState(null);
   const [templates, setTemplates] = useState([]);
   const [selected, setSelected] = useState(null);
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [rows, setRows] = useState([]);
   const [index, setIndex] = useState(0);
   const [size, setSize] = useState('A4');
@@ -132,22 +133,19 @@ const BulkGenerator = () => {
     img.src = canvas.toDataURL({ format: 'png' });
   };
 
-  const loadCurrent = async () => {
-    if (!canvas || !selected || !rows[index]) return;
-    const { data } = await axios.get(`https://canvaback.onrender.com/api/template/${selected}`);
-    const json = fillPlaceholders(data.canvasJson, rows[index]);
-    await new Promise(res =>
-      canvas.loadFromJSON(json, () => {
-        canvas.renderAll();
-        res();
-      })
-    );
-    renderPreview();
-  };
 
   useEffect(() => {
-    loadCurrent();
-  }, [selected, rows, index, canvas, size, custom, orientation]);
+  if (!selected) return;
+
+  axios.get(`https://canvaback.onrender.com/api/template/${selected}`)
+    .then(res => {
+      setSelectedTemplate(res.data); 
+    })
+    .catch(() => {
+      setSelectedTemplate(null);
+    });
+}, [selected]);
+
 
   useEffect(() => {
     renderPreview();
@@ -169,7 +167,7 @@ const BulkGenerator = () => {
 
   const loadStudents = async () => {
     try {
-      const res = await axios.get(`${BASE_URL}/api/students`);
+      const res = await axios.get(`https://canvaback.onrender.com/api/students`);
       const data = Array.isArray(res.data?.data) ? res.data.data : [];
       setRows(data);
       setIndex(0);
@@ -187,86 +185,115 @@ const BulkGenerator = () => {
     a.click();
   };
 
-  const downloadAll = async () => {
-    for (let i = 0; i < rows.length; i++) {
-      const { data } = await axios.get(`https://canvaback.onrender.com/api/template/${selected}`);
-      const json = fillPlaceholders(data.canvasJson, rows[i]);
-      await new Promise(resolve => canvas.loadFromJSON(json, () => {
-        canvas.renderAll();
-        const url = canvas.toDataURL({ format: 'png' });
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `design_${i + 1}.png`;
-        a.click();
-        setTimeout(resolve, 300);
-      }));
-    }
-  };
+  const drawImageWithText = (imageSrc, textMap, width, height) => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
 
-  const downloadLayout = async (format) => {
-    if (!canvas || !selected || rows.length === 0) return;
-    const baseSize = size === 'A4' ? A4 : size === 'A3' ? A3 : custom;
-    const pageSize = orientation === 'landscape'
-      ? { width: baseSize.height, height: baseSize.width }
-      : baseSize;
+      ctx.drawImage(img, 0, 0, width, height);
 
-    const perPage = cols * rowsPerPage;
-    const cellW = cardSize.width || (pageSize.width - margins.left - margins.right - spacing.horizontal * (cols - 1)) / cols;
-    const cellH = cardSize.height || (pageSize.height - margins.top - spacing.vertical * (rowsPerPage - 1)) / rowsPerPage;
+      // Draw text overlays — example, adjust as per your template
+      ctx.font = 'bold 48px Arial';
+      ctx.fillStyle = '#000';
+      if (textMap.name) ctx.fillText(textMap.name, 200, 300); // Position dynamically
+      if (textMap.id) ctx.fillText(textMap.id, 200, 360);
 
-    const images = [];
-    for (let i = 0; i < rows.length; i++) {
-      const { data } = await axios.get(`https://canvaback.onrender.com/api/template/${selected}`);
-      const json = fillPlaceholders(data.canvasJson, rows[i]);
-      await new Promise(resolve =>
-        canvas.loadFromJSON(json, () => {
-          canvas.renderAll();
-          const url = canvas.toDataURL({ format: format === 'jpg' ? 'jpeg' : 'png' });
-          images.push(url);
-          resolve();
-        })
-      );
-    }
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.src = imageSrc;
+  });
+};
 
-    if (format === 'pdf') {
-      const pdf = new jsPDF({ orientation, unit: 'px', format: [pageSize.width, pageSize.height] });
-      images.forEach((img, i) => {
-        if (i && i % perPage === 0) pdf.addPage();
-        const pos = i % perPage;
-        const x = margins.left + (pos % cols) * (cellW + spacing.horizontal);
-        const y = margins.top + Math.floor(pos / cols) * (cellH + spacing.vertical);
-        pdf.addImage(img, 'PNG', x, y, cellW, cellH);
-      });
-      pdf.save('bulk_layout.pdf');
-    } else {
-      let pageIndex = 0;
-      for (let i = 0; i < images.length; i += perPage) {
-        const pageCanvas = document.createElement('canvas');
-        pageCanvas.width = pageSize.width;
-        pageCanvas.height = pageSize.height;
-        const ctx = pageCanvas.getContext('2d');
-        for (let j = 0; j < perPage && i + j < images.length; j++) {
-          const pos = j;
-          const imgSrc = images[i + j];
-          await new Promise(res => {
-            const img = new Image();
-            img.onload = () => {
-              const x = margins.left + (pos % cols) * (cellW + spacing.horizontal);
-              const y = margins.top + Math.floor(pos / cols) * (cellH + spacing.vertical);
-              ctx.drawImage(img, x, y, cellW, cellH);
-              res();
-            };
-            img.src = imgSrc;
-          });
-        }
-        const a = document.createElement('a');
-        a.href = pageCanvas.toDataURL(`image/${format === 'jpg' ? 'jpeg' : 'png'}`);
-        a.download = `page_${pageIndex + 1}.${format}`;
-        a.click();
-        pageIndex++;
+
+ const downloadAll = async () => {
+  if (!selectedTemplate?.image || rows.length === 0) return;
+
+  for (let i = 0; i < rows.length; i++) {
+    const data = rows[i];
+    const imageDataUrl = await drawImageWithText(
+      selectedTemplate.image,
+      data,
+      custom.width,
+      custom.height
+    );
+
+    const a = document.createElement('a');
+    a.href = imageDataUrl;
+    a.download = `design_${i + 1}.png`;
+    a.click();
+    await new Promise(res => setTimeout(res, 300));
+  }
+};
+
+const downloadLayout = async (format) => {
+  if (!selectedTemplate?.image || rows.length === 0) return;
+
+  const baseSize = size === 'A4' ? A4 : size === 'A3' ? A3 : custom;
+  const pageSize = orientation === 'landscape'
+    ? { width: baseSize.height, height: baseSize.width }
+    : baseSize;
+
+  const perPage = cols * rowsPerPage;
+  const cellW = cardSize.width || (pageSize.width - margins.left - margins.right - spacing.horizontal * (cols - 1)) / cols;
+  const cellH = cardSize.height || (pageSize.height - margins.top - spacing.vertical * (rowsPerPage - 1)) / rowsPerPage;
+
+  const images = [];
+  for (let i = 0; i < rows.length; i++) {
+    const imageDataUrl = await drawImageWithText(
+      selectedTemplate.image,
+      rows[i],
+      cellW,
+      cellH
+    );
+    images.push(imageDataUrl);
+  }
+
+  if (format === 'pdf') {
+    const pdf = new jsPDF({ orientation, unit: 'px', format: [pageSize.width, pageSize.height] });
+    images.forEach((img, i) => {
+      if (i && i % perPage === 0) pdf.addPage();
+      const pos = i % perPage;
+      const x = margins.left + (pos % cols) * (cellW + spacing.horizontal);
+      const y = margins.top + Math.floor(pos / cols) * (cellH + spacing.vertical);
+      pdf.addImage(img, 'PNG', x, y, cellW, cellH);
+    });
+    pdf.save('bulk_layout.pdf');
+  } else {
+    let pageIndex = 0;
+    for (let i = 0; i < images.length; i += perPage) {
+      const pageCanvas = document.createElement('canvas');
+      pageCanvas.width = pageSize.width;
+      pageCanvas.height = pageSize.height;
+      const ctx = pageCanvas.getContext('2d');
+
+      for (let j = 0; j < perPage && i + j < images.length; j++) {
+        const pos = j;
+        const imgSrc = images[i + j];
+        await new Promise(res => {
+          const img = new Image();
+          img.onload = () => {
+            const x = margins.left + (pos % cols) * (cellW + spacing.horizontal);
+            const y = margins.top + Math.floor(pos / cols) * (cellH + spacing.vertical);
+            ctx.drawImage(img, x, y, cellW, cellH);
+            res();
+          };
+          img.src = imgSrc;
+        });
       }
+
+      const a = document.createElement('a');
+      a.href = pageCanvas.toDataURL(`image/${format === 'jpg' ? 'jpeg' : 'png'}`);
+      a.download = `page_${pageIndex + 1}.${format}`;
+      a.click();
+      pageIndex++;
     }
-  };
+  }
+};
 
 
   return (
@@ -408,14 +435,49 @@ const BulkGenerator = () => {
         )}
 
         <div className="mt-4 flex flex-wrap md:flex-nowrap gap-4 justify-center">
-          <div className="border bg-white shadow inline-block md:w-1/2">
-            <canvas id="bulk-canvas" className="max-w-full h-auto" />
-          </div>
-          <div className="border bg-white shadow inline-block">
-            <ZoomControls zoom={previewZoom} setZoom={setPreviewZoom} />
-            <canvas ref={previewRef} className="max-w-full h-auto" />
-          </div>
-        </div>
+  {/* Left Box: Display Image */}
+  <div className="border bg-white shadow p-2 inline-block md:w-1/2 text-center">
+    {selectedTemplate?.image ? (
+      <img
+        src={selectedTemplate.image}
+        alt={selectedTemplate.title || 'Template'}
+        style={{
+          maxWidth: '100%',
+          height: 'auto',
+          transform: `scale(${previewZoom})`,
+          transformOrigin: 'top left',
+          display: 'inline-block',
+        }}
+      />
+    ) : (
+      <p className="text-gray-500 italic">No image available.</p>
+    )}
+  </div>
+
+  {/* Right Box: ZoomControls + Image */}
+  <div className="border bg-white shadow p-2 inline-block md:w-1/2 text-center">
+    <ZoomControls zoom={previewZoom} setZoom={setPreviewZoom} />
+    
+    {selectedTemplate?.image ? (
+      <img
+        src={selectedTemplate.image}
+        alt="Preview Zoomed"
+        style={{
+          maxWidth: '100%',
+          height: 'auto',
+          marginTop: '1rem',
+          transform: `scale(${previewZoom})`,
+          transformOrigin: 'top left',
+        }}
+      />
+    ) : (
+      <p className="text-gray-500 italic mt-4">No image to preview.</p>
+    )}
+  </div>
+</div>
+
+
+
       </div>
     </div>
   );

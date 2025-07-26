@@ -26,19 +26,36 @@ const PresetControls = ({ layout, applyLayout }) => {
     if (presets[name]) applyLayout(presets[name]);
   };
 
-  return (
-    <div className="flex gap-2 items-center">
-      <select
-        value={selected}
-        onChange={(e) => loadPreset(e.target.value)}
-        className="border rounded p-1 flex-1"
+  const Thumbnail = ({ layout }) => {
+    const cols = layout.cols || 1;
+    const rows = layout.rowsPerPage || 1;
+    return (
+      <div
+        className="w-12 h-12 grid gap-px bg-gray-200"
+        style={{ gridTemplateColumns: `repeat(${cols},1fr)`, gridTemplateRows: `repeat(${rows},1fr)` }}
       >
-        <option value="">Presets</option>
-        {Object.keys(presets).map((k) => (
-          <option key={k} value={k}>{k}</option>
+        {Array.from({ length: cols * rows }).map((_, i) => (
+          <div key={i} className="bg-white border" />
         ))}
-      </select>
-      <button onClick={savePreset} className="px-2 py-1 bg-blue-600 text-white rounded">Save</button>
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-2">
+      <button onClick={savePreset} className="px-2 py-1 bg-blue-600 text-white rounded w-full">Save Layout</button>
+      <div className="grid grid-cols-3 gap-2">
+        {Object.entries(presets).map(([name, val]) => (
+          <button
+            key={name}
+            onClick={() => loadPreset(name)}
+            className={`border rounded p-1 flex flex-col items-center ${selected === name ? 'ring-2 ring-blue-500' : ''}`}
+          >
+            <Thumbnail layout={val} />
+            <span className="text-xs mt-1 truncate w-full text-center">{name}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 };

@@ -32,22 +32,8 @@ const CanvasEditor = () => {
   const { templateId } = useParams();
   const [students, setStudents] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null);
-  const [instituteInfo, setInstituteInfo] = useState(null);
-
-
- useEffect(() => {
-  const institute_uuid = getStoredInstituteUUID();
-  if (institute_uuid) {
-    axios
-      .get(`https://canvaback.onrender.com/api/institute/${institute_uuid}`)
-      .then((res) => {
-        console.log("Institute Info:", res.data.result); // ✅ Shows actual data
-        setInstituteInfo(res.data.result); // ✅ Fix: use .result
-      })
-      .catch((err) => console.error("Failed to fetch institute info", err));
-  }
-}, []);
-
+   const [institutes, setInstitutes] = useState([]);
+  const [selectedInstitute, setSelectedInstitute] = useState(null);
 
   const {
     canvasRef,
@@ -106,6 +92,19 @@ const CanvasEditor = () => {
   setSelectedStudent(student);
 };
 
+ // 🔁 Fetch all institutes on mount
+  useEffect(() => {
+    axios
+      .get("http://localhost:5000/api/institute/")
+      .then((res) => setInstitutes(res.data))
+      .catch((err) => console.error("Failed to fetch institutes", err));
+  }, []);
+
+  const handleInstituteSelect = (institute_uuid) => {
+  const institute = institutes.find((i) => i.institute_uuid === institute_uuid);
+  setSelectedInstitute(institute);
+};
+
 useEffect(() => {
   const renderTemplateAndStudent = async () => {
     if (!canvas) return;
@@ -120,11 +119,23 @@ if (templateId) {
     const { image, title } = res.data;
 
     if (image) {
-      const targetWidth = 400;
-      const targetHeight = 550;
+      let targetWidth = 400;
+let targetHeight = 550;
 
-      canvas.setWidth(targetWidth);
-      canvas.setHeight(targetHeight);
+if (res.data.width && res.data.height) {
+  targetWidth = res.data.width;
+  targetHeight = res.data.height;
+} else if (image) {
+  const imgObj = await new Promise((resolve) => {
+    fabric.Image.fromURL(image, resolve, { crossOrigin: "anonymous" });
+  });
+  targetWidth = imgObj.width || 400;
+  targetHeight = imgObj.height || 550;
+}
+
+canvas.setWidth(targetWidth);
+canvas.setHeight(targetHeight);
+
 
       await new Promise((resolve) => {
         fabric.Image.fromURL(
@@ -151,16 +162,17 @@ if (templateId) {
       });
 
       if (title) {
-        const titleText = new fabric.Text(title, {
-          left: targetWidth / 2,
-          top: 20,
-          fontSize: 24,
-          fill: "#333",
-          originX: "center",
-          selectable: true,       // ✅ make title movable
-          hasControls: true,
-        });
-        canvas.add(titleText);
+       const titleText = new fabric.IText("{{title}}", {
+  left: targetWidth / 2,
+  top: 20,
+  fontSize: 24,
+  fill: "#333",
+  originX: "center",
+  selectable: true,
+  hasControls: true,
+});
+canvas.add(titleText);
+
       }
     }
   } catch (err) {
@@ -170,84 +182,100 @@ if (templateId) {
 
 // Add student name and photo
 if (selectedStudent) {
-  const fullName = `${selectedStudent.firstName} ${selectedStudent.middleName || ""} ${selectedStudent.lastName || ""}`.trim();
-
-  const nameText = new fabric.Text(fullName, {
-    left: 50,
-    top: 100,
+  const nameText = new fabric.IText("{{firstName}} {{lastName}}", {
+    left: 195,
+    top: 400,
     fontSize: 22,
     fill: "#000",
-    selectable: true,       // ✅ allow moving
+    selectable: true,
     hasControls: true,
   });
   canvas.add(nameText);
 
-  if (selectedStudent.photo && selectedStudent.photo[0]) {
-    fabric.Image.fromURL(
-      selectedStudent.photo[0],
-      (img) => {
-        img.set({
-          left: 50,
-          top: 150,
-          scaleX: 0.2,
-          scaleY: 0.2,
-          selectable: true,   // ✅ movable
-          hasControls: true,
-        });
-        canvas.add(img);
-        canvas.renderAll();
-      },
-      { crossOrigin: "anonymous" }
-    );
-  } else {
-    canvas.renderAll();
-  }
-} else {
+  const photoPlaceholder = new fabric.IText("{{photo}}", {
+    left: 50,
+    top: 150,
+    fontSize: 18,
+    fill: "#555",
+    selectable: true,
+    hasControls: true,
+  });
+  canvas.add(photoPlaceholder);
+
   canvas.renderAll();
 }
 
-// Add logo (movable)
-if (instituteInfo?.logo) {
-  await new Promise((resolve) => {
-    fabric.Image.fromURL(instituteInfo.logo, (img) => {
-      img.set({
-        left: 20,
-        top: 20,
-        scaleX: 0.2,
-        scaleY: 0.2,
-        selectable: true,     // ✅ allow dragging
-        hasControls: true,
-      });
-      canvas.add(img);
-      img.bringToFront();
-      resolve();
-    }, { crossOrigin: 'anonymous' });
+
+// Display text "Logo" (movable)
+if (selectedInstitute?.logo) {
+  const logoText = new fabric.IText("{{logo}}", {
+    left: 20,
+    top: 20,
+    fontSize: 20,
+    fill: "black",
+    selectable: true,
+    hasControls: true,
   });
+  canvas.add(logoText);
+  logoText.bringToFront();
 }
 
-// Add signature (movable)
-if (instituteInfo?.signature) {
-  await new Promise((resolve) => {
-    fabric.Image.fromURL(instituteInfo.signature, (img) => {
-      img.set({
-        left: canvas.width - 100,
-        top: canvas.height - 80,
-        scaleX: 0.2,
-        scaleY: 0.2,
-        selectable: true,    // ✅ draggable
-        hasControls: true,
-      });
-      canvas.add(img);
-      img.bringToFront();
-      resolve();
-    }, { crossOrigin: 'anonymous' });
+// Display text "Signature" (movable)
+if (selectedInstitute?.signature) {
+  const signatureText = new fabric.IText("{{signature}}", {
+    left: canvas.width - 150,
+    top: canvas.height - 80,
+    fontSize: 20,
+    fill: "black",
+    selectable: true,
+    hasControls: true,
   });
+  canvas.add(signatureText);
+  signatureText.bringToFront();
 }
+
 
   };
 
   renderTemplateAndStudent();
-}, [templateId, selectedStudent, canvas, instituteInfo]);
+}, [templateId, selectedStudent, canvas, selectedInstitute]);
+
+const saveTemplateLayout = async () => {
+  if (!canvas) return;
+
+  // Optionally prompt for a template name
+  const title = prompt("Enter a name for this template:", `Template-${Date.now()}`);
+  if (!title) return;
+
+  // Export canvas JSON (including extra props)
+  const templateJson = canvas.toJSON(['selectable', 'hasControls']);
+
+  // Export as PNG (preview)
+  const imageData = canvas.toDataURL({ format: "png", quality: 1 });
+
+ const payload = {
+  title,
+  layout: JSON.stringify(templateJson),
+  image: imageData,
+  width: canvas.getWidth(),
+  height: canvas.getHeight(),
+  photo: selectedStudent?.photo?.[0] || null,
+  signature: selectedInstitute?.signature || null,
+  logo: selectedInstitute?.logo || null,
+  template: templateId || null, // ✅ use templateId from URL
+};
+
+await axios.post(`https://canvaback.onrender.com/api/templatelayout/save`, payload);
+
+
+  try {
+    const res = await axios.post("https://canvaback.onrender.com/api/templatelayout/save", payload);
+    alert("✅ Template saved successfully!");
+  } catch (error) {
+    console.error("❌ Failed to save template", error);
+    alert("Error saving template.");
+  }
+};
 
 
   return (
@@ -265,6 +293,19 @@ if (instituteInfo?.signature) {
   {students.map((student) => (
     <option key={student.uuid} value={student.uuid}>
       {student.firstName} {student.lastName}
+    </option>
+  ))}
+</select>
+
+
+      </div>
+       <div className="p-4">
+        <label className="block mb-2 font-semibold">Select Institute:</label>
+        <select onChange={(e) => handleInstituteSelect(e.target.value)}>
+  <option value="">Select a institute</option>
+  {(institutes || []).map((institute) => (
+    <option key={institute.institute_uuid} value={institute.institute_uuid}>
+      {institute.institute_title}
     </option>
   ))}
 </select>
@@ -311,6 +352,7 @@ if (instituteInfo?.signature) {
             saveHistory();
           }} className="p-2 rounded-full bg-yellow-500 text-white shadow hover:bg-yellow-600"><RefreshCw size={22} /></button>
           <button title="Download PNG" onClick={downloadHighRes} className="p-2 rounded-full bg-green-600 text-white shadow hover:bg-green-700"><Download size={22} /></button>
+          <button title="Save Template" onClick={saveTemplateLayout} className="p-2 rounded-full bg-blue-600 text-white shadow hover:bg-blue-700">Save Template</button>
         </div>
       </div>
 
@@ -430,17 +472,17 @@ if (instituteInfo?.signature) {
       {/* Drawer Settings */}
       <Drawer isOpen={showSettings} onClose={() => setShowSettings(false)}>
 
-        {instituteInfo?.logo && (
+        {selectedInstitute?.logo && (
   <div className="p-4">
     <h3 className="text-lg font-bold mb-2">Institute Logo</h3>
-    <img src={instituteInfo.logo} className="w-32 h-32 object-contain" />
+    <img src={selectedInstitute.logo} className="w-32 h-32 object-contain" />
   </div>
 )}
 
-{instituteInfo?.sign && (
+{selectedInstitute?.sign && (
   <div className="p-4">
     <h3 className="text-lg font-bold mb-2">Signature</h3>
-    <img src={instituteInfo.signature} className="w-32 h-20 object-contain" />
+    <img src={selectedInstitute.signature} className="w-32 h-20 object-contain" />
   </div>
 )}
 

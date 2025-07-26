@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
-import { jsPDF } from 'jspdf';
 import { fabric } from 'fabric';
-import BASE_URL from '../config';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
 import SidebarSection from '../components/bulk/SidebarSection';
 import ZoomControls from '../components/bulk/ZoomControls';
 import PresetControls from '../components/bulk/PresetControls';
@@ -33,7 +33,6 @@ const fillPlaceholders = (json, row) => {
 
 const BulkGenerator = () => {
   const canvasRef = useRef(null);
-  const previewRef = useRef(null);
   const [canvas, setCanvas] = useState(null);
   const [templates, setTemplates] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -48,7 +47,6 @@ const BulkGenerator = () => {
   const [spacing, setSpacing] = useState({ horizontal: 0, vertical: 0 });
   const [cardSize, setCardSize] = useState({ width: 0, height: 0 });
   const [previewZoom, setPreviewZoom] = useState(1);
-  const [templateImage, setTemplateImage] = useState('');
   const [activeObj, setActiveObj] = useState(null);
   const [lockedObjects, setLockedObjects] = useState(new Set());
   const [showLeft, setShowLeft] = useState(false);
@@ -117,83 +115,6 @@ const BulkGenerator = () => {
     canvas.setHeight(s.height);
   }, [canvas, size, custom, orientation]);
 
- const renderPreview = async () => {
-  if (!previewRef.current || !selected || !canvas || rows.length === 0) return;
-
-  const baseSize = size === 'A4' ? A4 : size === 'A3' ? A3 : custom;
-  const pageSize = orientation === 'landscape'
-    ? { width: baseSize.height, height: baseSize.width }
-    : baseSize;
-
-  const canvasEl = previewRef.current;
-  const ctx = canvasEl.getContext('2d');
-
-  const baseScale = Math.min(600 / pageSize.width, 800 / pageSize.height, 1);
-  const scale = baseScale * previewZoom;
-
-  canvasEl.width = pageSize.width * scale;
-  canvasEl.height = pageSize.height * scale;
-
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, canvasEl.width, canvasEl.height);
-
-  const cellW = cardSize.width || (pageSize.width - margins.left - margins.right - spacing.horizontal * (cols - 1)) / cols;
-  const cellH = cardSize.height || (pageSize.height - margins.top - spacing.vertical * (rowsPerPage - 1)) / rowsPerPage;
-
-  const perPage = cols * rowsPerPage;
-  const start = 0; // You could paginate later if needed
-
-  const { data } = await axios.get(`https://canvaback.onrender.com/api/template/${selected}`);
-
-  for (let i = 0; i < perPage && start + i < rows.length; i++) {
-    const student = rows[start + i];
-    const filledJson = fillPlaceholders(data.canvasJson, student);
-
-    await new Promise((resolve) => {
-      canvas.loadFromJSON(filledJson, () => {
-        canvas.renderAll();
-
-        const imgData = canvas.toDataURL({ format: 'png' });
-        const img = new Image();
-        img.onload = () => {
-          const x = margins.left + (i % cols) * (cellW + spacing.horizontal);
-          const y = margins.top + Math.floor(i / cols) * (cellH + spacing.vertical);
-          ctx.drawImage(img, x * scale, y * scale, cellW * scale, cellH * scale);
-          resolve();
-        };
-        img.src = imgData;
-      });
-    });
-  }
-};
-
-  const loadCurrent = async () => {
-    if (!selected) return;
-  const { data } = await axios.get(`https://canvaback.onrender.com/api/template/${selected}`);
-  setTemplateImage(data.image);
-    renderPreview();
-  };
-
- useEffect(() => {
-  loadCurrent();
-}, [selected]);
-
-useEffect(() => {
-  renderPreview();
-}, [
-  templateImage,
-  size,
-  custom,
-  orientation,
-  margins,
-  spacing,
-  cols,
-  rowsPerPage,
-  cardSize,
-  previewZoom,
-  selected,
-  rows
-]);
 
   const handleFile = (e) => {
     const file = e.target.files[0];
@@ -300,13 +221,13 @@ const drawImageWithText = async (ctx, student, x, y, width, height, imageUrl) =>
     ? { width: baseSize.height, height: baseSize.width }
     : baseSize;
 
-  const cols = layout.columns;
-  const rowsPerPage = layout.rows;
-  const spacing = layout.spacing;
-  const margins = layout.margins;
+  const cols = currentLayout.cols;
+  const rowsPerPage = currentLayout.rowsPerPage;
+  const spacing = currentLayout.spacing;
+  const margins = currentLayout.margins;
 
-  const cellW = layout.cardSize.width;
-  const cellH = layout.cardSize.height;
+  const cellW = currentLayout.cardSize.width;
+  const cellH = currentLayout.cardSize.height;
 
   const totalPages = Math.ceil(rows.length / (cols * rowsPerPage));
 

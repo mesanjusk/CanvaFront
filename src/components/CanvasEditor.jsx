@@ -95,7 +95,7 @@ const CanvasEditor = () => {
  // 🔁 Fetch all institutes on mount
   useEffect(() => {
     axios
-      .get("http://localhost:5000/api/institute/")
+      .get("https://canvaback.onrender.com/api/institute/")
       .then((res) => setInstitutes(res.data))
       .catch((err) => console.error("Failed to fetch institutes", err));
   }, []);

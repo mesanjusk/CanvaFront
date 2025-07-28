@@ -2,6 +2,8 @@ import React from 'react';
 import SidebarSection from './SidebarSection';
 import PresetControls from './PresetControls';
 
+const DPI = 300;
+
 const LeftSidebar = ({
   show,
   templates,
@@ -73,20 +75,20 @@ const LeftSidebar = ({
         {size === 'custom' && (
           <>
             <div className="flex flex-col">
-              <label className="text-sm font-medium">Page Width</label>
+              <label className="text-sm font-medium">Page Width (in)</label>
               <input
                 type="number"
-                value={custom.width}
-                onChange={e => setCustom({ ...custom, width: Number(e.target.value) })}
+                value={custom.width / DPI}
+                onChange={e => setCustom({ ...custom, width: Math.round(Number(e.target.value) * DPI) })}
                 className="border p-2 rounded"
               />
             </div>
             <div className="flex flex-col">
-              <label className="text-sm font-medium">Page Height</label>
+              <label className="text-sm font-medium">Page Height (in)</label>
               <input
                 type="number"
-                value={custom.height}
-                onChange={e => setCustom({ ...custom, height: Number(e.target.value) })}
+                value={custom.height / DPI}
+                onChange={e => setCustom({ ...custom, height: Math.round(Number(e.target.value) * DPI) })}
                 className="border p-2 rounded"
               />
             </div>
@@ -116,29 +118,29 @@ const LeftSidebar = ({
           />
         </div>
         <div className="flex flex-col">
-          <label className="text-sm font-medium">Left Margin</label>
+          <label className="text-sm font-medium">Left Margin (in)</label>
           <input
             type="number"
-            value={margins.left}
-            onChange={e => setMargins({ ...margins, left: Number(e.target.value) })}
+            value={margins.left / DPI}
+            onChange={e => setMargins({ ...margins, left: Math.round(Number(e.target.value) * DPI) })}
             className="border p-2 rounded"
           />
         </div>
         <div className="flex flex-col">
-          <label className="text-sm font-medium">Right Margin</label>
+          <label className="text-sm font-medium">Right Margin (in)</label>
           <input
             type="number"
-            value={margins.right}
-            onChange={e => setMargins({ ...margins, right: Number(e.target.value) })}
+            value={margins.right / DPI}
+            onChange={e => setMargins({ ...margins, right: Math.round(Number(e.target.value) * DPI) })}
             className="border p-2 rounded"
           />
         </div>
         <div className="flex flex-col">
-          <label className="text-sm font-medium">Top Margin</label>
+          <label className="text-sm font-medium">Top Margin (in)</label>
           <input
             type="number"
-            value={margins.top}
-            onChange={e => setMargins({ ...margins, top: Number(e.target.value) })}
+            value={margins.top / DPI}
+            onChange={e => setMargins({ ...margins, top: Math.round(Number(e.target.value) * DPI) })}
             className="border p-2 rounded"
           />
         </div>

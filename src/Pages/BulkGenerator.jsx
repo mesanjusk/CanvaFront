@@ -56,6 +56,7 @@ const BulkGenerator = () => {
   const [showRight, setShowRight] = useState(false);
   const [showEditor, setShowEditor] = useState(false);
   const [editorTemplate, setEditorTemplate] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState('');
 
 
   const currentLayout = {
@@ -170,6 +171,27 @@ const BulkGenerator = () => {
       console.error('Failed to load students', e);
     }
   };
+
+  const generatePreview = async () => {
+    if (!selected) {
+      setPreviewUrl('');
+      return;
+    }
+    try {
+      const { data } = await axios.get(`https://canvaback.onrender.com/api/template/${selected}`);
+      const json = fillPlaceholders(data.canvasJson || data.layout || data, rows[index] || {});
+      const prev = new fabric.StaticCanvas(null, { width: custom.width, height: custom.height, backgroundColor: '#fff' });
+      await new Promise(res => prev.loadFromJSON(json, () => { prev.renderAll(); res(); }));
+      setPreviewUrl(prev.toDataURL('png'));
+      prev.dispose();
+    } catch {
+      setPreviewUrl('');
+    }
+  };
+
+  useEffect(() => {
+    generatePreview();
+  }, [selected, index, rows, size, custom, orientation, margins, spacing, cardSize]);
 
 const drawImageWithText = async (ctx, student, x, y, width, height, imageUrl) => {
   return new Promise((resolve) => {
@@ -369,7 +391,14 @@ const drawImageWithText = async (ctx, student, x, y, width, height, imageUrl) =>
           )}
         </main>
 
-        <RightSidebar show={showRight} templates={templates} onSelect={(t) => { loadTemplate(t._id); openEditor(t); }} />
+        <RightSidebar
+          show={showRight}
+          templates={templates}
+          selectedTemplate={templates.find(t => t.id === selected || t._id === selected)}
+          previewUrl={previewUrl}
+          onSelect={(t) => { loadTemplate(t._id); openEditor(t); }}
+          onBack={() => setSelected(null)}
+        />
       </div>
 
       {showEditor && editorTemplate && (

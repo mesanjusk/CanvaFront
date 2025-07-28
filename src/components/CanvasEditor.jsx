@@ -29,7 +29,7 @@ import { useParams } from "react-router-dom";
 
 const LOCAL_KEY = "localTemplates";
 
-const CanvasEditor = ({ templateId: propTemplateId, onSaved }) => {
+const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false }) => {
   const { templateId: routeId } = useParams();
   const templateId = propTemplateId || routeId;
   const [students, setStudents] = useState([]);
@@ -279,14 +279,16 @@ const saveTemplateLayout = async () => {
 
 
   return (
-     <div className="h-screen flex flex-col">
+     <div className="h-full flex flex-col">
       <Toaster position="top-right" />
-      <header className="h-12 bg-gray-800 text-white flex items-center px-4 gap-4">
-        <a href="/" className="font-bold">Framee</a>
-        <a href="/templates" className="underline">Templates</a>
-      </header>
+      {!hideHeader && (
+        <header className="h-12 bg-gray-800 text-white flex items-center px-4 gap-4">
+          <a href="/" className="font-bold">Framee</a>
+          <a href="/templates" className="underline">Templates</a>
+        </header>
+      )}
       <main className="flex-1 bg-gray-100">
-        <div className="min-h-screen w-full bg-gray-100 flex flex-col">
+        <div className="min-h-full w-full bg-gray-100 flex flex-col">
       <div className="p-4">
         <label className="block mb-2 font-semibold">Select Student:</label>
         <select onChange={(e) => handleStudentSelect(e.target.value)}>

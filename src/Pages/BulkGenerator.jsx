@@ -9,7 +9,8 @@ import LeftSidebar from '../components/bulk/LeftSidebar';
 import RightSidebar from '../components/bulk/RightSidebar';
 import GeneratorFooter from '../components/bulk/GeneratorFooter';
 import FloatingObjectToolbar from '../components/FloatingObjectToolbar';
-import CanvasEditorModal from '../components/CanvasEditorModal';
+import CanvasEditor from '../components/CanvasEditor';
+import PreviewModal from '../components/PreviewModal';
 import toast from 'react-hot-toast';
 
 const A4 = { width: 2480, height: 3508 };
@@ -58,6 +59,7 @@ const BulkGenerator = () => {
   const [editorTemplate, setEditorTemplate] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
   const [pagePreviewUrl, setPagePreviewUrl] = useState('');
+  const [showPreview, setShowPreview] = useState(false);
 
 
   const currentLayout = {
@@ -390,22 +392,6 @@ const drawImageWithText = async (ctx, student, x, y, width, height, imageUrl) =>
           templates={templates}
           selected={selected}
           setSelected={setSelected}
-          size={size}
-          setSize={setSize}
-          orientation={orientation}
-          setOrientation={setOrientation}
-          custom={custom}
-          setCustom={setCustom}
-          cols={cols}
-          setCols={setCols}
-          rowsPerPage={rowsPerPage}
-          setRowsPerPage={setRowsPerPage}
-          margins={margins}
-          setMargins={setMargins}
-          spacing={spacing}
-          setSpacing={setSpacing}
-          cardSize={cardSize}
-          setCardSize={setCardSize}
           handleFile={handleFile}
           loadStudents={loadStudents}
           currentLayout={currentLayout}
@@ -447,12 +433,23 @@ const drawImageWithText = async (ctx, student, x, y, width, height, imageUrl) =>
         />
       </div>
 
+
       {showEditor && editorTemplate && (
-        <CanvasEditorModal
-          templateId={editorTemplate._id}
-          onClose={() => setShowEditor(false)}
-          onSaved={() => { setShowEditor(false); fetchTemplates(); loadTemplate(editorTemplate._id); }}
-        />
+        <div className="fixed inset-0 z-40 bg-white overflow-auto">
+          <CanvasEditor
+            templateId={editorTemplate._id}
+            hideHeader
+            onSaved={() => { setShowEditor(false); fetchTemplates(); loadTemplate(editorTemplate._id); }}
+          />
+          <button
+            onClick={() => setShowEditor(false)}
+            className="absolute top-2 right-2 bg-gray-800 text-white px-2 py-1 rounded"
+          >Close</button>
+        </div>
+      )}
+
+      {showPreview && (
+        <PreviewModal src={pagePreviewUrl} onClose={() => setShowPreview(false)} />
       )}
 
       <GeneratorFooter
@@ -462,6 +459,23 @@ const drawImageWithText = async (ctx, student, x, y, width, height, imageUrl) =>
         downloadCurrent={downloadCurrent}
         downloadAll={downloadAll}
         downloadLayout={downloadLayout}
+        size={size}
+        setSize={setSize}
+        orientation={orientation}
+        setOrientation={setOrientation}
+        custom={custom}
+        setCustom={setCustom}
+        cols={cols}
+        setCols={setCols}
+        rowsPerPage={rowsPerPage}
+        setRowsPerPage={setRowsPerPage}
+        margins={margins}
+        setMargins={setMargins}
+        spacing={spacing}
+        setSpacing={setSpacing}
+        cardSize={cardSize}
+        setCardSize={setCardSize}
+        onPreview={() => setShowPreview(true)}
       />
     </div>
   );

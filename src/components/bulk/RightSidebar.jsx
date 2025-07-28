@@ -5,6 +5,7 @@ const RightSidebar = ({
   templates,
   selectedTemplate,
   previewUrl,
+  pagePreviewUrl,
   onSelect,
   onBack,
 }) => {
@@ -41,6 +42,9 @@ const RightSidebar = ({
       <h2 className="font-medium mb-2">Preview</h2>
       {previewUrl && (
         <img src={previewUrl} alt="Preview" className="w-full mb-2 border rounded" />
+      )}
+      {pagePreviewUrl && (
+        <img src={pagePreviewUrl} alt="Page Preview" className="w-full mb-2 border rounded" />
       )}
       <button onClick={onBack} className="w-full bg-gray-200 rounded p-2">
         Change Template

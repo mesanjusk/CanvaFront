@@ -57,6 +57,7 @@ const BulkGenerator = () => {
   const [showEditor, setShowEditor] = useState(false);
   const [editorTemplate, setEditorTemplate] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
+  const [pagePreviewUrl, setPagePreviewUrl] = useState('');
 
 
   const currentLayout = {
@@ -175,6 +176,7 @@ const BulkGenerator = () => {
   const generatePreview = async () => {
     if (!selected) {
       setPreviewUrl('');
+      setPagePreviewUrl('');
       return;
     }
     try {
@@ -189,9 +191,52 @@ const BulkGenerator = () => {
     }
   };
 
+  const generatePagePreview = async () => {
+    if (!selected) {
+      setPagePreviewUrl('');
+      return;
+    }
+    try {
+      const { data } = await axios.get(`https://canvaback.onrender.com/api/template/${selected}`);
+      const json = data.canvasJson || data.layout || data;
+      const base = size === 'A4' ? A4 : size === 'A3' ? A3 : custom;
+      const pageSize = orientation === 'landscape'
+        ? { width: base.height, height: base.width }
+        : base;
+      const page = new fabric.StaticCanvas(null, {
+        width: pageSize.width,
+        height: pageSize.height,
+        backgroundColor: '#fff',
+      });
+      const slots = cols * rowsPerPage;
+      const rowSlice = rows.slice(index, index + slots);
+      for (let i = 0; i < slots; i++) {
+        const row = rowSlice[i] || {};
+        const filled = fillPlaceholders(json, row);
+        const cell = new fabric.StaticCanvas(null, { width: cardSize.width, height: cardSize.height, backgroundColor: '#fff' });
+        await new Promise(r => cell.loadFromJSON(filled, () => { cell.renderAll(); r(); }));
+        const dataUrl = cell.toDataURL('png');
+        const img = await new Promise(r => fabric.Image.fromURL(dataUrl, (imgEl) => r(imgEl)));
+        img.set({
+          left: margins.left + (i % cols) * (cardSize.width + spacing.horizontal),
+          top: margins.top + Math.floor(i / cols) * (cardSize.height + spacing.vertical),
+          selectable: false,
+        });
+        page.add(img);
+        cell.dispose();
+      }
+      page.renderAll();
+      setPagePreviewUrl(page.toDataURL('png'));
+      page.dispose();
+    } catch {
+      setPagePreviewUrl('');
+    }
+  };
+
   useEffect(() => {
     generatePreview();
-  }, [selected, index, rows, size, custom, orientation, margins, spacing, cardSize]);
+    generatePagePreview();
+  }, [selected, index, rows, size, custom, orientation, margins, spacing, cardSize, cols, rowsPerPage]);
 
 const drawImageWithText = async (ctx, student, x, y, width, height, imageUrl) => {
   return new Promise((resolve) => {
@@ -396,6 +441,7 @@ const drawImageWithText = async (ctx, student, x, y, width, height, imageUrl) =>
           templates={templates}
           selectedTemplate={templates.find(t => t.id === selected || t._id === selected)}
           previewUrl={previewUrl}
+          pagePreviewUrl={pagePreviewUrl}
           onSelect={(t) => { loadTemplate(t._id); openEditor(t); }}
           onBack={() => setSelected(null)}
         />

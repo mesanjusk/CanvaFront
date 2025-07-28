@@ -2,8 +2,6 @@ import React from 'react';
 import SidebarSection from './SidebarSection';
 import PresetControls from './PresetControls';
 
-const DPI = 300;
-
 const LeftSidebar = ({
   show,
   templates,

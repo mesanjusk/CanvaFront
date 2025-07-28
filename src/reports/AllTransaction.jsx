@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import BASE_URL from '../config';
 import TopNavbar from '../Pages/topNavbar';
 import Footer from '../Pages/footer';
 import { FaWhatsapp, FaSortUp, FaSortDown } from 'react-icons/fa';
@@ -18,9 +19,8 @@ const AllTransaction = () => {
     const [filterType, setFilterType] = useState('all');
     const navigate = useNavigate();
 
-    // TODO: UPDATE these URLs to your actual endpoints!
-    const TRANSACTION_API = '/api/transaction';
-    const CUSTOMER_API = '/api/customer';
+    const TRANSACTION_API = `${BASE_URL}/api/transaction`;
+    const CUSTOMER_API = `${BASE_URL}/api/customer`;
 
     useEffect(() => {
         const fetchTransactions = async () => {

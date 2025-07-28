@@ -98,9 +98,10 @@ export default function App() {
           <Route path="addTemplate" element={<AddTemplate />} />
           <Route path="addCategory" element={<AddCategory />} />
           <Route path="addSubcategory" element={<AddSubcategory />} />
-          <Route path="templateManager" element={<TemplateManager />} /> 
-          <Route path="bulk" element={<BulkGenerator />} />
+      <Route path="templateManager" element={<TemplateManager />} />
       </Route>
+
+      <Route path="/:username/bulk" element={<PrivateRoute><BulkGenerator /></PrivateRoute>} />
 
       {/* 🧭 Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />

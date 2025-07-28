@@ -4,9 +4,10 @@ import * as XLSX from 'xlsx';
 import { fabric } from 'fabric';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-import SidebarSection from '../components/bulk/SidebarSection';
 import ZoomControls from '../components/bulk/ZoomControls';
-import PresetControls from '../components/bulk/PresetControls';
+import LeftSidebar from '../components/bulk/LeftSidebar';
+import RightSidebar from '../components/bulk/RightSidebar';
+import GeneratorFooter from '../components/bulk/GeneratorFooter';
 import FloatingObjectToolbar from '../components/FloatingObjectToolbar';
 
 const A4 = { width: 2480, height: 3508 };
@@ -288,125 +289,32 @@ const drawImageWithText = async (ctx, student, x, y, width, height, imageUrl) =>
         </div>
       </header>
       <div className="flex flex-1 overflow-hidden">
-        <aside className={`bg-gray-50 w-64 p-4 space-y-4 overflow-y-auto ${showLeft ? 'block' : 'hidden'} md:block`}>
-          <SidebarSection title="Template">
-            <div className="flex flex-col">
-              <label className="text-sm font-medium">Template</label>
-              <select
-                value={selected || ''}
-                onChange={e => setSelected(e.target.value)}
-                className="border p-2 rounded w-full"
-              >
-                <option value="">Select Template</option>
-                {templates.map(t => (
-                  <option key={t.id} value={t.id}>{t.title}</option>
-                ))}
-              </select>
-            </div>
-          </SidebarSection>
-
-          <SidebarSection title="Page Settings">
-            <div className="flex flex-col">
-              <label className="text-sm font-medium">Page Size</label>
-              <select
-                value={size}
-                onChange={e => setSize(e.target.value)}
-                className="border p-2 rounded w-full"
-              >
-                <option value="A4">A4</option>
-                <option value="A3">A3</option>
-                <option value="custom">Custom</option>
-              </select>
-            </div>
-            <div className="flex flex-col">
-              <label className="text-sm font-medium">Orientation</label>
-              <select
-                value={orientation}
-                onChange={e => setOrientation(e.target.value)}
-                className="border p-2 rounded w-full"
-              >
-                <option value="portrait">Portrait</option>
-                <option value="landscape">Landscape</option>
-              </select>
-            </div>
-            {size === 'custom' && (
-              <>
-                <div className="flex flex-col">
-                  <label className="text-sm font-medium">Page Width</label>
-                  <input type="number" value={custom.width} onChange={e => setCustom({ ...custom, width: Number(e.target.value) })} className="border p-2 rounded" />
-                </div>
-                <div className="flex flex-col">
-                  <label className="text-sm font-medium">Page Height</label>
-                  <input type="number" value={custom.height} onChange={e => setCustom({ ...custom, height: Number(e.target.value) })} className="border p-2 rounded" />
-                </div>
-              </>
-            )}
-          </SidebarSection>
-
-          <SidebarSection title="Layout">
-            <div className="flex flex-col">
-              <label className="text-sm font-medium">Columns</label>
-              <input
-                type="number"
-                min={1}
-                value={cols}
-                onChange={e => setCols(Number(e.target.value) || 1)}
-                className="border p-2 rounded"
-              />
-            </div>
-            <div className="flex flex-col">
-              <label className="text-sm font-medium">Rows per Page</label>
-              <input
-                type="number"
-                min={1}
-                value={rowsPerPage}
-                onChange={e => setRowsPerPage(Number(e.target.value) || 1)}
-                className="border p-2 rounded"
-              />
-            </div>
-            <div className="flex flex-col">
-              <label className="text-sm font-medium">Left Margin</label>
-              <input type="number" value={margins.left} onChange={e => setMargins({ ...margins, left: Number(e.target.value) })} className="border p-2 rounded" />
-            </div>
-            <div className="flex flex-col">
-              <label className="text-sm font-medium">Right Margin</label>
-              <input type="number" value={margins.right} onChange={e => setMargins({ ...margins, right: Number(e.target.value) })} className="border p-2 rounded" />
-            </div>
-            <div className="flex flex-col">
-              <label className="text-sm font-medium">Top Margin</label>
-              <input type="number" value={margins.top} onChange={e => setMargins({ ...margins, top: Number(e.target.value) })} className="border p-2 rounded" />
-            </div>
-            <div className="flex flex-col">
-              <label className="text-sm font-medium">Horizontal Spacing</label>
-              <input type="number" value={spacing.horizontal} onChange={e => setSpacing({ ...spacing, horizontal: Number(e.target.value) })} className="border p-2 rounded" />
-            </div>
-            <div className="flex flex-col">
-              <label className="text-sm font-medium">Vertical Spacing</label>
-              <input type="number" value={spacing.vertical} onChange={e => setSpacing({ ...spacing, vertical: Number(e.target.value) })} className="border p-2 rounded" />
-            </div>
-            <div className="flex flex-col">
-              <label className="text-sm font-medium">Card Width</label>
-              <input type="number" value={cardSize.width} onChange={e => setCardSize({ ...cardSize, width: Number(e.target.value) })} className="border p-2 rounded" />
-            </div>
-            <div className="flex flex-col">
-              <label className="text-sm font-medium">Card Height</label>
-              <input type="number" value={cardSize.height} onChange={e => setCardSize({ ...cardSize, height: Number(e.target.value) })} className="border p-2 rounded" />
-            </div>
-          </SidebarSection>
-
-          <SidebarSection title="Data">
-            <div className="flex flex-col">
-              <label className="text-sm font-medium">Upload File</label>
-              <input type="file" accept=".xlsx,.csv" onChange={handleFile} className="border p-2 rounded" />
-            </div>
-            <div className="flex flex-col">
-              <label className="text-sm font-medium invisible">Load</label>
-              <button onClick={loadStudents} className="bg-blue-600 text-white px-3 py-2 rounded">Load Students</button>
-            </div>
-          </SidebarSection>
-
-          <PresetControls layout={currentLayout} applyLayout={applyLayout} />
-        </aside>
+        <LeftSidebar
+          show={showLeft}
+          templates={templates}
+          selected={selected}
+          setSelected={setSelected}
+          size={size}
+          setSize={setSize}
+          orientation={orientation}
+          setOrientation={setOrientation}
+          custom={custom}
+          setCustom={setCustom}
+          cols={cols}
+          setCols={setCols}
+          rowsPerPage={rowsPerPage}
+          setRowsPerPage={setRowsPerPage}
+          margins={margins}
+          setMargins={setMargins}
+          spacing={spacing}
+          setSpacing={setSpacing}
+          cardSize={cardSize}
+          setCardSize={setCardSize}
+          handleFile={handleFile}
+          loadStudents={loadStudents}
+          currentLayout={currentLayout}
+          applyLayout={applyLayout}
+        />
 
         <main className="flex-1 relative flex items-center justify-center bg-gray-100 overflow-hidden">
           <div className="absolute top-2 right-2">
@@ -432,39 +340,17 @@ const drawImageWithText = async (ctx, student, x, y, width, height, imageUrl) =>
           )}
         </main>
 
-        <aside className={`bg-gray-50 w-64 p-4 overflow-y-auto space-y-2 ${showRight ? 'block' : 'hidden'} md:block`}>
-          <h2 className="font-medium">Students</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {rows.map((student, idx) => (
-              <div key={idx} className="p-2 bg-white rounded shadow text-center">
-                <img
-                  src={student.photo?.[0] || 'https://via.placeholder.com/100?text=No+Photo'}
-                  alt={`${student.firstName} ${student.lastName}`}
-                  className="w-12 h-12 mx-auto rounded-full object-cover mb-1 border"
-                />
-                <p className="text-xs font-medium truncate">
-                  {student.firstName} {student.lastName}
-                </p>
-              </div>
-            ))}
-          </div>
-        </aside>
+        <RightSidebar show={showRight} students={rows} />
       </div>
 
-      <footer className="p-2 bg-gray-200">
-        {rows.length > 0 && (
-          <div className="flex flex-wrap justify-center gap-2">
-            <button onClick={() => setIndex(i => Math.max(i - 1, 0))} className="px-2 py-1 bg-gray-200 rounded">Prev</button>
-            <span>{index + 1} / {rows.length}</span>
-            <button onClick={() => setIndex(i => Math.min(i + 1, rows.length - 1))} className="px-2 py-1 bg-gray-200 rounded">Next</button>
-            <button onClick={downloadCurrent} className="px-2 py-1 bg-green-600 text-white rounded">Download</button>
-            <button onClick={downloadAll} className="px-2 py-1 bg-blue-600 text-white rounded">Export All</button>
-            <button onClick={() => downloadLayout('pdf')} className="px-2 py-1 bg-purple-600 text-white rounded">Layout PDF</button>
-            <button onClick={() => downloadLayout('png')} className="px-2 py-1 bg-purple-600 text-white rounded">Layout PNG</button>
-            <button onClick={() => downloadLayout('jpg')} className="px-2 py-1 bg-purple-600 text-white rounded">Layout JPG</button>
-          </div>
-        )}
-      </footer>
+      <GeneratorFooter
+        rows={rows}
+        index={index}
+        setIndex={setIndex}
+        downloadCurrent={downloadCurrent}
+        downloadAll={downloadAll}
+        downloadLayout={downloadLayout}
+      />
     </div>
   );
 };

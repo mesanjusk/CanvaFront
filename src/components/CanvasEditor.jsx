@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import toast, { Toaster } from 'react-hot-toast';
 import { useCanvasEditor } from "../hooks/useCanvasEditor";
 import { useCanvasTools } from "../hooks/useCanvasTools";
 import CanvasArea from "./CanvasArea";
@@ -28,8 +29,9 @@ import { useParams } from "react-router-dom";
 
 const LOCAL_KEY = "localTemplates";
 
-const CanvasEditor = () => {
-  const { templateId } = useParams();
+const CanvasEditor = ({ templateId: propTemplateId, onSaved }) => {
+  const { templateId: routeId } = useParams();
+  const templateId = propTemplateId || routeId;
   const [students, setStudents] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null);
    const [institutes, setInstitutes] = useState([]);
@@ -265,21 +267,20 @@ const saveTemplateLayout = async () => {
   template: templateId || null, // ✅ use templateId from URL
 };
 
-await axios.post(`https://canvaback.onrender.com/api/templatelayout/save`, payload);
-
-
   try {
-    const res = await axios.post("https://canvaback.onrender.com/api/templatelayout/save", payload);
-    alert("✅ Template saved successfully!");
+    await axios.post(`https://canvaback.onrender.com/api/templatelayout/save`, payload);
+    toast.success('Template saved successfully');
+    onSaved?.();
   } catch (error) {
     console.error("❌ Failed to save template", error);
-    alert("Error saving template.");
+    toast.error('Error saving template');
   }
 };
 
 
   return (
      <div className="h-screen flex flex-col">
+      <Toaster position="top-right" />
       <header className="h-12 bg-gray-800 text-white flex items-center px-4 gap-4">
         <a href="/" className="font-bold">Framee</a>
         <a href="/templates" className="underline">Templates</a>

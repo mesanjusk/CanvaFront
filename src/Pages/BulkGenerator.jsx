@@ -9,6 +9,8 @@ import LeftSidebar from '../components/bulk/LeftSidebar';
 import RightSidebar from '../components/bulk/RightSidebar';
 import GeneratorFooter from '../components/bulk/GeneratorFooter';
 import FloatingObjectToolbar from '../components/FloatingObjectToolbar';
+import CanvasEditorModal from '../components/CanvasEditorModal';
+import toast from 'react-hot-toast';
 
 const A4 = { width: 2480, height: 3508 };
 const A3 = { width: 3508, height: 4961 };
@@ -52,6 +54,8 @@ const BulkGenerator = () => {
   const [lockedObjects, setLockedObjects] = useState(new Set());
   const [showLeft, setShowLeft] = useState(false);
   const [showRight, setShowRight] = useState(false);
+  const [showEditor, setShowEditor] = useState(false);
+  const [editorTemplate, setEditorTemplate] = useState(null);
 
 
   const currentLayout = {
@@ -76,6 +80,26 @@ const BulkGenerator = () => {
     setCardSize(layout.cardSize);
   };
 
+  const loadTemplate = async (tplId) => {
+    if (!canvas) return;
+    try {
+      const { data } = await axios.get(`https://canvaback.onrender.com/api/template/${tplId}`);
+      const json = data.canvasJson || data.layout || data;
+      await new Promise((resolve) => canvas.loadFromJSON(json, () => {
+        canvas.renderAll();
+        resolve();
+      }));
+      setSelected(tplId);
+    } catch (e) {
+      toast.error('Failed to load template');
+    }
+  };
+
+  const openEditor = (tpl) => {
+    setEditorTemplate(tpl);
+    setShowEditor(true);
+  };
+
   useEffect(() => {
     const c = new fabric.Canvas('bulk-canvas', {
       width: custom.width,
@@ -97,13 +121,18 @@ const BulkGenerator = () => {
     };
   }, []);
 
+  const fetchTemplates = async () => {
+    try {
+      const res = await axios.get('https://canvaback.onrender.com/api/template/');
+      const data = Array.isArray(res.data) ? res.data : res.data.result || [];
+      setTemplates(data.map(t => ({ ...t, id: t._id })));
+    } catch {
+      setTemplates([]);
+    }
+  };
+
   useEffect(() => {
-    axios.get('https://canvaback.onrender.com/api/template/')
-      .then(res => {
-        const data = Array.isArray(res.data) ? res.data : res.data.result || [];
-        setTemplates(data.map(t => ({ ...t, id: t._id })));
-      })
-      .catch(() => setTemplates([]));
+    fetchTemplates();
   }, []);
 
   useEffect(() => {
@@ -340,8 +369,16 @@ const drawImageWithText = async (ctx, student, x, y, width, height, imageUrl) =>
           )}
         </main>
 
-        <RightSidebar show={showRight} students={rows} />
+        <RightSidebar show={showRight} templates={templates} onSelect={(t) => { loadTemplate(t._id); openEditor(t); }} />
       </div>
+
+      {showEditor && editorTemplate && (
+        <CanvasEditorModal
+          templateId={editorTemplate._id}
+          onClose={() => setShowEditor(false)}
+          onSaved={() => { setShowEditor(false); fetchTemplates(); loadTemplate(editorTemplate._id); }}
+        />
+      )}
 
       <GeneratorFooter
         rows={rows}

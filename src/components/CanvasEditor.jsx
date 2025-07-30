@@ -11,7 +11,6 @@ import UndoRedoControls from "./UndoRedoControls";
 import LayerPanel from "./LayerPanel";
 import BottomToolbar from "./BottomToolbar";
 import FloatingObjectToolbar from "./FloatingObjectToolbar";
-import { getStoredUser, getStoredInstituteUUID} from '../utils/storageUtils';
 
 import {
   RefreshCw,
@@ -112,7 +111,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
       .catch((err) => console.error("Failed to fetch institutes", err));
   }, []);
 
-  const handleInstituteSelect = (institute_uuid) => {
+const handleInstituteSelect = (institute_uuid) => {
   const institute = institutes.find((i) => i.institute_uuid === institute_uuid);
   setSelectedInstitute(institute);
 };
@@ -124,129 +123,125 @@ useEffect(() => {
     canvas.clear(); // Clear everything
 
     // Load and add template background
-   // Load and add template background
-if (templateId) {
-  try {
-    const res = await axios.get(`https://canvaback.onrender.com/api/template/${templateId}`);
-    const { image, title } = res.data;
-
-    if (image) {
-      let targetWidth = 400;
-let targetHeight = 550;
-
-if (res.data.width && res.data.height) {
-  targetWidth = res.data.width;
-  targetHeight = res.data.height;
-} else if (image) {
-  const imgObj = await new Promise((resolve) => {
-    fabric.Image.fromURL(image, resolve, { crossOrigin: "anonymous" });
-  });
-  targetWidth = imgObj.width || 400;
-  targetHeight = imgObj.height || 550;
-}
-
-canvas.setWidth(targetWidth);
-canvas.setHeight(targetHeight);
-
-
-      await new Promise((resolve) => {
-        fabric.Image.fromURL(
-          image,
-          (img) => {
-            const scaleX = targetWidth / img.width;
-            const scaleY = targetHeight / img.height;
-            const scale = Math.min(scaleX, scaleY);
-
-            img.scale(scale);
-            img.set({
-              left: (targetWidth - img.getScaledWidth()) / 2,
-              top: (targetHeight - img.getScaledHeight()) / 2,
-              selectable: true,        
-              hasControls: true,        
-            });
-
-            canvas.add(img);
-            img.sendToBack();
-            resolve();
-          },
-          { crossOrigin: "anonymous" }
+    if (templateId) {
+      try {
+        const res = await axios.get(
+          `https://canvaback.onrender.com/api/template/${templateId}`
         );
-      });
+        const { image, title } = res.data;
 
-      if (title) {
-       const titleText = new fabric.IText("{{title}}", {
-  left: targetWidth / 2,
-  top: 20,
-  fontSize: 24,
-  fill: "#333",
-  originX: "center",
-  selectable: true,
-  hasControls: true,
-});
-canvas.add(titleText);
+        if (image) {
+          let targetWidth = 400;
+          let targetHeight = 550;
 
+          if (res.data.width && res.data.height) {
+            targetWidth = res.data.width;
+            targetHeight = res.data.height;
+          } else {
+            const imgObj = await new Promise((resolve) => {
+              fabric.Image.fromURL(image, resolve, { crossOrigin: "anonymous" });
+            });
+            targetWidth = imgObj.width || 400;
+            targetHeight = imgObj.height || 550;
+          }
+
+          canvas.setWidth(targetWidth);
+          canvas.setHeight(targetHeight);
+
+          await new Promise((resolve) => {
+            fabric.Image.fromURL(
+              image,
+              (img) => {
+                const scaleX = targetWidth / img.width;
+                const scaleY = targetHeight / img.height;
+                const scale = Math.min(scaleX, scaleY);
+
+                img.scale(scale);
+                img.set({
+                  left: (targetWidth - img.getScaledWidth()) / 2,
+                  top: (targetHeight - img.getScaledHeight()) / 2,
+                  selectable: true,
+                  hasControls: true,
+                });
+
+                canvas.add(img);
+                img.sendToBack();
+                resolve();
+              },
+              { crossOrigin: "anonymous" }
+            );
+          });
+
+          if (title) {
+            const titleText = new fabric.IText("{{title}}", {
+              left: targetWidth / 2,
+              top: 20,
+              fontSize: 24,
+              fill: "#333",
+              originX: "center",
+              selectable: true,
+              hasControls: true,
+            });
+            canvas.add(titleText);
+          }
+        }
+      } catch (err) {
+        console.error("Error loading template:", err);
       }
     }
-  } catch (err) {
-    console.error("Error loading template:", err);
-  }
-}
 
-// Add student name and photo
-if (selectedStudent) {
-  const nameText = new fabric.IText("{{firstName}} {{lastName}}", {
-    left: 195,
-    top: 400,
-    fontSize: 22,
-    fill: "#000",
-    selectable: true,
-    hasControls: true,
-  });
-  canvas.add(nameText);
+    // Add student name and photo
+    if (selectedStudent) {
+      const nameText = new fabric.IText("{{firstName}} {{lastName}}", {
+        left: 195,
+        top: 400,
+        fontSize: 22,
+        fill: "#000",
+        selectable: true,
+        hasControls: true,
+      });
+      canvas.add(nameText);
 
-  const photoPlaceholder = new fabric.IText("{{photo}}", {
-    left: 50,
-    top: 150,
-    fontSize: 18,
-    fill: "#555",
-    selectable: true,
-    hasControls: true,
-  });
-  canvas.add(photoPlaceholder);
+      const photoPlaceholder = new fabric.IText("{{photo}}", {
+        left: 50,
+        top: 150,
+        fontSize: 18,
+        fill: "#555",
+        selectable: true,
+        hasControls: true,
+      });
+      canvas.add(photoPlaceholder);
 
-  canvas.renderAll();
-}
+      canvas.renderAll();
+    }
 
+    // Display text "Logo" (movable)
+    if (selectedInstitute?.logo) {
+      const logoText = new fabric.IText("{{logo}}", {
+        left: 20,
+        top: 20,
+        fontSize: 20,
+        fill: "black",
+        selectable: true,
+        hasControls: true,
+      });
+      canvas.add(logoText);
+      logoText.bringToFront();
+    }
 
-// Display text "Logo" (movable)
-if (selectedInstitute?.logo) {
-  const logoText = new fabric.IText("{{logo}}", {
-    left: 20,
-    top: 20,
-    fontSize: 20,
-    fill: "black",
-    selectable: true,
-    hasControls: true,
-  });
-  canvas.add(logoText);
-  logoText.bringToFront();
-}
-
-// Display text "Signature" (movable)
-if (selectedInstitute?.signature) {
-  const signatureText = new fabric.IText("{{signature}}", {
-    left: canvas.width - 150,
-    top: canvas.height - 80,
-    fontSize: 20,
-    fill: "black",
-    selectable: true,
-    hasControls: true,
-  });
-  canvas.add(signatureText);
-  signatureText.bringToFront();
-}
-
-
+    // Display text "Signature" (movable)
+    if (selectedInstitute?.signature) {
+      const signatureText = new fabric.IText("{{signature}}", {
+        left: canvas.width - 150,
+        top: canvas.height - 80,
+        fontSize: 20,
+        fill: "black",
+        selectable: true,
+        hasControls: true,
+      });
+      canvas.add(signatureText);
+      signatureText.bringToFront();
+    }
   };
 
   renderTemplateAndStudent();
@@ -522,7 +517,7 @@ const exportJSON = () => {
   </div>
 )}
 
-{selectedInstitute?.sign && (
+{selectedInstitute?.signature && (
   <div className="p-4">
     <h3 className="text-lg font-bold mb-2">Signature</h3>
     <img src={selectedInstitute.signature} className="w-32 h-20 object-contain" />

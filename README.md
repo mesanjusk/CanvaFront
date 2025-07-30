@@ -21,3 +21,12 @@ npm run dev
 - Canvas size can be changed
 
 This code base is meant as a starting point for further development.
+
+## Prototype pages
+
+The project also includes a basic video editor and print layout page that load after login:
+
+- `VideoEditor` allows adding simple text and image overlays over an uploaded video and saving the design to your API endpoint via `VITE_BASE_URL`.
+- `PrintLayout` lets you pick from a couple of preset sizes and edit them using the existing `CanvasEditor` component.
+
+These pages are intentionally minimal and meant as examples rather than full Canva replacements.

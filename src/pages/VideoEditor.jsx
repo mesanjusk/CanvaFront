@@ -51,7 +51,8 @@ const VideoEditor = () => {
     if (!canvas) return;
     const json = canvas.toJSON();
     try {
-      await axios.post('https://example.com/api/video-design', { data: json });
+      const base = import.meta.env.VITE_BASE_URL || '';
+      await axios.post(`${base}/api/video-design`, { data: json });
       alert('Saved!');
     } catch {
       alert('Save failed');

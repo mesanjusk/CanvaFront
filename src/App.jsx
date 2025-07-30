@@ -45,6 +45,8 @@ import AddTemplate from './pages/addTemplate';
 import AddCategory from './pages/addCategory';
 import AddSubcategory from './pages/addSubcategory';
 import BulkGenerator from './Pages/BulkGenerator';
+import VideoEditor from './pages/VideoEditor';
+import PrintLayout from './pages/PrintLayout';
 
 export default function App() {
   return (
@@ -93,6 +95,8 @@ export default function App() {
         <Route path="allExams" element={<AllExams />} />
         <Route path="fees" element={<Fees />} />
         <Route path="tools" element={<ToolsPanel />} />
+        <Route path="video" element={<VideoEditor />} />
+        <Route path="print-layout" element={<PrintLayout />} />
         
           
           <Route path="addTemplate" element={<AddTemplate />} />

@@ -20,6 +20,10 @@ import {
   Square,
   Circle,
   Image as ImageIcon,
+  Sun,
+  Moon,
+  FileJson,
+  X
 } from "lucide-react";
 
 import TextEditToolbar from "./TextEditToolbar";
@@ -34,8 +38,14 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
   const templateId = propTemplateId || routeId;
   const [students, setStudents] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null);
-   const [institutes, setInstitutes] = useState([]);
+  const [institutes, setInstitutes] = useState([]);
   const [selectedInstitute, setSelectedInstitute] = useState(null);
+  const [darkMode, setDarkMode] = useState(false);
+  const [showLauncher, setShowLauncher] = useState(false);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', darkMode);
+  }, [darkMode]);
 
   const {
     canvasRef,
@@ -242,6 +252,15 @@ if (selectedInstitute?.signature) {
   renderTemplateAndStudent();
 }, [templateId, selectedStudent, canvas, selectedInstitute]);
 
+const loadTemplate = (templateJson) => {
+  if (canvas) {
+    canvas.loadFromJSON(templateJson, () => {
+      canvas.renderAll();
+      saveHistory();
+    });
+  }
+};
+
 const saveTemplateLayout = async () => {
   if (!canvas) return;
 
@@ -277,20 +296,39 @@ const saveTemplateLayout = async () => {
   }
 };
 
+const exportJSON = () => {
+  if (!canvas) return;
+  const json = canvas.toJSON(['selectable', 'hasControls']);
+  const blob = new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'canvas.json';
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
 
   return (
     <div className="h-full flex flex-col">
       <Toaster position="top-right" />
       {!hideHeader && (
-        <header className="h-12 bg-gray-800 text-white flex items-center justify-between px-4">
+        <header className="h-12 bg-gray-800 dark:bg-gray-900 text-white flex items-center justify-between px-4">
           <div className="flex items-center gap-4">
             <a href="/" className="font-bold">Framee</a>
             <a href="/templates" className="underline">Templates</a>
           </div>
+          <button
+            onClick={() => setDarkMode(!darkMode)}
+            className="p-1 rounded hover:bg-gray-700"
+            title="Toggle theme"
+          >
+            {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
         </header>
       )}
-      <main className="flex flex-1 overflow-hidden bg-gray-100">
-        <aside className="w-60 border-r bg-white p-4 space-y-6 overflow-y-auto">
+      <main className="flex flex-1 overflow-hidden bg-gray-100 dark:bg-gray-800">
+        <aside className="w-full sm:w-60 border-r bg-white dark:bg-gray-800 p-4 space-y-6 overflow-y-auto sticky top-0 h-screen">
           <div>
             <label className="block mb-1 font-semibold">Select Student:</label>
             <select onChange={(e) => handleStudentSelect(e.target.value)} className="w-full border rounded px-2 py-1">
@@ -306,14 +344,24 @@ const saveTemplateLayout = async () => {
             <label className="block mb-1 font-semibold">Select Institute:</label>
             <select onChange={(e) => handleInstituteSelect(e.target.value)} className="w-full border rounded px-2 py-1">
               <option value="">Select an institute</option>
-              {(institutes || []).map((institute) => (
-                <option key={institute.institute_uuid} value={institute.institute_uuid}>
-                  {institute.institute_title}
-                </option>
-              ))}
-            </select>
-          </div>
-        </aside>
+          {(institutes || []).map((institute) => (
+            <option key={institute.institute_uuid} value={institute.institute_uuid}>
+              {institute.institute_title}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <h3 className="text-sm font-semibold mb-2">Tutorial</h3>
+        <iframe
+          className="w-full h-32 rounded"
+          src="https://www.youtube.com/embed/dQw4w9WgXcQ"
+          title="Tutorial Video"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        ></iframe>
+      </div>
+      </aside>
         <div className="flex-1 flex flex-col">
           {/* Toolbar */}
           <div className="flex justify-between items-center px-4 py-2 bg-white border-b shadow z-20">
@@ -337,14 +385,6 @@ const saveTemplateLayout = async () => {
           <label htmlFor="upload-image" className="p-2 rounded bg-white shadow hover:bg-blue-100 cursor-pointer" title="Upload Image">
             <ImageIcon size={28} />
           </label>
-          <TemplatePanel loadTemplate={(templateJson) => {
-            if (canvas) {
-              canvas.loadFromJSON(templateJson, () => {
-                canvas.renderAll();
-                saveHistory();
-              });
-            }
-          }} />
           <UndoRedoControls undo={undo} redo={redo} duplicateObject={duplicateObject} downloadPDF={downloadPDF} />
         </div>
         <div className="flex gap-2 items-center">
@@ -354,6 +394,7 @@ const saveTemplateLayout = async () => {
             saveHistory();
           }} className="p-2 rounded-full bg-yellow-500 text-white shadow hover:bg-yellow-600"><RefreshCw size={22} /></button>
           <button title="Download PNG" onClick={downloadHighRes} className="p-2 rounded-full bg-green-600 text-white shadow hover:bg-green-700"><Download size={22} /></button>
+          <button title="Export JSON" onClick={exportJSON} className="p-2 rounded-full bg-indigo-600 text-white shadow hover:bg-indigo-700"><FileJson size={22} /></button>
           <button title="Save Template" onClick={saveTemplateLayout} className="p-2 rounded-full bg-blue-600 text-white shadow hover:bg-blue-700">Save Template</button>
         </div>
       </div>
@@ -526,6 +567,26 @@ const saveTemplateLayout = async () => {
         <LayerPanel canvas={canvas} />
       </Drawer>
 
+      {showLauncher && (
+        <div className="fixed right-2 top-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 p-2 rounded shadow-lg z-40">
+          <button
+            className="absolute top-1 right-1 text-gray-500 hover:text-gray-800"
+            onClick={() => setShowLauncher(false)}
+          >
+            <X size={16} />
+          </button>
+          <TemplatePanel loadTemplate={loadTemplate} />
+        </div>
+      )}
+
+      <button
+        onClick={() => setShowLauncher(!showLauncher)}
+        className="fixed right-2 top-1/2 -translate-y-1/2 bg-blue-600 text-white p-3 rounded-full shadow z-30"
+        title="Templates"
+      >
+        T
+      </button>
+
       <BottomToolbar
         alignLeft={alignLeft}
         alignCenter={alignCenter}
@@ -539,6 +600,9 @@ const saveTemplateLayout = async () => {
     </div>
        
       </main>
+      <footer className="h-10 flex items-center justify-center text-xs bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+        © 2025 Framee
+      </footer>
     </div>
    
   );

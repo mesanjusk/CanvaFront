@@ -279,45 +279,44 @@ const saveTemplateLayout = async () => {
 
 
   return (
-     <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col">
       <Toaster position="top-right" />
       {!hideHeader && (
-        <header className="h-12 bg-gray-800 text-white flex items-center px-4 gap-4">
-          <a href="/" className="font-bold">Framee</a>
-          <a href="/templates" className="underline">Templates</a>
+        <header className="h-12 bg-gray-800 text-white flex items-center justify-between px-4">
+          <div className="flex items-center gap-4">
+            <a href="/" className="font-bold">Framee</a>
+            <a href="/templates" className="underline">Templates</a>
+          </div>
         </header>
       )}
-      <main className="flex-1 bg-gray-100">
-        <div className="min-h-full w-full bg-gray-100 flex flex-col">
-      <div className="p-4">
-        <label className="block mb-2 font-semibold">Select Student:</label>
-        <select onChange={(e) => handleStudentSelect(e.target.value)}>
-  <option value="">Select a student</option>
-  {students.map((student) => (
-    <option key={student.uuid} value={student.uuid}>
-      {student.firstName} {student.lastName}
-    </option>
-  ))}
-</select>
-
-
-      </div>
-       <div className="p-4">
-        <label className="block mb-2 font-semibold">Select Institute:</label>
-        <select onChange={(e) => handleInstituteSelect(e.target.value)}>
-  <option value="">Select a institute</option>
-  {(institutes || []).map((institute) => (
-    <option key={institute.institute_uuid} value={institute.institute_uuid}>
-      {institute.institute_title}
-    </option>
-  ))}
-</select>
-
-
-      </div>
-
-      {/* Toolbar */}
-      <div className="w-full flex justify-between items-center px-4 py-2 bg-white border-b shadow z-20">
+      <main className="flex flex-1 overflow-hidden bg-gray-100">
+        <aside className="w-60 border-r bg-white p-4 space-y-6 overflow-y-auto">
+          <div>
+            <label className="block mb-1 font-semibold">Select Student:</label>
+            <select onChange={(e) => handleStudentSelect(e.target.value)} className="w-full border rounded px-2 py-1">
+              <option value="">Select a student</option>
+              {students.map((student) => (
+                <option key={student.uuid} value={student.uuid}>
+                  {student.firstName} {student.lastName}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block mb-1 font-semibold">Select Institute:</label>
+            <select onChange={(e) => handleInstituteSelect(e.target.value)} className="w-full border rounded px-2 py-1">
+              <option value="">Select an institute</option>
+              {(institutes || []).map((institute) => (
+                <option key={institute.institute_uuid} value={institute.institute_uuid}>
+                  {institute.institute_title}
+                </option>
+              ))}
+            </select>
+          </div>
+        </aside>
+        <div className="flex-1 flex flex-col">
+          {/* Toolbar */}
+          <div className="flex justify-between items-center px-4 py-2 bg-white border-b shadow z-20">
         <div className="flex gap-2 items-center overflow-x-auto">
           <button title="Add Text" onClick={addText} className="p-2 rounded bg-white shadow hover:bg-blue-100"><Type size={28} /></button>
           <button title="Add Rectangle" onClick={addRect} className="p-2 rounded bg-white shadow hover:bg-blue-100"><Square size={28} /></button>

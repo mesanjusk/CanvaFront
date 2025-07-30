@@ -3,27 +3,15 @@ import toast, { Toaster } from 'react-hot-toast';
 import { useCanvasEditor } from "../hooks/useCanvasEditor";
 import { useCanvasTools } from "../hooks/useCanvasTools";
 import CanvasArea from "./CanvasArea";
-import RightPanel from "./RightPanel";
 import ImageCropModal from "./ImageCropModal";
-import Drawer from "./Drawer";
 import TemplatePanel from "./TemplatePanel";
-import UndoRedoControls from "./UndoRedoControls";
-import LayerPanel from "./LayerPanel";
 import BottomToolbar from "./BottomToolbar";
 import FloatingObjectToolbar from "./FloatingObjectToolbar";
+import EditorSidebar from "./EditorSidebar";
+import EditorToolbar from "./EditorToolbar";
+import EditorDrawer from "./EditorDrawer";
 
-import {
-  RefreshCw,
-  Download,
-  Type,
-  Square,
-  Circle,
-  Image as ImageIcon,
-  Sun,
-  Moon,
-  FileJson,
-  X
-} from "lucide-react";
+import { Sun, Moon, X } from "lucide-react";
 
 import TextEditToolbar from "./TextEditToolbar";
 import ShapeEditToolbar from "./ShapeEditToolbar";
@@ -303,6 +291,30 @@ const exportJSON = () => {
   URL.revokeObjectURL(url);
 };
 
+  const rightPanelProps = {
+    fillColor,
+    setFillColor,
+    fontSize,
+    setFontSize,
+    strokeColor,
+    setStrokeColor,
+    strokeWidth,
+    setStrokeWidth,
+    canvasWidth,
+    setCanvasWidth,
+    canvasHeight,
+    setCanvasHeight,
+    setBackgroundImage: (url) => {
+      fabric.Image.fromURL(url, (img) => {
+        canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
+          scaleX: canvas.width / img.width,
+          scaleY: canvas.height / img.height,
+        });
+        saveHistory();
+      });
+    },
+  };
+
 
   return (
     <div className="h-full flex flex-col">
@@ -323,76 +335,32 @@ const exportJSON = () => {
         </header>
       )}
       <main className="flex flex-1 overflow-hidden bg-gray-100 dark:bg-gray-800">
-        <aside className="w-full sm:w-60 border-r bg-white dark:bg-gray-800 p-4 space-y-6 overflow-y-auto sticky top-0 h-screen">
-          <div>
-            <label className="block mb-1 font-semibold">Select Student:</label>
-            <select onChange={(e) => handleStudentSelect(e.target.value)} className="w-full border rounded px-2 py-1">
-              <option value="">Select a student</option>
-              {students.map((student) => (
-                <option key={student.uuid} value={student.uuid}>
-                  {student.firstName} {student.lastName}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block mb-1 font-semibold">Select Institute:</label>
-            <select onChange={(e) => handleInstituteSelect(e.target.value)} className="w-full border rounded px-2 py-1">
-              <option value="">Select an institute</option>
-          {(institutes || []).map((institute) => (
-            <option key={institute.institute_uuid} value={institute.institute_uuid}>
-              {institute.institute_title}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div>
-        <h3 className="text-sm font-semibold mb-2">Tutorial</h3>
-        <iframe
-          className="w-full h-32 rounded"
-          src="https://www.youtube.com/embed/dQw4w9WgXcQ"
-          title="Tutorial Video"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-        ></iframe>
-      </div>
-      </aside>
+        <EditorSidebar
+          students={students}
+          institutes={institutes}
+          onStudentSelect={handleStudentSelect}
+          onInstituteSelect={handleInstituteSelect}
+        />
         <div className="flex-1 flex flex-col">
           {/* Toolbar */}
-          <div className="flex justify-between items-center px-4 py-2 bg-white border-b shadow z-20">
-        <div className="flex gap-2 items-center overflow-x-auto">
-          <button title="Add Text" onClick={addText} className="p-2 rounded bg-white shadow hover:bg-blue-100"><Type size={28} /></button>
-          <button title="Add Rectangle" onClick={addRect} className="p-2 rounded bg-white shadow hover:bg-blue-100"><Square size={28} /></button>
-          <button title="Add Circle" onClick={addCircle} className="p-2 rounded bg-white shadow hover:bg-blue-100"><Circle size={28} /></button>
-          <input type="file" accept="image/*" id="upload-image" style={{ display: "none" }} onChange={(e) => {
-            const file = e.target.files[0];
-            if (file) {
-              const reader = new FileReader();
-              reader.onload = () => {
-                setCropSrc(reader.result);
-                cropCallbackRef.current = (croppedUrl) => {
-                  addImage(croppedUrl);
-                };
-              };
-              reader.readAsDataURL(file);
-            }
-          }} />
-          <label htmlFor="upload-image" className="p-2 rounded bg-white shadow hover:bg-blue-100 cursor-pointer" title="Upload Image">
-            <ImageIcon size={28} />
-          </label>
-          <UndoRedoControls undo={undo} redo={redo} duplicateObject={duplicateObject} downloadPDF={downloadPDF} />
-        </div>
-        <div className="flex gap-2 items-center">
-          <button title="Reset Canvas" onClick={() => {
-            canvas?.clear();
-            resetHistory();
-            saveHistory();
-          }} className="p-2 rounded-full bg-yellow-500 text-white shadow hover:bg-yellow-600"><RefreshCw size={22} /></button>
-          <button title="Download PNG" onClick={downloadHighRes} className="p-2 rounded-full bg-green-600 text-white shadow hover:bg-green-700"><Download size={22} /></button>
-          <button title="Export JSON" onClick={exportJSON} className="p-2 rounded-full bg-indigo-600 text-white shadow hover:bg-indigo-700"><FileJson size={22} /></button>
-          <button title="Save Template" onClick={saveTemplateLayout} className="p-2 rounded-full bg-blue-600 text-white shadow hover:bg-blue-700">Save Template</button>
-        </div>
-      </div>
+          <EditorToolbar
+            addText={addText}
+            addRect={addRect}
+            addCircle={addCircle}
+            addImage={addImage}
+            setCropSrc={setCropSrc}
+            cropCallbackRef={cropCallbackRef}
+            undo={undo}
+            redo={redo}
+            duplicateObject={duplicateObject}
+            downloadPDF={downloadPDF}
+            downloadHighRes={downloadHighRes}
+            exportJSON={exportJSON}
+            saveTemplateLayout={saveTemplateLayout}
+            canvas={canvas}
+            resetHistory={resetHistory}
+            saveHistory={saveHistory}
+          />
 
       {/* Canvas Area */}
       <div className="flex-1 overflow-auto bg-gray-50 p-4">
@@ -508,59 +476,14 @@ const exportJSON = () => {
       )}
 
       {/* Drawer Settings */}
-      <Drawer isOpen={showSettings} onClose={() => setShowSettings(false)}>
-
-        {selectedInstitute?.logo && (
-  <div className="p-4">
-    <h3 className="text-lg font-bold mb-2">Institute Logo</h3>
-    <img src={selectedInstitute.logo} className="w-32 h-32 object-contain" />
-  </div>
-)}
-
-{selectedInstitute?.signature && (
-  <div className="p-4">
-    <h3 className="text-lg font-bold mb-2">Signature</h3>
-    <img src={selectedInstitute.signature} className="w-32 h-20 object-contain" />
-  </div>
-)}
-
-        
-         {selectedStudent && selectedStudent.photo && (
-    <div className="p-4">
-      <h3 className="text-lg font-bold mb-2">Selected Student Photo</h3>
-      <img
-        src={selectedStudent.photo[0]}
-        
-        className="w-32 h-32 object-cover rounded"
+      <EditorDrawer
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        selectedInstitute={selectedInstitute}
+        selectedStudent={selectedStudent}
+        rightPanelProps={rightPanelProps}
+        canvas={canvas}
       />
-    </div>
-  )}
-
-        <RightPanel
-          fillColor={fillColor}
-          setFillColor={setFillColor}
-          fontSize={fontSize}
-          setFontSize={setFontSize}
-          strokeColor={strokeColor}
-          setStrokeColor={setStrokeColor}
-          strokeWidth={strokeWidth}
-          setStrokeWidth={setStrokeWidth}
-          canvasWidth={canvasWidth}
-          setCanvasWidth={setCanvasWidth}
-          canvasHeight={canvasHeight}
-          setCanvasHeight={setCanvasHeight}
-          setBackgroundImage={(url) => {
-            fabric.Image.fromURL(url, (img) => {
-              canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
-                scaleX: canvas.width / img.width,
-                scaleY: canvas.height / img.height,
-              });
-              saveHistory();
-            });
-          }}
-        />
-        <LayerPanel canvas={canvas} />
-      </Drawer>
 
       {showLauncher && (
         <div className="fixed right-2 top-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 p-2 rounded shadow-lg z-40">

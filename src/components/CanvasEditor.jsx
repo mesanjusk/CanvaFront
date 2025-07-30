@@ -279,14 +279,24 @@ const saveTemplateLayout = async () => {
 
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-screen flex flex-col">
       <Toaster position="top-right" />
       {!hideHeader && (
         <header className="h-12 bg-gray-800 text-white flex items-center justify-between px-4">
           <div className="flex items-center gap-4">
             <a href="/" className="font-bold">Framee</a>
-            <a href="/templates" className="underline">Templates</a>
+            <a href="/templates" className="hover:underline">Templates</a>
           </div>
+          <nav className="flex items-center gap-4 text-sm">
+            <a
+              href="https://resourcepage.my.canva.site/"
+              target="_blank"
+              rel="noreferrer"
+              className="hover:underline"
+            >
+              Resource Page
+            </a>
+          </nav>
         </header>
       )}
       <main className="flex flex-1 overflow-hidden bg-gray-100">
@@ -481,7 +491,7 @@ const saveTemplateLayout = async () => {
   </div>
 )}
 
-{selectedInstitute?.sign && (
+{selectedInstitute?.signature && (
   <div className="p-4">
     <h3 className="text-lg font-bold mb-2">Signature</h3>
     <img src={selectedInstitute.signature} className="w-32 h-20 object-contain" />

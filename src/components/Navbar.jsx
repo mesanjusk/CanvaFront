@@ -132,7 +132,7 @@ useEffect(() => {
           {/* 1. Square 'F' */}
           <button
             className="flex items-center gap-2 focus:outline-none"
-            onClick={() => {/* your action here */ }}
+            onClick={() => navigate('/home')}
           >
             <div className="w-8 h-8 bg-blue-200 flex items-center justify-center rounded text-lg font-bold text-blue-700">
               F

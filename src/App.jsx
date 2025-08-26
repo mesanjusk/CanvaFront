@@ -47,6 +47,8 @@ import AddSubcategory from './pages/addSubcategory';
 import BulkGenerator from './Pages/BulkGenerator';
 import VideoEditor from './pages/VideoEditor';
 import PrintLayout from './pages/PrintLayout';
+import CanvaHome from './Pages/canvaHome';
+import Subcategory from './Pages/Subcategory';
 
 export default function App() {
   return (
@@ -61,6 +63,8 @@ export default function App() {
       <Route path="/CanvasEditor" element={<CanvasEditor />} />
       <Route path="/editor/:templateId" element={<CanvasEditor />} />
       <Route path="templates" element={<TemplateGallery />} />
+      <Route path="/home" element={<CanvaHome />} />
+      <Route path="/subcategory/:Id" element={<Subcategory />} />
 
       {/* 🔐 Protected Routes under :username */}
       <Route path="/:username" element={<PrivateRoute><DashboardLayout /></PrivateRoute>} >

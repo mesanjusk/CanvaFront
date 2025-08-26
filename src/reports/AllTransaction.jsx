@@ -230,6 +230,7 @@ const AllTransaction = () => {
                     </table>
                 </div>
             </div>
+        </div>
         </>
     );
 };

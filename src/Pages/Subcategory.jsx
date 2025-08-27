@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from "react"; 
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
-import Footer from "../components/Footer";
 import Navbar from "../components/Navbar";
+import Footer from "../components/Footer";
 
 export default function Subcategory() {
-  const { id } = useParams();
+  const { categoryId } = useParams();
+const id = categoryId;
+
   const navigate = useNavigate();
 
   const [subcategories, setSubcategories] = useState([]);
@@ -20,7 +22,7 @@ export default function Subcategory() {
   const fetchTemplatesByCategoryId = async () => {
     try {
       const [templatesRes, categoriesRes] = await Promise.all([
-        axios.get("https://canvaback.onrender.com/api/template/"),
+        axios.get("https://canvaback.onrender.com/api/template"),
         axios.get("https://canvaback.onrender.com/api/category")
       ]);
 
@@ -30,6 +32,7 @@ export default function Subcategory() {
 
       const matchedCategory = categories.find(cat => cat.category_uuid === id);
       if (!matchedCategory) {
+        console.warn("No category found with ID:", id);
         setOriginalTemplates([]);
         setAllTemplates([]);
         setSelectedCategoryName('');
@@ -39,14 +42,9 @@ export default function Subcategory() {
       setSelectedCategoryName(matchedCategory.name);
 
      
-const filtered = templates.filter((template) => {
-  const templateCat = template.category?.toString();
-  return (
-    templateCat === matchedCategory.category_uuid?.toString() ||
-    templateCat === matchedCategory._id?.toString()
-  );
-});
-
+const filtered = templates.filter(
+  (temp) => temp.category === matchedCategory.category_uuid || temp.category === matchedCategory._id
+);
       setOriginalTemplates(filtered);
       setAllTemplates(filtered);
     } catch (err) {
@@ -97,9 +95,9 @@ const handleClick = async (item) => {
                     key={item._id}
                     onClick={() => {
                       setSelectedSubcategoryName(item.name?.trim());
-                        const filteredBySub = originalTemplates.filter(
-                        (template) =>
-                          template.subcategory?.trim().toLowerCase() ===
+                      const filteredBySub = originalTemplates.filter(
+                        (temp) =>
+                          temp.subcategory?.trim().toLowerCase() ===
                           item.name?.trim().toLowerCase()
                       );
                       setAllTemplates(filteredBySub);
@@ -131,35 +129,36 @@ const handleClick = async (item) => {
           </div>
         </section>
 
-        {/*Templates Grid */}
+        {/* Template Grid */}
         {allTemplates.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 px-4 pb-6">
-            {allTemplates.map((template) => (
+            {allTemplates.map((temp) => (
               <div
-                key={template._id}
+                key={temp._id}
                 className="border rounded-lg p-3 shadow hover:shadow-md transition cursor-pointer"
-                 onClick={() => handleClick(template)}
+                 onClick={() => handleClick(temp)}
               >
                 <div className="w-full aspect-square overflow-hidden rounded mb-2">
                   <img
                     src={
-                      template.image
+                      temp.image
                     }
-                    alt={template.title || "Template"}
+                    alt={temp.title || "Template"}
                     className="w-full h-full object-cover"
                     loading="lazy"
                   />
                 </div>
-                <p className="text-sm text-center font-medium truncate">{template.title}</p>
+                <p className="text-sm text-center font-medium truncate">{temp.title}</p>
               </div>
             ))}
           </div>
         ) : (
           <p className="text-gray-500 text-center px-4">
-            No listings found in “{selectedCategoryName || "Selected Category"}”.
+            No templates found in “{selectedCategoryName || "Selected Category"}”.
           </p>
         )}
       </div>
+      
       <Footer />
     </>
   );

@@ -1,16 +1,17 @@
-import React, { useEffect, useState } from "react";
-import toast, { Toaster } from 'react-hot-toast';
-import { useCanvasEditor } from "../hooks/useCanvasEditor";
-import { useCanvasTools } from "../hooks/useCanvasTools";
-import CanvasArea from "./CanvasArea";
-import RightPanel from "./RightPanel";
-import ImageCropModal from "./ImageCropModal";
-import Drawer from "./Drawer";
-import TemplatePanel from "./TemplatePanel";
-import UndoRedoControls from "./UndoRedoControls";
-import LayerPanel from "./LayerPanel";
-import BottomToolbar from "./BottomToolbar";
-import FloatingObjectToolbar from "./FloatingObjectToolbar";
+import React, { useEffect, useState } from "react"; 
+import toast, { Toaster } from 'react-hot-toast'; 
+import { useCanvasEditor } from "../hooks/useCanvasEditor"; 
+import { useCanvasTools } from "../hooks/useCanvasTools"; 
+import CanvasArea from "./CanvasArea"; 
+import RightPanel from "./RightPanel"; 
+import ImageCropModal from "./ImageCropModal"; 
+import Drawer from "./Drawer"; 
+import TemplatePanel from "./TemplatePanel"; 
+import UndoRedoControls from "./UndoRedoControls"; 
+import LayerPanel from "./LayerPanel"; 
+import BottomToolbar from "./BottomToolbar"; 
+import FloatingObjectToolbar from "./FloatingObjectToolbar"; 
+import { getStoredUser, getStoredInstituteUUID} from '../utils/storageUtils';
 
 import {
   RefreshCw,
@@ -39,13 +40,11 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [institutes, setInstitutes] = useState([]);
   const [selectedInstitute, setSelectedInstitute] = useState(null);
-  const [darkMode, setDarkMode] = useState(false);
-  const [showLauncher, setShowLauncher] = useState(false);
-
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', darkMode);
-  }, [darkMode]);
-
+  const [courses, setCourses] = useState([]);
+const [batches, setBatches] = useState([]);
+const [selectedCourse, setSelectedCourse] = useState(null);
+const [selectedBatch, setSelectedBatch] = useState(null);
+  
   const {
     canvasRef,
     fillColor, setFillColor,
@@ -90,6 +89,26 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     resetHistory,
   } = useCanvasEditor(canvasRef, canvasWidth, canvasHeight);
 
+  // fetch classes & batches on mount
+useEffect(() => {
+  const fetchCoursesAndBatches = async () => {
+    try {
+      const [courseRes, batchRes] = await Promise.all([
+        axios.get("https://socialbackend-iucy.onrender.com/api/courses"),
+        axios.get("https://socialbackend-iucy.onrender.com/api/batches"),
+      ]);
+
+      setCourses(courseRes.data || []);
+      setBatches(batchRes.data || []);
+    } catch (err) {
+      console.error("Failed to fetch courses/batches", err);
+      toast.error("Error loading courses/batches");
+    }
+  };
+
+  fetchCoursesAndBatches();
+}, []);
+
   // 🔁 Fetch all students on mount
   useEffect(() => {
     axios
@@ -103,18 +122,36 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
   setSelectedStudent(student);
 };
 
- // 🔁 Fetch all institutes on mount
-  useEffect(() => {
-    axios
-      .get("https://canvaback.onrender.com/api/institute/")
-      .then((res) => setInstitutes(res.data))
-      .catch((err) => console.error("Failed to fetch institutes", err));
-  }, []);
+// 🔁 Fetch logged-in user's institute automatically 
+useEffect(() => { 
+  const fetchInstitute = async () => { 
+  try { 
+    const user = getStoredUser();
+    const institute_uuid = user?.institute_uuid || getStoredInstituteUUID(); 
+    if (institute_uuid) { 
+      const res = await axios.get(
+        `https://canvaback.onrender.com/api/institute/${institute_uuid}`
+      );
 
-const handleInstituteSelect = (institute_uuid) => {
-  const institute = institutes.find((i) => i.institute_uuid === institute_uuid);
-  setSelectedInstitute(institute);
+      // 👇 unwrap the actual institute object
+      const institute = res.data.result || res.data.data || res.data;
+
+      console.log("Fetched institute:", institute);
+
+      setSelectedInstitute({
+        ...institute,
+        logo: institute.logo || null,
+        signature: institute.signature || null
+      });  
+    } 
+  } catch (err) { 
+    console.error("Failed to fetch institute", err);
+  } 
 };
+
+  fetchInstitute();
+}, []);
+
 
 useEffect(() => {
   const renderTemplateAndStudent = async () => {
@@ -215,37 +252,47 @@ useEffect(() => {
       canvas.renderAll();
     }
 
-    // Display text "Logo" (movable)
-    if (selectedInstitute?.logo) {
-      const logoText = new fabric.IText("{{logo}}", {
-        left: 20,
-        top: 20,
-        fontSize: 20,
-        fill: "black",
-        selectable: true,
-        hasControls: true,
-      });
-      canvas.add(logoText);
-      logoText.bringToFront();
-    }
-
-    // Display text "Signature" (movable)
-    if (selectedInstitute?.signature) {
-      const signatureText = new fabric.IText("{{signature}}", {
-        left: canvas.width - 150,
-        top: canvas.height - 80,
-        fontSize: 20,
-        fill: "black",
-        selectable: true,
-        hasControls: true,
-      });
-      canvas.add(signatureText);
-      signatureText.bringToFront();
-    }
   };
 
   renderTemplateAndStudent();
-}, [templateId, selectedStudent, canvas, selectedInstitute]);
+}, [templateId, selectedStudent, canvas]);
+
+useEffect(() => {
+  if (!canvas || !selectedInstitute) return;
+
+  console.log("Logo URL:", selectedInstitute?.logo);
+  console.log("Signature URL:", selectedInstitute?.signature);
+
+  if (selectedInstitute.logo) {
+    fabric.Image.fromURL(
+      selectedInstitute.logo,
+      (img) => {
+        img.scaleToWidth(80);
+        img.set({ left: 20, top: 20, selectable: true });
+        canvas.add(img);
+        canvas.renderAll();
+      },
+      { crossOrigin: "anonymous" }
+    );
+  }
+
+  if (selectedInstitute.signature) {
+    fabric.Image.fromURL(
+      selectedInstitute.signature,
+      (img) => {
+        img.scaleToWidth(120);
+        img.set({
+          left: canvas.width - 150,
+          top: canvas.height - 80,
+          selectable: true,
+        });
+        canvas.add(img);
+        canvas.renderAll();
+      },
+      { crossOrigin: "anonymous" }
+    );
+  }
+}, [canvas, selectedInstitute]);
 
 const loadTemplate = (templateJson) => {
   if (canvas) {
@@ -305,300 +352,231 @@ const exportJSON = () => {
 
 
   return (
-    <div className="h-full flex flex-col">
-      <Toaster position="top-right" />
-      {!hideHeader && (
-        <header className="h-12 bg-gray-800 dark:bg-gray-900 text-white flex items-center justify-between px-4">
-          <div className="flex items-center gap-4">
-            <a href="/" className="font-bold">Framee</a>
-            <a href="/templates" className="underline">Templates</a>
-          </div>
-          <button
-            onClick={() => setDarkMode(!darkMode)}
-            className="p-1 rounded hover:bg-gray-700"
-            title="Toggle theme"
-          >
-            {darkMode ? <Sun size={20} /> : <Moon size={20} />}
-          </button>
-        </header>
-      )}
-      <main className="flex flex-1 overflow-hidden bg-gray-100 dark:bg-gray-800">
-        <aside className="w-full sm:w-60 border-r bg-white dark:bg-gray-800 p-4 space-y-6 overflow-y-auto sticky top-0 h-screen">
-          <div>
-            <label className="block mb-1 font-semibold">Select Student:</label>
-            <select onChange={(e) => handleStudentSelect(e.target.value)} className="w-full border rounded px-2 py-1">
-              <option value="">Select a student</option>
-              {students.map((student) => (
-                <option key={student.uuid} value={student.uuid}>
-                  {student.firstName} {student.lastName}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block mb-1 font-semibold">Select Institute:</label>
-            <select onChange={(e) => handleInstituteSelect(e.target.value)} className="w-full border rounded px-2 py-1">
-              <option value="">Select an institute</option>
-          {(institutes || []).map((institute) => (
-            <option key={institute.institute_uuid} value={institute.institute_uuid}>
-              {institute.institute_title}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div>
-        <h3 className="text-sm font-semibold mb-2">Tutorial</h3>
-        <iframe
-          className="w-full h-32 rounded"
-          src="https://www.youtube.com/embed/dQw4w9WgXcQ"
-          title="Tutorial Video"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-        ></iframe>
-      </div>
-      </aside>
-        <div className="flex-1 flex flex-col">
-          {/* Toolbar */}
-          <div className="flex justify-between items-center px-4 py-2 bg-white border-b shadow z-20">
-        <div className="flex gap-2 items-center overflow-x-auto">
-          <button title="Add Text" onClick={addText} className="p-2 rounded bg-white shadow hover:bg-blue-100"><Type size={28} /></button>
-          <button title="Add Rectangle" onClick={addRect} className="p-2 rounded bg-white shadow hover:bg-blue-100"><Square size={28} /></button>
-          <button title="Add Circle" onClick={addCircle} className="p-2 rounded bg-white shadow hover:bg-blue-100"><Circle size={28} /></button>
-          <input type="file" accept="image/*" id="upload-image" style={{ display: "none" }} onChange={(e) => {
-            const file = e.target.files[0];
-            if (file) {
-              const reader = new FileReader();
-              reader.onload = () => {
-                setCropSrc(reader.result);
-                cropCallbackRef.current = (croppedUrl) => {
-                  addImage(croppedUrl);
-                };
-              };
-              reader.readAsDataURL(file);
-            }
-          }} />
-          <label htmlFor="upload-image" className="p-2 rounded bg-white shadow hover:bg-blue-100 cursor-pointer" title="Upload Image">
-            <ImageIcon size={28} />
-          </label>
-          <UndoRedoControls undo={undo} redo={redo} duplicateObject={duplicateObject} downloadPDF={downloadPDF} />
-        </div>
-        <div className="flex gap-2 items-center">
-          <button title="Reset Canvas" onClick={() => {
-            canvas?.clear();
-            resetHistory();
-            saveHistory();
-          }} className="p-2 rounded-full bg-yellow-500 text-white shadow hover:bg-yellow-600"><RefreshCw size={22} /></button>
-          <button title="Download PNG" onClick={downloadHighRes} className="p-2 rounded-full bg-green-600 text-white shadow hover:bg-green-700"><Download size={22} /></button>
-          <button title="Export JSON" onClick={exportJSON} className="p-2 rounded-full bg-indigo-600 text-white shadow hover:bg-indigo-700"><FileJson size={22} /></button>
-          <button title="Save Template" onClick={saveTemplateLayout} className="p-2 rounded-full bg-blue-600 text-white shadow hover:bg-blue-700">Save Template</button>
-        </div>
-      </div>
+    <div className="h-full flex flex-col"> 
+    <Toaster position="top-right" /> 
+    {!hideHeader && ( 
+      <header className="h-12 bg-gray-800 text-white flex items-center px-4 gap-4"> 
+      <a href="/" className="font-bold">Framee</a> 
+      <a href="/templates" className="underline">Templates</a> 
+      </header> 
+    )} 
+    <main className="flex-1 bg-gray-100"> 
+      <div className="min-h-full w-full bg-gray-100 flex flex-col"> 
+        <div className="p-4"> 
+          <label className="block mb-2 font-semibold">Select Student:</label> 
+          <select onChange={(e) => handleStudentSelect(e.target.value)}> 
+            <option value="">Select a student</option> 
+            {students.map((student) => ( 
+              <option key={student.uuid} value={student.uuid}> 
+              {student.firstName} {student.lastName} 
+              </option> 
+            ))} 
+            </select> 
+            </div>
 
-      {/* Canvas Area */}
-      <div className="flex-1 overflow-auto bg-gray-50 p-4">
-        <div className="mx-auto w-max max-w-full">
-          <CanvasArea ref={canvasRef} width={canvasWidth} height={canvasHeight} />
-        </div>
-      </div>
+<div className="p-4">
+  <label className="block mb-2 font-semibold">Select Course:</label>
+  <select onChange={(e) => setSelectedClass(e.target.value)}>
+    <option value="">Select a course</option>
+    {courses.map((cls) => (
+      <option key={cls._id} value={cls._id}>
+        {cls.name}
+      </option>
+    ))}
+  </select>
+</div>
 
-      {/* Object Toolbars */}
-      {activeObj && (
-        <FloatingObjectToolbar
-          activeObj={activeObj}
-          cropImage={cropImage}
-          handleDelete={() => {
-            canvas?.remove(activeObj);
-            setActiveObj(null);
-            saveHistory();
-          }}
-          toggleLock={(obj) => {
-            const isLocked = lockedObjects.has(obj);
-            obj.set({
-              selectable: !isLocked,
-              evented: !isLocked,
-              hasControls: !isLocked,
-              lockMovementX: isLocked ? false : true,
-              lockMovementY: isLocked ? false : true,
-              editable: obj.type === "i-text" ? !isLocked : undefined,
-            });
-            const updated = new Set(lockedObjects);
-            isLocked ? updated.delete(obj) : updated.add(obj);
-            setLockedObjects(updated);
-            canvas?.discardActiveObject();
-            canvas?.requestRenderAll();
-          }}
-          setShowSettings={setShowSettings}
-          fitCanvasToObject={() => {
-            const bounds = activeObj.getBoundingRect();
-            canvas.setWidth(bounds.width + 100);
-            canvas.setHeight(bounds.height + 100);
-            canvas.centerObject(activeObj);
-            canvas.requestRenderAll();
-          }}
-          isLocked={isLocked}
-          multipleSelected={multipleSelected}
-          groupObjects={() => {
-            const objs = canvas.getActiveObjects();
-            if (objs.length > 1) {
-              const group = new fabric.Group(objs);
-              objs.forEach(o => canvas.remove(o));
-              canvas.add(group);
-              canvas.setActiveObject(group);
-              canvas.requestRenderAll();
-              saveHistory();
-            }
-          }}
-          ungroupObjects={() => {
-            const active = canvas.getActiveObject();
-            if (active && active.type === "group") {
-              const items = active._objects;
-              active._restoreObjectsState();
-              canvas.remove(active);
-              items.forEach(obj => canvas.add(obj));
-              canvas.setActiveObject(new fabric.ActiveSelection(items, { canvas }));
-              canvas.requestRenderAll();
-              saveHistory();
-            }
-          }}
-          canvas={canvas}
-        />
-      )}
+<div className="p-4">
+  <label className="block mb-2 font-semibold">Select Batch:</label>
+  <select onChange={(e) => setSelectedBatch(e.target.value)}>
+    <option value="">Select a batch</option>
+    {batches.map((batch) => (
+      <option key={batch._id} value={batch._id}>
+        {batch.name}
+      </option>
+    ))}
+  </select>
+</div>
 
-      {/* Text & Shape Toolbars */}
-      {activeObj?.type === "i-text" && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 w-full max-w-5xl z-50">
-          <TextEditToolbar
-            obj={activeObj}
-            canvas={canvas}
-            fillColor={fillColor}
-            setFillColor={setFillColor}
-            fontSize={fontSize}
-            setFontSize={setFontSize}
-          />
-        </div>
-      )}
+            {/* Toolbar */} 
+            <div className="w-full flex justify-between items-center px-4 py-2 bg-white border-b shadow z-20"> 
+              <div className="flex gap-2 items-center overflow-x-auto"> 
+                <button title="Add Text" onClick={addText} 
+                className="p-2 rounded bg-white shadow hover:bg-blue-100">
+                  <Type size={28} />
+                  </button> 
+                  <button title="Add Rectangle" onClick={addRect} 
+                  className="p-2 rounded bg-white shadow hover:bg-blue-100">
+                    <Square size={28} />
+                    </button> 
+                    <button title="Add Circle" onClick={addCircle} 
+                    className="p-2 rounded bg-white shadow hover:bg-blue-100"><Circle size={28} />
+                    </button> 
+                    <input type="file" accept="image/*" id="upload-image" 
+                    style={{ display: "none" }} onChange={(e) => { 
+                      const file = e.target.files[0]; 
+                      if (file) { const reader = new FileReader(); 
+                        reader.onload = () => { 
+                          setCropSrc(reader.result); 
+                          cropCallbackRef.current = (croppedUrl) => { 
+                            addImage(croppedUrl); 
+                          }; 
+                        }; 
+                        reader.readAsDataURL(file); 
+                      } 
+                    }} /> 
+                    <label htmlFor="upload-image" 
+                    className="p-2 rounded bg-white shadow hover:bg-blue-100 cursor-pointer" 
+                    title="Upload Image"> <ImageIcon size={28} /> </label> 
+                    <TemplatePanel loadTemplate={(templateJson) => { 
+                      if (canvas) { 
+                        canvas.loadFromJSON(templateJson, () => { 
+                          canvas.renderAll(); 
+                          replacePlaceholders(); 
+                          saveHistory(); 
+                        }); 
+                      } 
+                    }} /> 
+                    <UndoRedoControls undo={undo} redo={redo} duplicateObject={duplicateObject} 
+                    downloadPDF={downloadPDF} /> 
+                    </div> 
+                    <div className="flex gap-2 items-center"> 
+                      <button title="Reset Canvas" onClick={() => { 
+                        canvas?.clear(); 
+                        resetHistory(); 
+                        saveHistory(); 
+                      }} className="p-2 rounded-full bg-yellow-500 text-white shadow hover:bg-yellow-600">
+                        <RefreshCw size={22} />
+                        </button> 
+                        <button title="Download PNG" onClick={downloadHighRes} 
+                        className="p-2 rounded-full bg-green-600 text-white shadow hover:bg-green-700">
+                          <Download size={22} />
+                          </button> 
+                          <button title="Save Template" onClick={saveTemplateLayout} 
+                          className="p-2 rounded-full bg-blue-600 text-white shadow hover:bg-blue-700">
+                            Save Template</button> 
+                            </div> 
+                            </div> 
+                            {/* Canvas Area */} 
+                            <div className="flex-1 overflow-auto bg-gray-50 p-4"> 
+                              <div className="mx-auto w-max max-w-full"> 
+                                <CanvasArea ref={canvasRef} width={canvasWidth} height={canvasHeight} /> 
+                                </div> 
+                                </div> 
+                                {/* Object Toolbars */} 
+                                {activeObj && ( 
+                                  <FloatingObjectToolbar activeObj={activeObj} cropImage={cropImage} 
+                                  handleDelete={() => { canvas?.remove(activeObj); setActiveObj(null); 
+                                    saveHistory(); }} 
+                                    toggleLock={(obj) => { 
+                                      const isLocked = lockedObjects.has(obj); 
+                                      obj.set({ selectable: !isLocked, 
+                                        evented: !isLocked, 
+                                        hasControls: !isLocked, 
+                                        lockMovementX: isLocked ? false : true, 
+                                        lockMovementY: isLocked ? false : true, 
+                                        editable: obj.type === "i-text" ? !isLocked : undefined, }); 
+                                        const updated = new Set(lockedObjects); 
+                                        isLocked ? updated.delete(obj) : updated.add(obj); 
+                                        setLockedObjects(updated); 
+                                        canvas?.discardActiveObject(); 
+                                        canvas?.requestRenderAll(); 
+                                      }} 
+                                        setShowSettings={setShowSettings} 
+                                        fitCanvasToObject={() => { 
+                                          const bounds = activeObj.getBoundingRect(); 
+                                          canvas.setWidth(bounds.width + 100); 
+                                          canvas.setHeight(bounds.height + 100); 
+                                          canvas.centerObject(activeObj); 
+                                          canvas.requestRenderAll(); 
+                                        }} 
+                                        isLocked={isLocked} 
+                                        multipleSelected={multipleSelected} 
+                                        groupObjects={() => { 
+                                          const objs = canvas.getActiveObjects(); 
+                                          if (objs.length > 1) { 
+                                            const group = new fabric.Group(objs); 
+                                            objs.forEach(o => canvas.remove(o));
+                                             canvas.add(group); 
+                                             canvas.setActiveObject(group); 
+                                             canvas.requestRenderAll(); 
+                                             saveHistory(); 
+                                            } 
+                                          }} 
+                                          ungroupObjects={() => { 
+                                            const active = canvas.getActiveObject(); 
+                                            if (active && active.type === "group") { 
+                                              const items = active._objects; 
+                                              active._restoreObjectsState(); 
+                                              canvas.remove(active); 
+                                              items.forEach(obj => canvas.add(obj)); 
+                                              canvas.setActiveObject(new fabric.ActiveSelection(items, 
+                                                { canvas })); 
+                                                canvas.requestRenderAll(); 
+                                                saveHistory(); 
+                                              } 
+                                            }} 
+                                              canvas={canvas} /> 
+                                              )} 
+                                              {/* Text & Shape Toolbars */} 
+                                              {activeObj?.type === "i-text" && ( 
+                                                <div className="fixed bottom-24 left-1/2 -translate-x-1/2 w-full max-w-5xl z-50"> 
+                                                <TextEditToolbar obj={activeObj} canvas={canvas} fillColor={fillColor} 
+                                                setFillColor={setFillColor} fontSize={fontSize} setFontSize={setFontSize} /> 
+                                                </div> 
+                                                )} 
+                                                {activeObj && 
+                                                ["rect", "circle", "image"].includes(activeObj.type) && ( 
+                                                <ShapeEditToolbar obj={activeObj} canvas={canvas} fillColor={fillColor} setFillColor={setFillColor} 
+                                                strokeColor={strokeColor} setStrokeColor={setStrokeColor} 
+                                                strokeWidth={strokeWidth} setStrokeWidth={setStrokeWidth} /> 
+                                              )} 
+                                              {/* Crop Image Modal */} 
+                                              {cropSrc && ( 
+                                                <ImageCropModal src={cropSrc} onCancel={() => { setCropSrc(null); 
+                                                  cropCallbackRef.current = null; }} 
+                                                  onConfirm={(url) => { cropCallbackRef.current?.(url); setCropSrc(null); 
+                                                    cropCallbackRef.current = null; }} /> 
+                                                  )} 
+                                                  {/* Drawer Settings */} 
+                                                  <Drawer isOpen={showSettings} onClose={() => setShowSettings(false)}> 
+                                                    {selectedInstitute?.logo && ( 
+                                                      <div className="p-4"> <h3 className="text-lg font-bold mb-2">Institute Logo</h3> 
+                                                      <img src={selectedInstitute.logo} className="w-32 h-32 object-contain" /> 
+                                                      </div> 
+                                                      )} 
+                                                      {selectedInstitute?.signature && ( 
+                                                        <div className="p-4"> 
+                                                        <h3 className="text-lg font-bold mb-2">Signature</h3> 
+                                                        <img src={selectedInstitute.signature} className="w-32 h-20 object-contain" /> 
+                                                        </div> 
+                                                        )} 
+                                                        {selectedStudent && selectedStudent.photo && ( 
+                                                          <div className="p-4"> <h3 className="text-lg font-bold mb-2">Selected Student Photo</h3>
+                                                           <img src={selectedStudent.photo[0]} className="w-32 h-32 object-cover rounded" /> 
+                                                           </div> 
+                                                          )} 
+                                                           <RightPanel fillColor={fillColor} setFillColor={setFillColor} fontSize={fontSize} 
+                                                           setFontSize={setFontSize} strokeColor={strokeColor} setStrokeColor={setStrokeColor} 
+                                                           strokeWidth={strokeWidth} setStrokeWidth={setStrokeWidth} canvasWidth={canvasWidth} 
+                                                           setCanvasWidth={setCanvasWidth} canvasHeight={canvasHeight} 
+                                                           setCanvasHeight={setCanvasHeight} setBackgroundImage={(url) => { 
+                                                            fabric.Image.fromURL(url, (img) => { 
+                                                              canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), 
+                                                              { scaleX: canvas.width / img.width, scaleY: canvas.height / img.height, 
 
-      {activeObj && ["rect", "circle", "image"].includes(activeObj.type) && (
-        <ShapeEditToolbar
-          obj={activeObj}
-          canvas={canvas}
-          fillColor={fillColor}
-          setFillColor={setFillColor}
-          strokeColor={strokeColor}
-          setStrokeColor={setStrokeColor}
-          strokeWidth={strokeWidth}
-          setStrokeWidth={setStrokeWidth}
-        />
-      )}
-
-      {/* Crop Image Modal */}
-      {cropSrc && (
-        <ImageCropModal
-          src={cropSrc}
-          onCancel={() => {
-            setCropSrc(null);
-            cropCallbackRef.current = null;
-          }}
-          onConfirm={(url) => {
-            cropCallbackRef.current?.(url);
-            setCropSrc(null);
-            cropCallbackRef.current = null;
-          }}
-        />
-      )}
-
-      {/* Drawer Settings */}
-      <Drawer isOpen={showSettings} onClose={() => setShowSettings(false)}>
-
-        {selectedInstitute?.logo && (
-  <div className="p-4">
-    <h3 className="text-lg font-bold mb-2">Institute Logo</h3>
-    <img src={selectedInstitute.logo} className="w-32 h-32 object-contain" />
-  </div>
-)}
-
-{selectedInstitute?.signature && (
-  <div className="p-4">
-    <h3 className="text-lg font-bold mb-2">Signature</h3>
-    <img src={selectedInstitute.signature} className="w-32 h-20 object-contain" />
-  </div>
-)}
-
-        
-         {selectedStudent && selectedStudent.photo && (
-    <div className="p-4">
-      <h3 className="text-lg font-bold mb-2">Selected Student Photo</h3>
-      <img
-        src={selectedStudent.photo[0]}
-        
-        className="w-32 h-32 object-cover rounded"
-      />
-    </div>
-  )}
-
-        <RightPanel
-          fillColor={fillColor}
-          setFillColor={setFillColor}
-          fontSize={fontSize}
-          setFontSize={setFontSize}
-          strokeColor={strokeColor}
-          setStrokeColor={setStrokeColor}
-          strokeWidth={strokeWidth}
-          setStrokeWidth={setStrokeWidth}
-          canvasWidth={canvasWidth}
-          setCanvasWidth={setCanvasWidth}
-          canvasHeight={canvasHeight}
-          setCanvasHeight={setCanvasHeight}
-          setBackgroundImage={(url) => {
-            fabric.Image.fromURL(url, (img) => {
-              canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
-                scaleX: canvas.width / img.width,
-                scaleY: canvas.height / img.height,
-              });
-              saveHistory();
-            });
-          }}
-        />
-        <LayerPanel canvas={canvas} />
-      </Drawer>
-
-      {showLauncher && (
-        <div className="fixed right-2 top-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 p-2 rounded shadow-lg z-40">
-          <button
-            className="absolute top-1 right-1 text-gray-500 hover:text-gray-800"
-            onClick={() => setShowLauncher(false)}
-          >
-            <X size={16} />
-          </button>
-          <TemplatePanel loadTemplate={loadTemplate} />
-        </div>
-      )}
-
-      <button
-        onClick={() => setShowLauncher(!showLauncher)}
-        className="fixed right-2 top-1/2 -translate-y-1/2 bg-blue-600 text-white p-3 rounded-full shadow z-30"
-        title="Templates"
-      >
-        T
-      </button>
-
-      <BottomToolbar
-        alignLeft={alignLeft}
-        alignCenter={alignCenter}
-        alignRight={alignRight}
-        alignTop={alignTop}
-        alignMiddle={alignMiddle}
-        alignBottom={alignBottom}
-        bringToFront={bringToFront}
-        sendToBack={sendToBack}
-      />
-    </div>
-       
-      </main>
-      <footer className="h-10 flex items-center justify-center text-xs bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200">
-        © 2025 Framee
-      </footer>
-    </div>
+                                                              }); 
+                                                              saveHistory(); 
+                                                            }); }} /> 
+                                                            <LayerPanel canvas={canvas} /> 
+                                                            </Drawer> 
+                                                            <BottomToolbar alignLeft={alignLeft} alignCenter={alignCenter} 
+                                                            alignRight={alignRight} alignTop={alignTop} 
+                                                            alignMiddle={alignMiddle} alignBottom={alignBottom} bringToFront={bringToFront} 
+                                                            sendToBack={sendToBack} /> 
+                                                            </div> 
+                                                            </main> 
+                                                            </div>
    
   );
 };

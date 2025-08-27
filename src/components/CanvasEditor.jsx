@@ -44,7 +44,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
 const [batches, setBatches] = useState([]);
 const [selectedCourse, setSelectedCourse] = useState(null);
 const [selectedBatch, setSelectedBatch] = useState(null);
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem("theme") === "dark");
   
   const {
     canvasRef,
@@ -103,6 +103,12 @@ const [selectedBatch, setSelectedBatch] = useState(null);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, [hideHeader, setCanvasWidth, setCanvasHeight]);
+
+  // apply persisted theme preference
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", darkMode);
+    localStorage.setItem("theme", darkMode ? "dark" : "light");
+  }, [darkMode]);
 
   // fetch classes & batches on mount
 useEffect(() => {
@@ -367,7 +373,7 @@ const exportJSON = () => {
 
 
   return (
-    <div className={`h-screen flex flex-col ${darkMode ? 'dark' : ''}`}>
+    <div className="h-screen flex flex-col">
     <Toaster position="top-right" />
     {!hideHeader && (
       <header className="h-12 flex items-center px-4 gap-4 bg-white text-gray-800 dark:bg-gray-800 dark:text-white">

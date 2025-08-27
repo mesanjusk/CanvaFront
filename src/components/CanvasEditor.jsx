@@ -44,7 +44,6 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
 const [batches, setBatches] = useState([]);
 const [selectedCourse, setSelectedCourse] = useState(null);
 const [selectedBatch, setSelectedBatch] = useState(null);
-  const [darkMode, setDarkMode] = useState(false);
   
   const {
     canvasRef,
@@ -89,20 +88,6 @@ const [selectedBatch, setSelectedBatch] = useState(null);
     saveHistory,
     resetHistory,
   } = useCanvasEditor(canvasRef, canvasWidth, canvasHeight);
-
-  // Resize canvas to fit the viewport for responsive editing
-  useEffect(() => {
-    const handleResize = () => {
-      const headerOffset = hideHeader ? 0 : 48; // header height in px
-      const toolbarOffset = 64; // approximate toolbar height
-      setCanvasWidth(window.innerWidth);
-      setCanvasHeight(window.innerHeight - headerOffset - toolbarOffset);
-    };
-
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, [hideHeader, setCanvasWidth, setCanvasHeight]);
 
   // fetch classes & batches on mount
 useEffect(() => {
@@ -367,23 +352,16 @@ const exportJSON = () => {
 
 
   return (
-    <div className={`h-screen flex flex-col ${darkMode ? 'dark' : ''}`}>
-    <Toaster position="top-right" />
-    {!hideHeader && (
-      <header className="h-12 flex items-center px-4 gap-4 bg-white text-gray-800 dark:bg-gray-800 dark:text-white">
-        <a href="/" className="font-bold">Framee</a>
-        <a href="/templates" className="underline">Templates</a>
-        <button
-          onClick={() => setDarkMode(!darkMode)}
-          className="ml-auto p-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
-          aria-label="Toggle theme"
-        >
-          {darkMode ? <Sun size={20} /> : <Moon size={20} />}
-        </button>
-      </header>
-    )}
-    <main className="flex-1 bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-100">
-      <div className="min-h-full w-full bg-gray-100 dark:bg-gray-900 flex flex-col">
+    <div className="h-full flex flex-col"> 
+    <Toaster position="top-right" /> 
+    {!hideHeader && ( 
+      <header className="h-12 bg-gray-800 text-white flex items-center px-4 gap-4"> 
+      <a href="/" className="font-bold">Framee</a> 
+      <a href="/templates" className="underline">Templates</a> 
+      </header> 
+    )} 
+    <main className="flex-1 bg-gray-100"> 
+      <div className="min-h-full w-full bg-gray-100 flex flex-col"> 
         <div className="p-4"> 
           <label className="block mb-2 font-semibold">Select Student:</label> 
           <select onChange={(e) => handleStudentSelect(e.target.value)}> 
@@ -421,7 +399,7 @@ const exportJSON = () => {
 </div>
 
             {/* Toolbar */} 
-            <div className="w-full flex justify-between items-center px-4 py-2 bg-white border-b shadow z-20 dark:bg-gray-700 dark:border-gray-600">
+            <div className="w-full flex justify-between items-center px-4 py-2 bg-white border-b shadow z-20"> 
               <div className="flex gap-2 items-center overflow-x-auto"> 
                 <button title="Add Text" onClick={addText} 
                 className="p-2 rounded bg-white shadow hover:bg-blue-100">
@@ -480,9 +458,11 @@ const exportJSON = () => {
                             </div> 
                             </div> 
                             {/* Canvas Area */} 
-                            <div className="flex-1 overflow-auto bg-gray-50 dark:bg-gray-800 p-4 flex items-center justify-center">
-                              <CanvasArea ref={canvasRef} width={canvasWidth} height={canvasHeight} />
-                              </div>
+                            <div className="flex-1 overflow-auto bg-gray-50 p-4"> 
+                              <div className="mx-auto w-max max-w-full"> 
+                                <CanvasArea ref={canvasRef} width={canvasWidth} height={canvasHeight} /> 
+                                </div> 
+                                </div> 
                                 {/* Object Toolbars */} 
                                 {activeObj && ( 
                                   <FloatingObjectToolbar activeObj={activeObj} cropImage={cropImage} 

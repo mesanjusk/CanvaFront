@@ -1,8 +1,9 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  darkMode: "class",
   content: [
     "./src/**/*.{js,jsx,ts,tsx}", // Scan all JSX/TSX in src
-    "./public/index.html"         // Optional: also scan HTML
+    "./public/index.html" // Optional: also scan HTML
   ],
   theme: {
     extend: {

@@ -607,4 +607,4 @@ const exportJSON = () => {
   );
 };
 
-export default CanvasEditor;
+export default CanvasEditor; 

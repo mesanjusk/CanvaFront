@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react"; 
+import React, { useEffect, useState, useCallback } from "react"; 
 import toast, { Toaster } from 'react-hot-toast'; 
 import { useCanvasEditor } from "../hooks/useCanvasEditor"; 
 import { useCanvasTools } from "../hooks/useCanvasTools"; 
@@ -44,6 +44,9 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
 const [batches, setBatches] = useState([]);
 const [selectedCourse, setSelectedCourse] = useState(null);
 const [selectedBatch, setSelectedBatch] = useState(null);
+const [filteredStudents, setFilteredStudents] = useState([]);
+const [admissions, setAdmissions] = useState([]);
+const [templateImage, setTemplateImage] = useState(null);
   
   const {
     canvasRef,
@@ -117,10 +120,45 @@ useEffect(() => {
       .catch((err) => console.error("Failed to fetch students", err));
   }, []);
 
-  const handleStudentSelect = (uuid) => {
-  const student = students.find((s) => s.uuid === uuid);
+  
+
+useEffect(() => {
+  if (!selectedCourse || !selectedBatch) {
+    setFilteredStudents([]);
+    return;
+  }
+
+  const fetchAdmissions = async () => {
+
+    try {
+      const res = await axios.get(
+        `https://canvaback.onrender.com/api/admissions?course=${selectedCourse}&batchTime=${selectedBatch}`
+      );
+
+      const admissionData = res.data.data || [];
+      setAdmissions(admissionData);
+
+      // ✅ Extract students directly from $lookup
+      const studentList = admissionData
+        .map(a => a.student)    
+        .filter(Boolean);       
+
+      setFilteredStudents(studentList);
+
+    } catch (err) {
+      console.error("Failed to fetch admissions", err);
+      toast.error("Error loading admissions");
+    }
+  };
+
+  fetchAdmissions();
+}, [selectedCourse, selectedBatch]);
+
+const handleStudentSelect = (uuid) => {
+  const student = filteredStudents.find((s) => s.uuid === uuid);
   setSelectedStudent(student);
 };
+
 
 // 🔁 Fetch logged-in user's institute automatically 
 useEffect(() => { 
@@ -135,8 +173,6 @@ useEffect(() => {
 
       // 👇 unwrap the actual institute object
       const institute = res.data.result || res.data.data || res.data;
-
-      console.log("Fetched institute:", institute);
 
       setSelectedInstitute({
         ...institute,
@@ -153,129 +189,97 @@ useEffect(() => {
 }, []);
 
 
+// Fetch template only when templateId changes
 useEffect(() => {
-  const renderTemplateAndStudent = async () => {
-    if (!canvas) return;
+  if (!templateId) return;
 
-    canvas.clear(); // Clear everything
+  const fetchTemplate = async () => {
+    try {
+      const res = await axios.get(
+        `https://canvaback.onrender.com/api/template/${templateId}`
+      );
 
-    // Load and add template background
-    if (templateId) {
-      try {
-        const res = await axios.get(
-          `https://canvaback.onrender.com/api/template/${templateId}`
+      if (res.data?.image) {
+        const img = await new Promise((resolve) =>
+          fabric.Image.fromURL(
+            res.data.image,
+            resolve,
+            { crossOrigin: "anonymous" }
+          )
         );
-        const { image, title } = res.data;
 
-        if (image) {
-          let targetWidth = 400;
-          let targetHeight = 550;
-
-          if (res.data.width && res.data.height) {
-            targetWidth = res.data.width;
-            targetHeight = res.data.height;
-          } else {
-            const imgObj = await new Promise((resolve) => {
-              fabric.Image.fromURL(image, resolve, { crossOrigin: "anonymous" });
-            });
-            targetWidth = imgObj.width || 400;
-            targetHeight = imgObj.height || 550;
-          }
-
-          canvas.setWidth(targetWidth);
-          canvas.setHeight(targetHeight);
-
-          await new Promise((resolve) => {
-            fabric.Image.fromURL(
-              image,
-              (img) => {
-                const scaleX = targetWidth / img.width;
-                const scaleY = targetHeight / img.height;
-                const scale = Math.min(scaleX, scaleY);
-
-                img.scale(scale);
-                img.set({
-                  left: (targetWidth - img.getScaledWidth()) / 2,
-                  top: (targetHeight - img.getScaledHeight()) / 2,
-                  selectable: true,
-                  hasControls: true,
-                });
-
-                canvas.add(img);
-                img.sendToBack();
-                resolve();
-              },
-              { crossOrigin: "anonymous" }
-            );
-          });
-
-          if (title) {
-            const titleText = new fabric.IText("{{title}}", {
-              left: targetWidth / 2,
-              top: 20,
-              fontSize: 24,
-              fill: "#333",
-              originX: "center",
-              selectable: true,
-              hasControls: true,
-            });
-            canvas.add(titleText);
-          }
-        }
-      } catch (err) {
-        console.error("Error loading template:", err);
+        img.set({
+          selectable: false,
+          evented: false,
+          hasControls: false,
+          left: 0,
+          top: 0,
+        });
+        img.customId = "templateBg";
+        setTemplateImage(img);
       }
+    } catch (err) {
+      console.error("Error loading template:", err);
     }
-
-    // Add student name and photo
-    if (selectedStudent) {
-      const nameText = new fabric.IText("{{firstName}} {{lastName}}", {
-        left: 195,
-        top: 400,
-        fontSize: 22,
-        fill: "#000",
-        selectable: true,
-        hasControls: true,
-      });
-      canvas.add(nameText);
-
-      const photoPlaceholder = new fabric.IText("{{photo}}", {
-        left: 50,
-        top: 150,
-        fontSize: 18,
-        fill: "#555",
-        selectable: true,
-        hasControls: true,
-      });
-      canvas.add(photoPlaceholder);
-
-      canvas.renderAll();
-    }
-
   };
 
-  renderTemplateAndStudent();
-}, [templateId, selectedStudent, canvas]);
+  fetchTemplate();
+}, [templateId]);
 
-useEffect(() => {
+
+// --- Render function wrapped in useCallback ---
+const renderTemplateAndStudent = useCallback(() => {
   if (!canvas || !selectedInstitute) return;
 
-  console.log("Logo URL:", selectedInstitute?.logo);
-  console.log("Signature URL:", selectedInstitute?.signature);
+  canvas.clear(); // ✅ clear only once per render cycle
 
+  // Add cached template background
+  if (templateImage) {
+    const bg = fabric.util.object.clone(templateImage);
+    const scaleX = canvas.width / bg.width;
+    const scaleY = canvas.height / bg.height;
+    bg.scaleX = scaleX;
+    bg.scaleY = scaleY;
+    canvas.add(bg);
+    bg.sendToBack();
+  }
+
+  // Add student placeholders
+  if (selectedStudent) {
+    const nameText = new fabric.IText("{{firstName}} {{lastName}}", {
+      left: 195,
+      top: 400,
+      fontSize: 22,
+      fill: "#000",
+      selectable: true,
+    });
+    canvas.add(nameText);
+
+    const photoPlaceholder = new fabric.IText("{{photo}}", {
+      left: 50,
+      top: 150,
+      fontSize: 18,
+      fill: "#555",
+      selectable: true,
+    });
+    canvas.add(photoPlaceholder);
+  }
+
+  // Add institute logo
   if (selectedInstitute.logo) {
     fabric.Image.fromURL(
       selectedInstitute.logo,
       (img) => {
         img.scaleToWidth(80);
         img.set({ left: 20, top: 20, selectable: true });
+        img.customId = "instituteLogo";
         canvas.add(img);
-        canvas.renderAll();
       },
       { crossOrigin: "anonymous" }
     );
   }
 
+  // Add institute signature
   if (selectedInstitute.signature) {
     fabric.Image.fromURL(
       selectedInstitute.signature,
@@ -286,13 +290,25 @@ useEffect(() => {
           top: canvas.height - 80,
           selectable: true,
         });
+        img.customId = "instituteSignature";
         canvas.add(img);
-        canvas.renderAll();
       },
       { crossOrigin: "anonymous" }
     );
   }
-}, [canvas, selectedInstitute]);
+
+  canvas.renderAll();
+}, [canvas, templateImage, selectedStudent, selectedInstitute]);
+
+
+// --- Debounced effect to run render ---
+useEffect(() => {
+  const t = setTimeout(() => {
+    renderTemplateAndStudent();
+  }, 200); // wait 200ms before applying changes
+
+  return () => clearTimeout(t);
+}, [renderTemplateAndStudent]);
 
 const loadTemplate = (templateJson) => {
   if (canvas) {
@@ -362,24 +378,13 @@ const exportJSON = () => {
     )} 
     <main className="flex-1 bg-gray-100"> 
       <div className="min-h-full w-full bg-gray-100 flex flex-col"> 
-        <div className="p-4"> 
-          <label className="block mb-2 font-semibold">Select Student:</label> 
-          <select onChange={(e) => handleStudentSelect(e.target.value)}> 
-            <option value="">Select a student</option> 
-            {students.map((student) => ( 
-              <option key={student.uuid} value={student.uuid}> 
-              {student.firstName} {student.lastName} 
-              </option> 
-            ))} 
-            </select> 
-            </div>
-
+    
 <div className="p-4">
   <label className="block mb-2 font-semibold">Select Course:</label>
-  <select onChange={(e) => setSelectedClass(e.target.value)}>
+  <select onChange={(e) => setSelectedCourse(e.target.value)}>
     <option value="">Select a course</option>
     {courses.map((cls) => (
-      <option key={cls._id} value={cls._id}>
+      <option key={cls._id} value={cls.Course_uuid}>
         {cls.name}
       </option>
     ))}
@@ -391,12 +396,25 @@ const exportJSON = () => {
   <select onChange={(e) => setSelectedBatch(e.target.value)}>
     <option value="">Select a batch</option>
     {batches.map((batch) => (
-      <option key={batch._id} value={batch._id}>
+      <option key={batch._id} value={batch.name}>
         {batch.name}
       </option>
     ))}
   </select>
 </div>
+
+    <div className="p-4"> 
+          <label className="block mb-2 font-semibold">Select Student:</label> 
+         <select onChange={(e) => handleStudentSelect(e.target.value)}> 
+  <option value="">Select a student</option> 
+  {filteredStudents.map((student) => ( 
+    <option key={student.uuid} value={student.uuid}> 
+      {student.firstName} {student.lastName} 
+    </option> 
+  ))} 
+</select>
+            </div>
+
 
             {/* Toolbar */} 
             <div className="w-full flex justify-between items-center px-4 py-2 bg-white border-b shadow z-20"> 
@@ -458,11 +476,19 @@ const exportJSON = () => {
                             </div> 
                             </div> 
                             {/* Canvas Area */} 
-                            <div className="flex-1 overflow-auto bg-gray-50 p-4"> 
-                              <div className="mx-auto w-max max-w-full"> 
-                                <CanvasArea ref={canvasRef} width={canvasWidth} height={canvasHeight} /> 
-                                </div> 
-                                </div> 
+                         <div className="flex-1 bg-gray-50 flex items-center justify-center p-2">
+  <div className="relative shadow-lg border bg-white"
+       style={{ width: "400px", height: "550px" }}> 
+    <CanvasArea
+      ref={canvasRef}
+      width={400}
+      height={550}
+      className="block"
+    />
+  </div>
+</div>
+
+ 
                                 {/* Object Toolbars */} 
                                 {activeObj && ( 
                                   <FloatingObjectToolbar activeObj={activeObj} cropImage={cropImage} 

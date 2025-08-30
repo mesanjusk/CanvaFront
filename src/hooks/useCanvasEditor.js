@@ -14,18 +14,19 @@ export function useCanvasEditor(canvasRef, canvasWidth, canvasHeight) {
   const isLocked = activeObj && lockedObjects.has(activeObj);
   const multipleSelected = canvas?.getActiveObjects().length > 1;
 
-  const sanitizeTextStyles = () => {
-    if (!canvas) return;
-    canvas.getObjects().forEach((obj) => {
-      if (obj.type === "i-text") {
-        if (!obj.styles) obj.styles = {};
-        const lineCount = obj.text?.split("\n").length || 1;
-        for (let i = 0; i < lineCount; i) {
-          if (!obj.styles[i]) obj.styles[i] = {};
-        }
+ const sanitizeTextStyles = () => {
+  if (!canvas) return;
+  canvas.getObjects().forEach((obj) => {
+    if (obj.type === "i-text") {
+      if (!obj.styles) obj.styles = {};
+      const lineCount = obj.text?.split("\n").length || 1;
+      for (let i = 0; i < lineCount; i++) {   // ✅ increment properly
+        if (!obj.styles[i]) obj.styles[i] = {};
       }
-    });
-  };
+    }
+  });
+};
+
 
   const saveHistory = () => {
     if (!canvas) return;
@@ -80,16 +81,25 @@ export function useCanvasEditor(canvasRef, canvasWidth, canvasHeight) {
     pdf.save("design.pdf");
   };
 
-  const downloadHighRes = () => {
-    if (!canvas) return;
-    sanitizeTextStyles();
-    const scale = 3;
-    const tempCanvas = canvas.toCanvasElement(scale);
+ const downloadHighRes = () => {
+  if (!canvas) return;
+  sanitizeTextStyles();
+  canvas.discardActiveObject();
+  canvas.renderAll();
+
+  requestAnimationFrame(() => {
+    const dataUrl = canvas.toDataURL({
+      format: "png",
+      multiplier: 2,
+      enableRetinaScaling: false,
+    });
     const link = document.createElement("a");
     link.download = "canvas-image.png";
-    link.href = tempCanvas.toDataURL({ format: "image/png" });
+    link.href = dataUrl;
     link.click();
-  };
+  });
+};
+
 
   useEffect(() => {
     if (canvasRef.current) {
@@ -110,7 +120,6 @@ export function useCanvasEditor(canvasRef, canvasWidth, canvasHeight) {
       });
 
       canvasInstance.on("object:modified", saveHistory);
-      canvasInstance.on("object:added", saveHistory);
 
       const mockData = { version: "5.2.4", objects: [] };
 
@@ -125,7 +134,7 @@ export function useCanvasEditor(canvasRef, canvasWidth, canvasHeight) {
         canvasInstance.off("selection:cleared");
         canvasInstance.off("object:moving");
         canvasInstance.off("object:modified", saveHistory);
-        canvasInstance.off("object:added", saveHistory);
+       
       };
     }
   }, [canvasRef]);

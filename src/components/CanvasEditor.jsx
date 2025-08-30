@@ -47,6 +47,10 @@ const [selectedBatch, setSelectedBatch] = useState(null);
 const [filteredStudents, setFilteredStudents] = useState([]);
 const [admissions, setAdmissions] = useState([]);
 const [templateImage, setTemplateImage] = useState(null);
+const studentObjectsRef = React.useRef([]);
+const bgRef = React.useRef(null);
+const logoRef = React.useRef(null);
+const signatureRef = React.useRef(null);
   
   const {
     canvasRef,
@@ -231,75 +235,181 @@ useEffect(() => {
 const renderTemplateAndStudent = useCallback(() => {
   if (!canvas || !selectedInstitute) return;
 
-  canvas.clear(); // ✅ clear only once per render cycle
+  // --- 1. Clear old dynamic objects ---
+  if (bgRef.current) canvas.remove(bgRef.current);
+  if (logoRef.current) canvas.remove(logoRef.current);
+  if (signatureRef.current) canvas.remove(signatureRef.current);
+  studentObjectsRef.current.forEach(obj => canvas.remove(obj));
 
-  // Add cached template background
+  studentObjectsRef.current = [];
+  bgRef.current = null;
+  logoRef.current = null;
+  signatureRef.current = null;
+
+  // --- 2. Add background ---
   if (templateImage) {
     const bg = fabric.util.object.clone(templateImage);
-    const scaleX = canvas.width / bg.width;
-    const scaleY = canvas.height / bg.height;
-    bg.scaleX = scaleX;
-    bg.scaleY = scaleY;
+    bg.scaleX = canvas.width / bg.width;
+    bg.scaleY = canvas.height / bg.height;
+    bg.set({ selectable: false, evented: false });
     canvas.add(bg);
     bg.sendToBack();
+    bgRef.current = bg;
   }
 
-  // Add student placeholders
+  // --- 3. Add student name ---
   if (selectedStudent) {
-    const nameText = new fabric.IText("{{firstName}} {{lastName}}", {
-      left: 195,
-      top: 400,
-      fontSize: 22,
-      fill: "#000",
-      selectable: true,
-    });
+    const nameText = new fabric.IText(
+      `${selectedStudent.firstName || ""} ${selectedStudent.lastName || ""}`,
+      { left: 130, top: 300, fontSize: 22, fill: "#000", selectable: true }
+    );
+    nameText.customId = "studentName";
     canvas.add(nameText);
-
-    const photoPlaceholder = new fabric.IText("{{photo}}", {
-      left: 50,
-      top: 150,
-      fontSize: 18,
-      fill: "#555",
-      selectable: true,
-    });
-    canvas.add(photoPlaceholder);
+    studentObjectsRef.current.push(nameText);
   }
 
-  // Add institute logo
-  if (selectedInstitute.logo) {
+  // --- 4. Async image loader ---
+  let cancelled = false;
+  const safeLoadImage = (url, cb) => {
     fabric.Image.fromURL(
-      selectedInstitute.logo,
+      url,
       (img) => {
-        img.scaleToWidth(80);
-        img.set({ left: 20, top: 20, selectable: true });
-        img.customId = "instituteLogo";
-        canvas.add(img);
+        if (cancelled) return;
+        cb(img);
       },
       { crossOrigin: "anonymous" }
     );
-  }
+  };
 
-  // Add institute signature
-  if (selectedInstitute.signature) {
-    fabric.Image.fromURL(
-      selectedInstitute.signature,
-      (img) => {
-        img.scaleToWidth(120);
+  // --- 5. Student photo ---
+const photoUrl = Array.isArray(selectedStudent?.photo)
+  ? selectedStudent.photo[0]
+  : selectedStudent?.photo;
+
+const phWidth = 300, phHeight = 220;
+
+const handlePhotoUpload = (oldObj) => {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "image/*";
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      safeLoadImage(ev.target.result, (img) => {
+        const scale = Math.min(phWidth / img.width, phHeight / img.height, 1);
         img.set({
-          left: canvas.width - 150,
-          top: canvas.height - 80,
-          selectable: true,
+          originX: "center",
+          originY: "center",
+          left: 200,
+          top: 180,
+          scaleX: scale,
+          scaleY: scale,
         });
-        img.customId = "instituteSignature";
+        img.customId = "studentPhoto";
+        if (oldObj) canvas.remove(oldObj); // remove old placeholder/photo
         canvas.add(img);
-      },
-      { crossOrigin: "anonymous" }
-    );
+        studentObjectsRef.current.push(img);
+        canvas.renderAll();
+
+        // make clickable again for replacing
+        img.on("mousedown", () => handlePhotoUpload(img));
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+};
+
+if (photoUrl) {
+  // Real student photo
+  safeLoadImage(photoUrl, (img) => {
+    const scale = Math.min(phWidth / img.width, phHeight / img.height, 1);
+    img.set({
+      originX: "center",
+      originY: "center",
+      left: 200,
+      top: 180,
+      scaleX: scale,
+      scaleY: scale,
+    });
+    img.customId = "studentPhoto";
+    canvas.add(img);
+    studentObjectsRef.current.push(img);
+
+    // make image clickable for replacing
+    img.on("mousedown", () => handlePhotoUpload(img));
+  });
+} else if (selectedStudent) {
+  // Placeholder if no photo
+  const placeholderRect = new fabric.Rect({
+    width: phWidth,
+    height: phHeight,
+    fill: "#f9f9f9",
+    stroke: "#bbb",
+    strokeDashArray: [5, 5],
+    strokeWidth: 1,
+    originX: "center",
+    originY: "center",
+  });
+
+  const placeholderText = new fabric.Text("Upload Photo", {
+    fontSize: 14,
+    fill: "#777",
+    originX: "center",
+    originY: "center",
+  });
+
+  const placeholderGroup = new fabric.Group(
+    [placeholderRect, placeholderText],
+    {
+      originX: "center",
+      originY: "center",
+      left:200,
+      top: 180,
+      selectable: true,
+      hasControls: false,
+      hasBorders: false,
+    }
+  );
+placeholderGroup.customId = "studentPhoto";
+  placeholderGroup.isPhotoPlaceholder = true;
+
+  // Click to upload new photo
+  placeholderGroup.on("mousedown", () => handlePhotoUpload(placeholderGroup));
+
+  canvas.add(placeholderGroup);
+  studentObjectsRef.current.push(placeholderGroup);
+}
+
+  // --- 6. Institute Logo ---
+  if (selectedInstitute.logo) {
+    safeLoadImage(selectedInstitute.logo, (img) => {
+      img.scaleToWidth(80);
+      img.set({ left: 20, top: 20 });
+      logoRef.current = img;
+      canvas.add(img);
+    });
+  }
+
+  // --- 7. Institute Signature ---
+  if (selectedInstitute.signature) {
+    safeLoadImage(selectedInstitute.signature, (img) => {
+      img.scaleToWidth(120);
+      img.set({ left: canvas.width - 150, top: canvas.height - 80 });
+      signatureRef.current = img;
+      canvas.add(img);
+    });
   }
 
   canvas.renderAll();
-}, [canvas, templateImage, selectedStudent, selectedInstitute]);
 
+  // --- 8. Cleanup ---
+  return () => { cancelled = true; };
+
+}, [canvas, templateImage, selectedStudent, selectedInstitute]);
 
 // --- Debounced effect to run render ---
 useEffect(() => {
@@ -310,62 +420,93 @@ useEffect(() => {
   return () => clearTimeout(t);
 }, [renderTemplateAndStudent]);
 
-const loadTemplate = (templateJson) => {
-  if (canvas) {
-    canvas.loadFromJSON(templateJson, () => {
-      canvas.renderAll();
-      saveHistory();
+const loadTemplateLayout = async (studentData) => {
+  try {
+    const response = await axios.get(
+      `http://localhost:5000/api/template/${templateId}`
+    );
+    const { placeholders } = response.data;
+
+    canvas.clear();
+
+    placeholders.forEach((ph) => {
+      if (ph.field === "photo" && studentData?.photo) {
+        fabric.Image.fromURL(studentData.photo, (img) => {
+          img.set({
+            left: ph.left,
+            top: ph.top,
+            scaleX: ph.width / img.width,
+            scaleY: ph.height / img.height,
+          });
+          img.field = "photo"; // keep field info
+          canvas.add(img);
+        });
+      }
+
+      if (ph.field === "name" && studentData?.name) {
+        const text = new fabric.Text(studentData.name, {
+          left: ph.left,
+          top: ph.top,
+          fontSize: ph.fontSize || 22,
+        });
+        text.field = "name";
+        canvas.add(text);
+      }
+
+      if (ph.field === "signature" && studentData?.signature) {
+        fabric.Image.fromURL(studentData.signature, (img) => {
+          img.set({
+            left: ph.left,
+            top: ph.top,
+            scaleX: ph.width / img.width,
+            scaleY: ph.height / img.height,
+          });
+          img.field = "signature";
+          canvas.add(img);
+        });
+      }
+
+      // Add more fields here (course, rollNo, etc.)
     });
+
+    canvas.renderAll();
+  } catch (err) {
+    console.error("❌ Failed to load template layout", err);
   }
 };
+
 
 const saveTemplateLayout = async () => {
   if (!canvas) return;
 
-  // Optionally prompt for a template name
-  const title = prompt("Enter a name for this template:", `Template-${Date.now()}`);
-  if (!title) return;
-
-  // Export canvas JSON (including extra props)
-  const templateJson = canvas.toJSON(['selectable', 'hasControls']);
-
-  // Export as PNG (preview)
-  const imageData = canvas.toDataURL({ format: "png", quality: 1 });
-
- const payload = {
-  title,
-  layout: JSON.stringify(templateJson),
-  image: imageData,
-  width: canvas.getWidth(),
-  height: canvas.getHeight(),
-  photo: selectedStudent?.photo?.[0] || null,
-  signature: selectedInstitute?.signature || null,
-  logo: selectedInstitute?.logo || null,
-  template: templateId || null, // ✅ use templateId from URL
-};
+  // Extract placeholder details
+  const placeholders = canvas.getObjects().map((obj) => {
+    return {
+      id: obj.id || obj._id || new Date().getTime().toString(),
+      left: obj.left,
+      top: obj.top,
+      width: obj.width,
+      height: obj.height,
+      scaleX: obj.scaleX,
+      scaleY: obj.scaleY,
+      fontSize: obj.fontSize || null,
+      field: obj.field || obj.name || null, // NEW: store type of placeholder
+    };
+  });
 
   try {
-    await axios.post(`https://canvaback.onrender.com/api/templatelayout/save`, payload);
-    toast.success('Template saved successfully');
-    onSaved?.();
-  } catch (error) {
-    console.error("❌ Failed to save template", error);
-    toast.error('Error saving template');
+    const response = await axios.put(
+      `http://localhost:5000/api/template/update-canvas/${templateId}`,
+      { placeholders }
+    );
+
+    console.log("✅ Template saved:", response.data);
+    toast.success("Template layout saved!");
+  } catch (err) {
+    console.error("❌ Failed to save template", err);
+    toast.error("Save failed!");
   }
 };
-
-const exportJSON = () => {
-  if (!canvas) return;
-  const json = canvas.toJSON(['selectable', 'hasControls']);
-  const blob = new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'canvas.json';
-  a.click();
-  URL.revokeObjectURL(url);
-};
-
 
   return (
     <div className="h-full flex flex-col"> 

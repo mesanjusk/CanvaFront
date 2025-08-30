@@ -496,7 +496,7 @@ const saveTemplateLayout = async () => {
 
   try {
     const response = await axios.put(
-      `http://localhost:5000/api/template/update-canvas/${templateId}`,
+      `https://canvaback.onrender.com/api/template/update-canvas/${templateId}`,
       { placeholders }
     );
 

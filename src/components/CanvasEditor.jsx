@@ -111,12 +111,14 @@ const signatureRef = React.useRef(null);
           const w = target.getScaledWidth();
           const h = target.getScaledHeight();
           const scale = Math.max(w / img.width, h / img.height);
+          const scaledW = img.width * scale;
+          const scaledH = img.height * scale;
           const pattern = new fabric.Pattern({
             source: img.getElement(),
             repeat: "no-repeat",
             patternTransform: [scale, 0, 0, scale, 0, 0],
-            offsetX: 0,
-            offsetY: 0,
+            offsetX: (w - scaledW) / 2,
+            offsetY: (h - scaledH) / 2,
           });
           target.set("fill", pattern);
           canvas.requestRenderAll();
@@ -137,9 +139,10 @@ const signatureRef = React.useRef(null);
         fill.offsetY += dy;
         obj.dirty = true;
         canvas.requestRenderAll();
+        saveHistory();
       }
     },
-    [canvas]
+    [canvas, saveHistory]
   );
 
   // fetch classes & batches on mount
@@ -740,7 +743,7 @@ const saveTemplateLayout = async () => {
                                                 </div> 
                                                 )} 
                                                 {activeObj && 
-                                                ["rect", "circle", "image"].includes(activeObj.type) && ( 
+                                                ["rect", "circle", "triangle", "path"].includes(activeObj.type) && (
                                                 <ShapeEditToolbar obj={activeObj} canvas={canvas} fillColor={fillColor} setFillColor={setFillColor}
                                                 strokeColor={strokeColor} setStrokeColor={setStrokeColor}
                                                 strokeWidth={strokeWidth} setStrokeWidth={setStrokeWidth}

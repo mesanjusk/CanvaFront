@@ -1,16 +1,17 @@
-import React, { useEffect, useState, useCallback } from "react"; 
-import toast, { Toaster } from 'react-hot-toast'; 
-import { useCanvasEditor } from "../hooks/useCanvasEditor"; 
-import { useCanvasTools } from "../hooks/useCanvasTools"; 
-import CanvasArea from "./CanvasArea"; 
-import RightPanel from "./RightPanel"; 
-import ImageCropModal from "./ImageCropModal"; 
-import Drawer from "./Drawer"; 
-import TemplatePanel from "./TemplatePanel"; 
-import UndoRedoControls from "./UndoRedoControls"; 
-import LayerPanel from "./LayerPanel"; 
-import BottomToolbar from "./BottomToolbar"; 
-import FloatingObjectToolbar from "./FloatingObjectToolbar"; 
+import React, { useEffect, useState, useCallback } from "react";
+import toast, { Toaster } from 'react-hot-toast';
+import { fabric } from "fabric";
+import { useCanvasEditor } from "../hooks/useCanvasEditor";
+import { useCanvasTools } from "../hooks/useCanvasTools";
+import CanvasArea from "./CanvasArea";
+import RightPanel from "./RightPanel";
+import ImageCropModal from "./ImageCropModal";
+import Drawer from "./Drawer";
+import TemplatePanel from "./TemplatePanel";
+import UndoRedoControls from "./UndoRedoControls";
+import LayerPanel from "./LayerPanel";
+import BottomToolbar from "./BottomToolbar";
+import FloatingObjectToolbar from "./FloatingObjectToolbar";
 import { getStoredUser, getStoredInstituteUUID} from '../utils/storageUtils';
 
 import {
@@ -95,6 +96,51 @@ const signatureRef = React.useRef(null);
     saveHistory,
     resetHistory,
   } = useCanvasEditor(canvasRef, canvasWidth, canvasHeight);
+
+  const applyImageToActiveShape = useCallback(
+    (dataUrl) => {
+      const target = canvas?.getActiveObject();
+      if (!target || !["rect", "circle", "triangle", "path"].includes(target.type)) {
+        addImage(dataUrl);
+        return;
+      }
+
+      fabric.Image.fromURL(
+        dataUrl,
+        (img) => {
+          const w = target.getScaledWidth();
+          const h = target.getScaledHeight();
+          const scale = Math.max(w / img.width, h / img.height);
+          const pattern = new fabric.Pattern({
+            source: img.getElement(),
+            repeat: "no-repeat",
+            patternTransform: [scale, 0, 0, scale, 0, 0],
+            offsetX: 0,
+            offsetY: 0,
+          });
+          target.set("fill", pattern);
+          canvas.requestRenderAll();
+          saveHistory();
+        },
+        { crossOrigin: "anonymous" }
+      );
+    },
+    [canvas, addImage, saveHistory]
+  );
+
+  const nudgeImage = useCallback(
+    (dx, dy) => {
+      const obj = canvas?.getActiveObject();
+      const fill = obj?.fill;
+      if (fill && typeof fill.offsetX === "number" && typeof fill.offsetY === "number") {
+        fill.offsetX += dx;
+        fill.offsetY += dy;
+        obj.dirty = true;
+        canvas.requestRenderAll();
+      }
+    },
+    [canvas]
+  );
 
   // fetch classes & batches on mount
 useEffect(() => {
@@ -557,9 +603,9 @@ const saveTemplateLayout = async () => {
             </div>
 
 
-            {/* Toolbar */} 
-            <div className="w-full flex justify-between items-center px-4 py-2 bg-white border-b shadow z-20"> 
-              <div className="flex gap-2 items-center overflow-x-auto"> 
+            {/* Toolbar */}
+            <div className="w-full flex flex-wrap md:flex-nowrap justify-between items-center px-2 md:px-4 py-2 bg-white border-b shadow z-20">
+              <div className="flex gap-2 md:gap-3 items-center overflow-x-auto flex-wrap">
                 <button title="Add Text" onClick={addText} 
                 className="p-2 rounded bg-white shadow hover:bg-blue-100">
                   <Type size={28} />
@@ -571,19 +617,20 @@ const saveTemplateLayout = async () => {
                     <button title="Add Circle" onClick={addCircle} 
                     className="p-2 rounded bg-white shadow hover:bg-blue-100"><Circle size={28} />
                     </button> 
-                    <input type="file" accept="image/*" id="upload-image" 
-                    style={{ display: "none" }} onChange={(e) => { 
-                      const file = e.target.files[0]; 
-                      if (file) { const reader = new FileReader(); 
-                        reader.onload = () => { 
-                          setCropSrc(reader.result); 
-                          cropCallbackRef.current = (croppedUrl) => { 
-                            addImage(croppedUrl); 
-                          }; 
-                        }; 
-                        reader.readAsDataURL(file); 
-                      } 
-                    }} /> 
+                    <input type="file" accept="image/*" id="upload-image"
+                    style={{ display: "none" }} onChange={(e) => {
+                      const file = e.target.files[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          setCropSrc(reader.result);
+                          cropCallbackRef.current = (croppedUrl) => {
+                            applyImageToActiveShape(croppedUrl);
+                          };
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }} />
                     <label htmlFor="upload-image" 
                     className="p-2 rounded bg-white shadow hover:bg-blue-100 cursor-pointer" 
                     title="Upload Image"> <ImageIcon size={28} /> </label> 
@@ -694,9 +741,10 @@ const saveTemplateLayout = async () => {
                                                 )} 
                                                 {activeObj && 
                                                 ["rect", "circle", "image"].includes(activeObj.type) && ( 
-                                                <ShapeEditToolbar obj={activeObj} canvas={canvas} fillColor={fillColor} setFillColor={setFillColor} 
-                                                strokeColor={strokeColor} setStrokeColor={setStrokeColor} 
-                                                strokeWidth={strokeWidth} setStrokeWidth={setStrokeWidth} /> 
+                                                <ShapeEditToolbar obj={activeObj} canvas={canvas} fillColor={fillColor} setFillColor={setFillColor}
+                                                strokeColor={strokeColor} setStrokeColor={setStrokeColor}
+                                                strokeWidth={strokeWidth} setStrokeWidth={setStrokeWidth}
+                                                nudgeImage={nudgeImage} />
                                               )} 
                                               {/* Crop Image Modal */} 
                                               {cropSrc && ( 

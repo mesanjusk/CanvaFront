@@ -20,10 +20,6 @@ import {
   Square,
   Circle,
   Image as ImageIcon,
-  Sun,
-  Moon,
-  FileJson,
-  X
 } from "lucide-react";
 
 import TextEditToolbar from "./TextEditToolbar";
@@ -31,7 +27,9 @@ import ShapeEditToolbar from "./ShapeEditToolbar";
 import axios from "axios";
 import { useParams } from "react-router-dom";
 
-const LOCAL_KEY = "localTemplates";
+const PHOTO_MASK_WIDTH = 400;
+const PHOTO_MASK_HEIGHT = 400;
+let activeStudentPhoto = null; 
 
 const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false }) => {
   const { templateId: routeId } = useParams();
@@ -41,16 +39,18 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
   const [institutes, setInstitutes] = useState([]);
   const [selectedInstitute, setSelectedInstitute] = useState(null);
   const [courses, setCourses] = useState([]);
-const [batches, setBatches] = useState([]);
-const [selectedCourse, setSelectedCourse] = useState(null);
-const [selectedBatch, setSelectedBatch] = useState(null);
-const [filteredStudents, setFilteredStudents] = useState([]);
-const [admissions, setAdmissions] = useState([]);
-const [templateImage, setTemplateImage] = useState(null);
-const studentObjectsRef = React.useRef([]);
-const bgRef = React.useRef(null);
-const logoRef = React.useRef(null);
-const signatureRef = React.useRef(null);
+  const [savedPlaceholders, setSavedPlaceholders] = useState([]);
+  const [batches, setBatches] = useState([]);
+  const [selectedCourse, setSelectedCourse] = useState(null);
+  const [selectedBatch, setSelectedBatch] = useState(null);
+  const [filteredStudents, setFilteredStudents] = useState([]);
+  const [admissions, setAdmissions] = useState([]);
+  const [templateImage, setTemplateImage] = useState(null);
+  const [activeStudentPhoto, setActiveStudentPhoto] = useState(null);
+  const studentObjectsRef = React.useRef([]);
+  const bgRef = React.useRef(null);
+  const logoRef = React.useRef(null);
+  const signatureRef = React.useRef(null);
   
   const {
     canvasRef,
@@ -96,417 +96,342 @@ const signatureRef = React.useRef(null);
     resetHistory,
   } = useCanvasEditor(canvasRef, canvasWidth, canvasHeight);
 
-  // fetch classes & batches on mount
-useEffect(() => {
-  const fetchCoursesAndBatches = async () => {
-    try {
-      const [courseRes, batchRes] = await Promise.all([
-        axios.get("https://socialbackend-iucy.onrender.com/api/courses"),
-        axios.get("https://socialbackend-iucy.onrender.com/api/batches"),
-      ]);
+  const getSavedProps = useCallback(
+    (field) => savedPlaceholders.find((p) => p.field === field) || null,
+    [savedPlaceholders]
+  );
 
-      setCourses(courseRes.data || []);
-      setBatches(batchRes.data || []);
-    } catch (err) {
-      console.error("Failed to fetch courses/batches", err);
-      toast.error("Error loading courses/batches");
+  // --- helper: create clip shape ---
+  const createClipShape = (shapeType, width, height) => {
+    if (shapeType === "circle") {
+      return new fabric.Circle({
+        radius: Math.min(width, height) / 2,
+        originX: "center",
+        originY: "center",
+      });
+    } else {
+      return new fabric.Rect({
+        width,
+        height,
+        originX: "center",
+        originY: "center",
+      });
     }
   };
 
-  fetchCoursesAndBatches();
-}, []);
+  // --- student photo toolbar controls ---
+  const handleZoomIn = () => {
+  if (activeStudentPhoto) {
+    activeStudentPhoto.scaleX *= 1.1;
+    activeStudentPhoto.scaleY *= 1.1;
+    canvas.renderAll();
+  }
+};
 
-  // 🔁 Fetch all students on mount
+const handleZoomOut = () => {
+  if (activeStudentPhoto) {
+    activeStudentPhoto.scaleX *= 0.9;
+    activeStudentPhoto.scaleY *= 0.9;
+    canvas.renderAll();
+  }
+};
+
+const handleReset = () => {
+  if (activeStudentPhoto) {
+    activeStudentPhoto.scaleX = 1;
+    activeStudentPhoto.scaleY = 1;
+    canvas.renderAll();
+  }
+};
+
+  // fetch courses & batches
+  useEffect(() => {
+    const fetchCoursesAndBatches = async () => {
+      try {
+        const [courseRes, batchRes] = await Promise.all([
+          axios.get("https://socialbackend-iucy.onrender.com/api/courses"),
+          axios.get("https://socialbackend-iucy.onrender.com/api/batches"),
+        ]);
+        setCourses(courseRes.data || []);
+        setBatches(batchRes.data || []);
+      } catch (err) {
+        toast.error("Error loading courses/batches");
+      }
+    };
+    fetchCoursesAndBatches();
+  }, []);
+
+  // fetch students
   useEffect(() => {
     axios
       .get("https://canvaback.onrender.com/api/students")
       .then((res) => setStudents(res.data.data))
-      .catch((err) => console.error("Failed to fetch students", err));
+      .catch(() => {});
   }, []);
 
-  
-
-useEffect(() => {
-  if (!selectedCourse || !selectedBatch) {
-    setFilteredStudents([]);
-    return;
-  }
-
-  const fetchAdmissions = async () => {
-
-    try {
-      const res = await axios.get(
-        `https://canvaback.onrender.com/api/admissions?course=${selectedCourse}&batchTime=${selectedBatch}`
-      );
-
-      const admissionData = res.data.data || [];
-      setAdmissions(admissionData);
-
-      // ✅ Extract students directly from $lookup
-      const studentList = admissionData
-        .map(a => a.student)    
-        .filter(Boolean);       
-
-      setFilteredStudents(studentList);
-
-    } catch (err) {
-      console.error("Failed to fetch admissions", err);
-      toast.error("Error loading admissions");
+  useEffect(() => {
+    if (!selectedCourse || !selectedBatch) {
+      setFilteredStudents([]);
+      return;
     }
-  };
-
-  fetchAdmissions();
-}, [selectedCourse, selectedBatch]);
-
-const handleStudentSelect = (uuid) => {
-  const student = filteredStudents.find((s) => s.uuid === uuid);
-  setSelectedStudent(student);
-};
-
-
-// 🔁 Fetch logged-in user's institute automatically 
-useEffect(() => { 
-  const fetchInstitute = async () => { 
-  try { 
-    const user = getStoredUser();
-    const institute_uuid = user?.institute_uuid || getStoredInstituteUUID(); 
-    if (institute_uuid) { 
-      const res = await axios.get(
-        `https://canvaback.onrender.com/api/institute/${institute_uuid}`
-      );
-
-      // 👇 unwrap the actual institute object
-      const institute = res.data.result || res.data.data || res.data;
-
-      setSelectedInstitute({
-        ...institute,
-        logo: institute.logo || null,
-        signature: institute.signature || null
-      });  
-    } 
-  } catch (err) { 
-    console.error("Failed to fetch institute", err);
-  } 
-};
-
-  fetchInstitute();
-}, []);
-
-
-// Fetch template only when templateId changes
-useEffect(() => {
-  if (!templateId) return;
-
-  const fetchTemplate = async () => {
-    try {
-      const res = await axios.get(
-        `https://canvaback.onrender.com/api/template/${templateId}`
-      );
-
-      if (res.data?.image) {
-        const img = await new Promise((resolve) =>
-          fabric.Image.fromURL(
-            res.data.image,
-            resolve,
-            { crossOrigin: "anonymous" }
-          )
+    const fetchAdmissions = async () => {
+      try {
+        const res = await axios.get(
+          `https://canvaback.onrender.com/api/admissions?course=${selectedCourse}&batchTime=${selectedBatch}`
         );
-
-        img.set({
-          selectable: false,
-          evented: false,
-          hasControls: false,
-          left: 0,
-          top: 0,
-        });
-        img.customId = "templateBg";
-        setTemplateImage(img);
+        const admissionData = res.data.data || [];
+        const studentList = admissionData.map(a => a.student).filter(Boolean);
+        setAdmissions(admissionData);
+        setFilteredStudents(studentList);
+      } catch {
+        toast.error("Error loading admissions");
       }
-    } catch (err) {
-      console.error("Error loading template:", err);
+    };
+    fetchAdmissions();
+  }, [selectedCourse, selectedBatch]);
+
+  const handleStudentSelect = (uuid) => {
+    const student = filteredStudents.find((s) => s.uuid === uuid);
+    setSelectedStudent(student);
+  };
+
+  // fetch institute
+  useEffect(() => { 
+    const fetchInstitute = async () => { 
+      try { 
+        const user = getStoredUser();
+        const institute_uuid = user?.institute_uuid || getStoredInstituteUUID(); 
+        if (institute_uuid) { 
+          const res = await axios.get(
+            `https://canvaback.onrender.com/api/institute/${institute_uuid}`
+          );
+          const institute = res.data.result || res.data.data || res.data;
+          setSelectedInstitute({
+            ...institute,
+            logo: institute.logo || null,
+            signature: institute.signature || null
+          });  
+        } 
+      } catch {} 
+    };
+    fetchInstitute();
+  }, []);
+
+  // fetch template
+  useEffect(() => {
+    if (!templateId) return;
+    const fetchTemplate = async () => {
+      try {
+        const res = await axios.get(
+          `https://canvaback.onrender.com/api/template/${templateId}`
+        );
+        setSavedPlaceholders(res.data?.placeholders || []);
+        if (res.data?.image) {
+          const img = await new Promise((resolve) =>
+            fabric.Image.fromURL(res.data.image, resolve, { crossOrigin: "anonymous" })
+          );
+          img.set({ selectable: false, evented: false, hasControls: false, left: 0, top: 0 });
+          img.customId = "templateBg";
+          setTemplateImage(img);
+        }
+      } catch {}
+    };
+    fetchTemplate();
+  }, [templateId]);
+
+  // --- render template ---
+  const renderTemplateAndStudent = useCallback(() => {
+    if (!canvas || !selectedInstitute) return;
+    if (bgRef.current) canvas.remove(bgRef.current);
+    if (logoRef.current) canvas.remove(logoRef.current);
+    if (signatureRef.current) canvas.remove(signatureRef.current);
+    studentObjectsRef.current.forEach((obj) => canvas.remove(obj));
+    studentObjectsRef.current = [];
+    bgRef.current = null;
+    logoRef.current = null;
+    signatureRef.current = null;
+
+    if (templateImage) {
+      const bg = fabric.util.object.clone(templateImage);
+      bg.scaleX = canvas.width / bg.width;
+      bg.scaleY = canvas.height / bg.height;
+      bg.set({ selectable: false, evented: false });
+      canvas.add(bg);
+      bg.sendToBack();
+      bgRef.current = bg;
     }
-  };
 
-  fetchTemplate();
-}, [templateId]);
+    let cancelled = false;
+    const safeLoadImage = (url, cb) => {
+      fabric.Image.fromURL(url, (img) => { if (!cancelled) cb(img); }, { crossOrigin: "anonymous" });
+    };
 
+    if (selectedStudent) {
+      const savedName = getSavedProps("studentName");
+      const nameText = new fabric.IText(
+        `${selectedStudent.firstName || ""} ${selectedStudent.lastName || ""}`,
+        { left: savedName?.left ?? 130, top: savedName?.top ?? 300, fontSize: savedName?.fontSize ?? 22, fill: "#000" }
+      );
+      nameText.customId = "studentName";
+      nameText.field = "studentName";
+      canvas.add(nameText);
+      studentObjectsRef.current.push(nameText);
+    }
 
-// --- Render function wrapped in useCallback ---
-const renderTemplateAndStudent = useCallback(() => {
-  if (!canvas || !selectedInstitute) return;
+    // --- student photo ---
+    const photoUrl = Array.isArray(selectedStudent?.photo) ? selectedStudent.photo[0] : selectedStudent?.photo;
+    const phWidth = 400, phHeight = 400;
+    const savedPhoto = getSavedProps("studentPhoto");
+    const photoLeft = savedPhoto?.left ?? 200;
+    const photoTop = savedPhoto?.top ?? 180;
+    const shapeType = savedPhoto?.shape || "circle";
 
-  // --- 1. Clear old dynamic objects ---
-  if (bgRef.current) canvas.remove(bgRef.current);
-  if (logoRef.current) canvas.remove(logoRef.current);
-  if (signatureRef.current) canvas.remove(signatureRef.current);
-  studentObjectsRef.current.forEach(obj => canvas.remove(obj));
+    const handlePhotoUpload = (oldObj) => {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "image/*";
+      input.onchange = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          safeLoadImage(ev.target.result, (img) => {
+            const autoScale = Math.min(phWidth / img.width, phHeight / img.height, 1);
+            img.set({ originX: "center", originY: "center", left: photoLeft, top: photoTop, scaleX: autoScale, scaleY: autoScale });
+            img.customId = "studentPhoto";
+            img.field = "studentPhoto";
+            img.shape = shapeType;
+            img.clipPath = createClipShape(shapeType, phWidth, phHeight);
+            if (oldObj) canvas.remove(oldObj);
+            canvas.add(img);
+            studentObjectsRef.current.push(img);
+            canvas.renderAll();
+            img.on("mousedown", () => handlePhotoUpload(img));
+          });
+        };
+        reader.readAsDataURL(file);
+      };
+      input.click();
+    };
 
-  studentObjectsRef.current = [];
-  bgRef.current = null;
-  logoRef.current = null;
-  signatureRef.current = null;
-
-  // --- 2. Add background ---
-  if (templateImage) {
-    const bg = fabric.util.object.clone(templateImage);
-    bg.scaleX = canvas.width / bg.width;
-    bg.scaleY = canvas.height / bg.height;
-    bg.set({ selectable: false, evented: false });
-    canvas.add(bg);
-    bg.sendToBack();
-    bgRef.current = bg;
-  }
-
-  // --- 3. Add student name ---
-  if (selectedStudent) {
-    const nameText = new fabric.IText(
-      `${selectedStudent.firstName || ""} ${selectedStudent.lastName || ""}`,
-      { left: 130, top: 300, fontSize: 22, fill: "#000", selectable: true }
-    );
-    nameText.customId = "studentName";
-    canvas.add(nameText);
-    studentObjectsRef.current.push(nameText);
-  }
-
-  // --- 4. Async image loader ---
-  let cancelled = false;
-  const safeLoadImage = (url, cb) => {
-    fabric.Image.fromURL(
-      url,
-      (img) => {
-        if (cancelled) return;
-        cb(img);
-      },
-      { crossOrigin: "anonymous" }
-    );
-  };
-
-  // --- 5. Student photo ---
-const photoUrl = Array.isArray(selectedStudent?.photo)
-  ? selectedStudent.photo[0]
-  : selectedStudent?.photo;
-
-const phWidth = 300, phHeight = 220;
-
-const handlePhotoUpload = (oldObj) => {
-  const input = document.createElement("input");
-  input.type = "file";
-  input.accept = "image/*";
-  input.onchange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      safeLoadImage(ev.target.result, (img) => {
-        const scale = Math.min(phWidth / img.width, phHeight / img.height, 1);
-        img.set({
-          originX: "center",
-          originY: "center",
-          left: 200,
-          top: 180,
-          scaleX: scale,
-          scaleY: scale,
-        });
+    if (photoUrl) {
+      safeLoadImage(photoUrl, (img) => {
+        const autoScale = Math.min(phWidth / img.width, phHeight / img.height, 1);
+        img.set({ originX: "center", originY: "center", left: photoLeft, top: photoTop, scaleX: savedPhoto?.scaleX ?? autoScale, scaleY: savedPhoto?.scaleY ?? autoScale });
         img.customId = "studentPhoto";
-        if (oldObj) canvas.remove(oldObj); // remove old placeholder/photo
+        img.field = "studentPhoto";
+        img.shape = shapeType;
+        img.clipPath = createClipShape(shapeType, phWidth, phHeight);
+
+         // ✅ Detect selection
+    img.on("selected", () => setActiveStudentPhoto(img));
+    img.on("deselected", () => setActiveStudentPhoto(null));
+
         canvas.add(img);
         studentObjectsRef.current.push(img);
-        canvas.renderAll();
-
-        // make clickable again for replacing
         img.on("mousedown", () => handlePhotoUpload(img));
       });
-    };
-    reader.readAsDataURL(file);
-  };
-  input.click();
-};
-
-if (photoUrl) {
-  // Real student photo
-  safeLoadImage(photoUrl, (img) => {
-    const scale = Math.min(phWidth / img.width, phHeight / img.height, 1);
-    img.set({
-      originX: "center",
-      originY: "center",
-      left: 200,
-      top: 180,
-      scaleX: scale,
-      scaleY: scale,
-    });
-    img.customId = "studentPhoto";
-    canvas.add(img);
-    studentObjectsRef.current.push(img);
-
-    // make image clickable for replacing
-    img.on("mousedown", () => handlePhotoUpload(img));
-  });
-} else if (selectedStudent) {
-  // Placeholder if no photo
-  const placeholderRect = new fabric.Rect({
-    width: phWidth,
-    height: phHeight,
-    fill: "#f9f9f9",
-    stroke: "#bbb",
-    strokeDashArray: [5, 5],
-    strokeWidth: 1,
-    originX: "center",
-    originY: "center",
-  });
-
-  const placeholderText = new fabric.Text("Upload Photo", {
-    fontSize: 14,
-    fill: "#777",
-    originX: "center",
-    originY: "center",
-  });
-
-  const placeholderGroup = new fabric.Group(
-    [placeholderRect, placeholderText],
-    {
-      originX: "center",
-      originY: "center",
-      left:200,
-      top: 180,
-      selectable: true,
-      hasControls: false,
-      hasBorders: false,
     }
-  );
-placeholderGroup.customId = "studentPhoto";
-  placeholderGroup.isPhotoPlaceholder = true;
-
-  // Click to upload new photo
-  placeholderGroup.on("mousedown", () => handlePhotoUpload(placeholderGroup));
-
-  canvas.add(placeholderGroup);
-  studentObjectsRef.current.push(placeholderGroup);
-}
-
-  // --- 6. Institute Logo ---
+ // --- 6. Institute Logo (respects saved pos) ---
+  const savedLogo = getSavedProps("logo");
   if (selectedInstitute.logo) {
     safeLoadImage(selectedInstitute.logo, (img) => {
-      img.scaleToWidth(80);
-      img.set({ left: 20, top: 20 });
+      // NOTE: use saved scale if present, else simple scaleToWidth(80)
+      if (savedLogo?.scaleX && savedLogo?.scaleY) {
+        img.set({
+          left: savedLogo.left ?? 20,
+          top: savedLogo.top ?? 20,
+          scaleX: savedLogo.scaleX,
+          scaleY: savedLogo.scaleY,
+          angle: savedLogo?.angle ?? 0,
+        });
+      } else {
+        img.scaleToWidth(80);
+        img.set({ left: savedLogo?.left ?? 20, top: savedLogo?.top ?? 20 });
+      }
+      img.customId = "logo";
+      img.field = "logo";
       logoRef.current = img;
       canvas.add(img);
     });
   }
 
-  // --- 7. Institute Signature ---
+  // --- 7. Institute Signature (respects saved pos) ---
+  const savedSign = getSavedProps("signature");
   if (selectedInstitute.signature) {
     safeLoadImage(selectedInstitute.signature, (img) => {
-      img.scaleToWidth(120);
-      img.set({ left: canvas.width - 150, top: canvas.height - 80 });
+      if (savedSign?.scaleX && savedSign?.scaleY) {
+        img.set({
+          left: savedSign.left ?? canvas.width - 150,
+          top: savedSign.top ?? canvas.height - 80,
+          scaleX: savedSign.scaleX,
+          scaleY: savedSign.scaleY,
+          angle: savedSign?.angle ?? 0,
+        });
+      } else {
+        img.scaleToWidth(120);
+        img.set({
+          left: savedSign?.left ?? canvas.width - 150,
+          top: savedSign?.top ?? canvas.height - 80,
+        });
+      }
+      img.customId = "signature";
+      img.field = "signature";
       signatureRef.current = img;
       canvas.add(img);
     });
   }
 
-  canvas.renderAll();
-
-  // --- 8. Cleanup ---
-  return () => { cancelled = true; };
-
-}, [canvas, templateImage, selectedStudent, selectedInstitute]);
-
-// --- Debounced effect to run render ---
-useEffect(() => {
-  const t = setTimeout(() => {
-    renderTemplateAndStudent();
-  }, 200); // wait 200ms before applying changes
-
-  return () => clearTimeout(t);
-}, [renderTemplateAndStudent]);
-
-const loadTemplateLayout = async (studentData) => {
-  try {
-    const response = await axios.get(
-      `http://localhost:5000/api/template/${templateId}`
-    );
-    const { placeholders } = response.data;
-
-    canvas.clear();
-
-    placeholders.forEach((ph) => {
-      if (ph.field === "photo" && studentData?.photo) {
-        fabric.Image.fromURL(studentData.photo, (img) => {
-          img.set({
-            left: ph.left,
-            top: ph.top,
-            scaleX: ph.width / img.width,
-            scaleY: ph.height / img.height,
-          });
-          img.field = "photo"; // keep field info
-          canvas.add(img);
-        });
-      }
-
-      if (ph.field === "name" && studentData?.name) {
-        const text = new fabric.Text(studentData.name, {
-          left: ph.left,
-          top: ph.top,
-          fontSize: ph.fontSize || 22,
-        });
-        text.field = "name";
-        canvas.add(text);
-      }
-
-      if (ph.field === "signature" && studentData?.signature) {
-        fabric.Image.fromURL(studentData.signature, (img) => {
-          img.set({
-            left: ph.left,
-            top: ph.top,
-            scaleX: ph.width / img.width,
-            scaleY: ph.height / img.height,
-          });
-          img.field = "signature";
-          canvas.add(img);
-        });
-      }
-
-      // Add more fields here (course, rollNo, etc.)
-    });
-
     canvas.renderAll();
-  } catch (err) {
-    console.error("❌ Failed to load template layout", err);
-  }
-};
+    return () => { cancelled = true; };
+  }, [canvas, selectedInstitute, templateImage, selectedStudent, getSavedProps]);
 
+  useEffect(() => {
+    const t = setTimeout(() => { renderTemplateAndStudent(); }, 200);
+    return () => clearTimeout(t);
+  }, [renderTemplateAndStudent]);
 
-const saveTemplateLayout = async () => {
-  if (!canvas) return;
+  const saveTemplateLayout = async () => {
+    if (!canvas) return;
+    const placeholders = canvas.getObjects()
+      .filter((o) => o.customId !== "templateBg")
+      .map((obj) => {
+        const rawW = obj.width || 0;
+        const rawH = obj.height || 0;
+        const scaleX = obj.scaleX || 1;
+        const scaleY = obj.scaleY || 1;
+        return {
+          field: obj.field || obj.customId || "unknown",
+          type: obj.type,
+          left: obj.left,
+          top: obj.top,
+          scaleX,
+          scaleY,
+          angle: obj.angle || 0,
+          renderedWidth: rawW * scaleX,
+          renderedHeight: rawH * scaleY,
+          text: obj.text || null,
+          fontSize: obj.fontSize || null,
+          fill: obj.fill || null,
+          fontFamily: obj.fontFamily || null,
+          fontWeight: obj.fontWeight || null,
+          textAlign: obj.textAlign || null,
+          src: obj.type === "image" && obj._element ? obj._element.src : null,
+          shape: obj.customId === "studentPhoto" ? (obj.shape || "circle") : null,
+        };
+      });
+    try {
+      await axios.put(
+        `https://canvaback.onrender.com/api/template/update-canvas/${templateId}`,
+        { placeholders }
+      );
+      setSavedPlaceholders(placeholders);
+      toast.success("Template layout saved!");
+    } catch {
+      toast.error("Save failed!");
+    }
+  };
 
-  // Extract placeholder details
-  const placeholders = canvas.getObjects().map((obj) => {
-    return {
-      id: obj.id || obj._id || new Date().getTime().toString(),
-      left: obj.left,
-      top: obj.top,
-      width: obj.width,
-      height: obj.height,
-      scaleX: obj.scaleX,
-      scaleY: obj.scaleY,
-      fontSize: obj.fontSize || null,
-      field: obj.field || obj.name || null, // NEW: store type of placeholder
-    };
-  });
-
-  try {
-    const response = await axios.put(
-      `https://canvaback.onrender.com/api/template/update-canvas/${templateId}`,
-      { placeholders }
-    );
-
-    console.log("✅ Template saved:", response.data);
-    toast.success("Template layout saved!");
-  } catch (err) {
-    console.error("❌ Failed to save template", err);
-    toast.error("Save failed!");
-  }
-};
 
   return (
     <div className="h-full flex flex-col"> 
@@ -631,116 +556,45 @@ const saveTemplateLayout = async () => {
 
  
                                 {/* Object Toolbars */} 
-                                {activeObj && ( 
-                                  <FloatingObjectToolbar activeObj={activeObj} cropImage={cropImage} 
-                                  handleDelete={() => { canvas?.remove(activeObj); setActiveObj(null); 
-                                    saveHistory(); }} 
-                                    toggleLock={(obj) => { 
-                                      const isLocked = lockedObjects.has(obj); 
-                                      obj.set({ selectable: !isLocked, 
-                                        evented: !isLocked, 
-                                        hasControls: !isLocked, 
-                                        lockMovementX: isLocked ? false : true, 
-                                        lockMovementY: isLocked ? false : true, 
-                                        editable: obj.type === "i-text" ? !isLocked : undefined, }); 
-                                        const updated = new Set(lockedObjects); 
-                                        isLocked ? updated.delete(obj) : updated.add(obj); 
-                                        setLockedObjects(updated); 
-                                        canvas?.discardActiveObject(); 
-                                        canvas?.requestRenderAll(); 
-                                      }} 
-                                        setShowSettings={setShowSettings} 
-                                        fitCanvasToObject={() => { 
-                                          const bounds = activeObj.getBoundingRect(); 
-                                          canvas.setWidth(bounds.width + 100); 
-                                          canvas.setHeight(bounds.height + 100); 
-                                          canvas.centerObject(activeObj); 
-                                          canvas.requestRenderAll(); 
-                                        }} 
-                                        isLocked={isLocked} 
-                                        multipleSelected={multipleSelected} 
-                                        groupObjects={() => { 
-                                          const objs = canvas.getActiveObjects(); 
-                                          if (objs.length > 1) { 
-                                            const group = new fabric.Group(objs); 
-                                            objs.forEach(o => canvas.remove(o));
-                                             canvas.add(group); 
-                                             canvas.setActiveObject(group); 
-                                             canvas.requestRenderAll(); 
-                                             saveHistory(); 
-                                            } 
-                                          }} 
-                                          ungroupObjects={() => { 
-                                            const active = canvas.getActiveObject(); 
-                                            if (active && active.type === "group") { 
-                                              const items = active._objects; 
-                                              active._restoreObjectsState(); 
-                                              canvas.remove(active); 
-                                              items.forEach(obj => canvas.add(obj)); 
-                                              canvas.setActiveObject(new fabric.ActiveSelection(items, 
-                                                { canvas })); 
-                                                canvas.requestRenderAll(); 
-                                                saveHistory(); 
-                                              } 
-                                            }} 
-                                              canvas={canvas} /> 
-                                              )} 
-                                              {/* Text & Shape Toolbars */} 
-                                              {activeObj?.type === "i-text" && ( 
-                                                <div className="fixed bottom-24 left-1/2 -translate-x-1/2 w-full max-w-5xl z-50"> 
-                                                <TextEditToolbar obj={activeObj} canvas={canvas} fillColor={fillColor} 
-                                                setFillColor={setFillColor} fontSize={fontSize} setFontSize={setFontSize} /> 
-                                                </div> 
-                                                )} 
-                                                {activeObj && 
-                                                ["rect", "circle", "image"].includes(activeObj.type) && ( 
-                                                <ShapeEditToolbar obj={activeObj} canvas={canvas} fillColor={fillColor} setFillColor={setFillColor} 
-                                                strokeColor={strokeColor} setStrokeColor={setStrokeColor} 
-                                                strokeWidth={strokeWidth} setStrokeWidth={setStrokeWidth} /> 
-                                              )} 
-                                              {/* Crop Image Modal */} 
-                                              {cropSrc && ( 
-                                                <ImageCropModal src={cropSrc} onCancel={() => { setCropSrc(null); 
-                                                  cropCallbackRef.current = null; }} 
-                                                  onConfirm={(url) => { cropCallbackRef.current?.(url); setCropSrc(null); 
-                                                    cropCallbackRef.current = null; }} /> 
-                                                  )} 
-                                                  {/* Drawer Settings */} 
-                                                  <Drawer isOpen={showSettings} onClose={() => setShowSettings(false)}> 
-                                                    {selectedInstitute?.logo && ( 
-                                                      <div className="p-4"> <h3 className="text-lg font-bold mb-2">Institute Logo</h3> 
-                                                      <img src={selectedInstitute.logo} className="w-32 h-32 object-contain" /> 
-                                                      </div> 
-                                                      )} 
-                                                      {selectedInstitute?.signature && ( 
-                                                        <div className="p-4"> 
-                                                        <h3 className="text-lg font-bold mb-2">Signature</h3> 
-                                                        <img src={selectedInstitute.signature} className="w-32 h-20 object-contain" /> 
-                                                        </div> 
-                                                        )} 
-                                                        {selectedStudent && selectedStudent.photo && ( 
-                                                          <div className="p-4"> <h3 className="text-lg font-bold mb-2">Selected Student Photo</h3>
-                                                           <img src={selectedStudent.photo[0]} className="w-32 h-32 object-cover rounded" /> 
-                                                           </div> 
-                                                          )} 
-                                                           <RightPanel fillColor={fillColor} setFillColor={setFillColor} fontSize={fontSize} 
-                                                           setFontSize={setFontSize} strokeColor={strokeColor} setStrokeColor={setStrokeColor} 
-                                                           strokeWidth={strokeWidth} setStrokeWidth={setStrokeWidth} canvasWidth={canvasWidth} 
-                                                           setCanvasWidth={setCanvasWidth} canvasHeight={canvasHeight} 
-                                                           setCanvasHeight={setCanvasHeight} setBackgroundImage={(url) => { 
-                                                            fabric.Image.fromURL(url, (img) => { 
-                                                              canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), 
-                                                              { scaleX: canvas.width / img.width, scaleY: canvas.height / img.height, 
-
-                                                              }); 
-                                                              saveHistory(); 
-                                                            }); }} /> 
-                                                            <LayerPanel canvas={canvas} /> 
-                                                            </Drawer> 
-                                                            <BottomToolbar alignLeft={alignLeft} alignCenter={alignCenter} 
-                                                            alignRight={alignRight} alignTop={alignTop} 
-                                                            alignMiddle={alignMiddle} alignBottom={alignBottom} bringToFront={bringToFront} 
-                                                            sendToBack={sendToBack} /> 
+                               {activeObj && (
+          <FloatingObjectToolbar
+            activeObj={activeObj}
+            cropImage={cropImage}
+            handleDelete={() => { canvas?.remove(activeObj); setActiveObj(null); saveHistory(); }}
+            toggleLock={(obj) => {}}
+            setShowSettings={setShowSettings}
+            isLocked={isLocked}
+            multipleSelected={multipleSelected}
+            groupObjects={() => {}}
+            ungroupObjects={() => {}}
+            canvas={canvas}
+          >
+            {/* extra buttons for student photo */}
+             {/* Student Photo Toolbar */}
+        {activeStudentPhoto && (
+          <div className="flex gap-2 justify-center mt-3">
+            <button
+              onClick={handleZoomIn}
+              className="px-3 py-1 bg-blue-500 text-white rounded"
+            >
+              Zoom In
+            </button>
+            <button
+              onClick={handleZoomOut}
+              className="px-3 py-1 bg-blue-500 text-white rounded"
+            >
+              Zoom Out
+            </button>
+            <button
+              onClick={handleReset}
+              className="px-3 py-1 bg-gray-500 text-white rounded"
+            >
+              Reset
+            </button>
+          </div>
+        )}
+          </FloatingObjectToolbar>
+        )} 
                                                             </div> 
                                                             </main> 
                                                             </div>

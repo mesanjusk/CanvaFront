@@ -24,13 +24,8 @@ import {
 } from "lucide-react";
 
 import TextEditToolbar from "./TextEditToolbar";
-import ShapeEditToolbar from "./ShapeEditToolbar";
 import axios from "axios";
 import { useParams } from "react-router-dom";
-
-const PHOTO_MASK_WIDTH = 400;
-const PHOTO_MASK_HEIGHT = 400;
-let activeStudentPhoto = null; 
 
 const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false }) => {
   const { templateId: routeId } = useParams();

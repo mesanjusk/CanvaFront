@@ -9,9 +9,10 @@ import Drawer from "./Drawer";
 import TemplatePanel from "./TemplatePanel"; 
 import UndoRedoControls from "./UndoRedoControls"; 
 import LayerPanel from "./LayerPanel"; 
-import BottomToolbar from "./BottomToolbar"; 
-import FloatingObjectToolbar from "./FloatingObjectToolbar"; 
+import BottomToolbar from "./BottomToolbar";
+import FloatingObjectToolbar from "./FloatingObjectToolbar";
 import { getStoredUser, getStoredInstituteUUID} from '../utils/storageUtils';
+import { Button, Stack } from "@mui/material";
 
 import {
   RefreshCw,
@@ -569,36 +570,41 @@ const handleReset = () => {
             ungroupObjects={() => {}}
             canvas={canvas}
           >
-            {/* extra buttons for student photo */}
-             {/* Student Photo Toolbar */}
+            {/* Student Photo Toolbar */}
         {activeStudentPhoto && (
-          <div className="flex gap-2 justify-center mt-3">
-            <button
-              onClick={handleZoomIn}
-              className="px-3 py-1 bg-blue-500 text-white rounded"
-            >
+          <Stack direction="row" spacing={1} justifyContent="center" mt={3}>
+            <Button variant="contained" onClick={handleZoomIn}>
               Zoom In
-            </button>
-            <button
-              onClick={handleZoomOut}
-              className="px-3 py-1 bg-blue-500 text-white rounded"
-            >
+            </Button>
+            <Button variant="contained" onClick={handleZoomOut}>
               Zoom Out
-            </button>
-            <button
-              onClick={handleReset}
-              className="px-3 py-1 bg-gray-500 text-white rounded"
-            >
+            </Button>
+            <Button variant="contained" color="secondary" onClick={handleReset}>
               Reset
-            </button>
-          </div>
+            </Button>
+            <Button variant="outlined" onClick={cropImage}>
+              Edit Photo
+            </Button>
+          </Stack>
         )}
           </FloatingObjectToolbar>
-        )} 
-                                                            </div> 
-                                                            </main> 
-                                                            </div>
-   
+        )}
+        {cropSrc && (
+          <ImageCropModal
+            src={cropSrc}
+            onCancel={() => setCropSrc(null)}
+            onConfirm={(img) => {
+              if (cropCallbackRef.current) {
+                cropCallbackRef.current(img);
+              }
+              setCropSrc(null);
+            }}
+          />
+        )}
+      </div>
+    </main>
+  </div>
+
   );
 };
 

@@ -27,7 +27,6 @@ export const AppProvider = ({ children }) => {
         // Sync legacy uuid key
         if (instiObj.institute_uuid)
           storage.setItem('institute_uuid', instiObj.institute_uuid);
-        console.log('✅ [AppContext] Restored user and institute:', { userObj, instiObj });
       } else {
         console.warn('⚠️ [AppContext] No stored user or institute found in storage.');
       }

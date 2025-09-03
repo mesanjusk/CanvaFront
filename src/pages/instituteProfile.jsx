@@ -97,7 +97,6 @@ const InstituteProfile = () => {
       toast.success('Profile updated');
       fetchProfile();
 
-      // ✅ Update theme, favicon, title, localStorage, Context
       document.documentElement.style.setProperty('--theme-color', updated.theme_color);
 
       document.title = `${updated.institute_title || 'Instify'} | Instify`;

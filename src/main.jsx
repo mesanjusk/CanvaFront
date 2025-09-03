@@ -4,7 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import "./index.css";
 import App from "./App";
 import BrandingProvider from "./context/BrandingContext";
-import { AppProvider } from "./context/AppContext"; // ✅ import your context provider
+import { AppProvider } from "./context/AppContext";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 
@@ -20,7 +20,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     <BrowserRouter>
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <AppProvider> {/* ✅ wrap in AppContext */}
+        <AppProvider>
           <BrandingProvider>
             <App />
           </BrandingProvider>

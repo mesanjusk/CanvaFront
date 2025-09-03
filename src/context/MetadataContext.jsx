@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
-import BASE_URL from '../config'; // ✅ Ensure consistent API base
+import BASE_URL from '../config';
 
 const MetadataContext = createContext({
   courses: [],
@@ -39,7 +39,7 @@ export const MetadataProvider = ({ children }) => {
       setBatches(Array.isArray(batchesRes.data.data) ? batchesRes.data.data : []);
       setPaymentModes(Array.isArray(paymentModesRes.data.data) ? paymentModesRes.data.data : []);
 
-      console.log("✅ Metadata loaded");
+      console.log("Metadata loaded");
     } catch (err) {
       console.warn('❌ Failed to load metadata', err?.response?.data || err.message);
     } finally {

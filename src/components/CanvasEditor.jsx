@@ -569,9 +569,8 @@ const handleReset = () => {
         img.shape = shapeType;
         img.clipPath = createClipShape(shapeType, phWidth, phHeight);
 
-         // ✅ Detect selection
-    img.on("selected", () => setActiveStudentPhoto(img));
-    img.on("deselected", () => setActiveStudentPhoto(null));
+        img.on("selected", () => setActiveStudentPhoto(img));
+        img.on("deselected", () => setActiveStudentPhoto(null));
 
         canvas.add(img);
         studentObjectsRef.current.push(img);

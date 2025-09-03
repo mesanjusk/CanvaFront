@@ -23,7 +23,6 @@ const AddSubcategory = () => {
   const [editImage, setEditImage] = useState(null);
   const [editIsLoading, setEditIsLoading] = useState(false);
 
-  // ✅ Fetch categories and subcategories on mount
   useEffect(() => {
     fetchCategories();
     fetchSubcategories();
@@ -68,7 +67,7 @@ const AddSubcategory = () => {
 
     try {
       await axios.post('https://canvaback.onrender.com/api/subcategory', formData);
-      setStatus('✅ Subcategory uploaded successfully!');
+      setStatus('Subcategory uploaded successfully!');
       setName('');
       setImage(null);
       setCategoryId('');

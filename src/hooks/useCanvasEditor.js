@@ -20,7 +20,7 @@ export function useCanvasEditor(canvasRef, canvasWidth, canvasHeight) {
     if (obj.type === "i-text") {
       if (!obj.styles) obj.styles = {};
       const lineCount = obj.text?.split("\n").length || 1;
-      for (let i = 0; i < lineCount; i++) {   // ✅ increment properly
+      for (let i = 0; i < lineCount; i++) {
         if (!obj.styles[i]) obj.styles[i] = {};
       }
     }

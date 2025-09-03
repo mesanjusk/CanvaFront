@@ -337,7 +337,6 @@ const drawImageWithText = async (ctx, student, x, y, width, height, imageUrl) =>
 
   const zip = new JSZip();
 
-  // ✅ Get the template background image URL from the selected object
   const imageUrl = selected?.imageUrl;
   if (!imageUrl) {
     console.error('No imageUrl found in selected template.');
@@ -359,7 +358,6 @@ const drawImageWithText = async (ctx, student, x, y, width, height, imageUrl) =>
         const x = margins.left + c * (cellW + spacing.horizontal);
         const y = margins.top + r * (cellH + spacing.vertical);
 
-        // ✅ Draw using template + student data
         await drawImageWithText(ctx, student, x, y, cellW, cellH, imageUrl);
       }
     }

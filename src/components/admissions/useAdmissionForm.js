@@ -392,7 +392,6 @@ if (checkDuplicate.data.exists && !form.student_uuid) {
     };
     await axios.post(`${BASE_URL}/api/account/addAccount`, accountPayload);
 
-    // ✅ Fetch account list ONCE
     let accList = [];
     try {
       const accountRes = await axios.get(
@@ -405,7 +404,6 @@ if (checkDuplicate.data.exists && !form.student_uuid) {
       console.error("Account fetch error:", err);
     }
 
-    // ✅ Transaction 1: Receipt (feePaid)
     if (feePaid > 0 && form.paidBy) {
       try {
         const studentAccount = accList.find(a =>
@@ -451,7 +449,6 @@ if (checkDuplicate.data.exists && !form.student_uuid) {
       }
     }
 
-    // ✅ Transaction 2: Fees Receivable (total - discount)
     const receivableAmount = fees - discount;
     if (receivableAmount > 0) {
       try {

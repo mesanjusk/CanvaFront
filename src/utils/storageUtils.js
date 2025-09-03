@@ -11,7 +11,7 @@ export const storeInstituteData = ({ institute_uuid, institute_name, institute_i
     institute_id,
     theme_color,
   };
-  localStorage.setItem('institute', JSON.stringify(instituteObj)); // ✅ Now stores combined object for AppContext
+  localStorage.setItem('institute', JSON.stringify(instituteObj));
 
   if (institute_uuid) localStorage.setItem('institute_uuid', institute_uuid);
   if (institute_name) localStorage.setItem('institute_title', institute_name);

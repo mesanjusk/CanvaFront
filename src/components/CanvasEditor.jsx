@@ -1,23 +1,10 @@
 // CanvasEditor.jsx
-import React, { useEffect, useState, useCallback, forwardRef } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import { useCanvasEditor } from "../hooks/useCanvasEditor";
 import { useCanvasTools } from "../hooks/useCanvasTools";
 import { getStoredUser, getStoredInstituteUUID } from "../utils/storageUtils";
-import {
-  Button,
-  Stack,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Slider,
-} from "@mui/material";
-import Cropper from "react-easy-crop";
+import { Button, Stack } from "@mui/material";
 import axios from "axios";
 import { useParams } from "react-router-dom";
 import { fabric } from "fabric";
@@ -33,189 +20,17 @@ import {
   Trash2,
   Lock,
   Unlock,
-  AlignLeft as AlignLeftIcon,
-  AlignCenter as AlignCenterIcon,
-  AlignRight as AlignRightIcon,
-  AlignStartVertical,
-  AlignVerticalSpaceAround,
-  AlignEndVertical,
-  ArrowUpFromLine,
-  ArrowDownToLine,
   Triangle,
   Hexagon,
   Star,
   Heart,
   Check,
 } from "lucide-react";
-
-/* =============================================================================
-   Small UI helpers
-============================================================================= */
-const IconButton = ({ onClick, title, children, className = "" }) => (
-  <button
-    onClick={onClick}
-    title={title}
-    className={`p-2 rounded bg-white shadow hover:bg-blue-100 ${className}`.trim()}
-    type="button"
-  >
-    {children}
-  </button>
-);
-
-const FontSelector = ({ activeObj, canvas }) => (
-  <select
-    className="border rounded px-2 py-1"
-    onChange={(e) => {
-      activeObj?.set("fontFamily", e.target.value);
-      canvas?.renderAll();
-    }}
-    defaultValue={activeObj?.fontFamily || "Arial"}
-  >
-    {["Arial", "Roboto", "Lobster"].map((f) => (
-      <option key={f} value={f} style={{ fontFamily: f }}>
-        {f}
-      </option>
-    ))}
-  </select>
-);
-
-/* =============================================================================
-   Canvas surface
-============================================================================= */
-const CanvasArea = forwardRef(({ width, height }, ref) => {
-  useEffect(() => {
-    const canvas = new fabric.Canvas("main-canvas", {
-      width,
-      height,
-      backgroundColor: "#fff",
-      preserveObjectStacking: true,
-    });
-    if (ref) ref.current = canvas;
-    return () => {
-      canvas.dispose();
-    };
-  }, [width, height, ref]);
-
-  return (
-    <div className="bg-white shadow border">
-      <canvas id="main-canvas" />
-    </div>
-  );
-});
-
-/* =============================================================================
-   Image crop helper
-============================================================================= */
-function getCroppedImg(src, croppedAreaPixels) {
-  return new Promise((resolve, reject) => {
-    const image = new window.Image();
-    image.crossOrigin = "anonymous";
-    image.src = src;
-    image.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = croppedAreaPixels.width;
-      canvas.height = croppedAreaPixels.height;
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(
-        image,
-        croppedAreaPixels.x,
-        croppedAreaPixels.y,
-        croppedAreaPixels.width,
-        croppedAreaPixels.height,
-        0,
-        0,
-        croppedAreaPixels.width,
-        croppedAreaPixels.height
-      );
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) {
-            reject(new Error("Canvas is empty"));
-            return;
-          }
-          const reader = new FileReader();
-          reader.readAsDataURL(blob);
-          reader.onloadend = () => resolve(reader.result);
-        },
-        "image/png"
-      );
-    };
-    image.onerror = (e) => reject(e);
-  });
-}
-
-const aspectOptions = {
-  Free: undefined,
-  "1:1": 1 / 1,
-  "4:3": 4 / 3,
-  "16:9": 16 / 9,
-  "3:4": 3 / 4,
-};
-
-const ImageCropModal = ({ src, onCancel, onConfirm }) => {
-  const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
-  const [aspect, setAspect] = useState(undefined);
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
-
-  const onCropComplete = useCallback((_, croppedPixels) => {
-    setCroppedAreaPixels(croppedPixels);
-  }, []);
-
-  const handleConfirm = async () => {
-    try {
-      const croppedImgUrl = await getCroppedImg(src, croppedAreaPixels);
-      onConfirm(croppedImgUrl);
-    } catch (e) {
-      alert("Crop failed: " + e.message);
-    }
-  };
-
-  return (
-    <Dialog open onClose={onCancel} maxWidth="sm" fullWidth>
-      <DialogTitle>Crop Image</DialogTitle>
-      <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        <FormControl variant="standard">
-          <InputLabel id="aspect-label">Aspect Ratio</InputLabel>
-          <Select
-            labelId="aspect-label"
-            value={aspect ?? "Free"}
-            onChange={(e) => {
-              const value = e.target.value;
-              setAspect(value === "Free" ? undefined : Number(value));
-            }}
-          >
-            {Object.entries(aspectOptions).map(([label, value]) => (
-              <MenuItem key={label} value={value ?? "Free"}>
-                {label}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <div style={{ position: "relative", width: "100%", height: 350, background: "#333" }}>
-          <Cropper
-            image={src}
-            crop={crop}
-            zoom={zoom}
-            aspect={aspect}
-            cropShape="rect"
-            showGrid={false}
-            onCropChange={setCrop}
-            onZoomChange={setZoom}
-            onCropComplete={onCropComplete}
-          />
-        </div>
-        <Slider value={zoom} min={1} max={3} step={0.01} onChange={(_, v) => setZoom(v)} />
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={handleConfirm} variant="contained" color="primary">
-          Confirm
-        </Button>
-        <Button onClick={onCancel}>Cancel</Button>
-      </DialogActions>
-    </Dialog>
-  );
-};
+import IconButton from "./IconButton";
+import CanvasArea from "./CanvasArea";
+import ImageCropModal from "./ImageCropModal";
+import BottomToolbar from "./BottomToolbar";
+import UndoRedoControls from "./UndoRedoControls";
 
 /* =============================================================================
    Frame + Adjust helpers
@@ -470,49 +285,6 @@ const removeMaskAndFrame = (canvas, imageObj, keepSlot = false) => {
     imageObj._overlayHandlers = null;
   }
   canvas.requestRenderAll();
-};
-
-/* =============================================================================
-   Bottom toolbar (stay fixed)
-============================================================================= */
-const BottomToolbar = ({
-  alignLeft,
-  alignCenter,
-  alignRight,
-  alignTop,
-  alignMiddle,
-  alignBottom,
-  bringToFront,
-  sendToBack,
-}) => {
-  return (
-    <div className="fixed bottom-0 w-full bg-white border-t shadow z-30 px-2 py-2 overflow-x-auto scrollbar-thin flex justify-start items-center gap-1">
-      <IconButton onClick={alignLeft} title="Align Left">
-        <AlignLeftIcon size={22} />
-      </IconButton>
-      <IconButton onClick={alignCenter} title="Align Center">
-        <AlignCenterIcon size={22} />
-      </IconButton>
-      <IconButton onClick={alignRight} title="Align Right">
-        <AlignRightIcon size={22} />
-      </IconButton>
-      <IconButton onClick={alignTop} title="Align Top">
-        <AlignStartVertical size={22} />
-      </IconButton>
-      <IconButton onClick={alignMiddle} title="Align Middle">
-        <AlignVerticalSpaceAround size={22} />
-      </IconButton>
-      <IconButton onClick={alignBottom} title="Align Bottom">
-        <AlignEndVertical size={22} />
-      </IconButton>
-      <IconButton onClick={bringToFront} title="Bring to Front">
-        <ArrowUpFromLine size={22} />
-      </IconButton>
-      <IconButton onClick={sendToBack} title="Send to Back">
-        <ArrowDownToLine size={22} />
-      </IconButton>
-    </div>
-  );
 };
 
 /* =============================================================================
@@ -1695,17 +1467,5 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     </div>
   );
 };
-
-/* =============================================================================
-   Undo/Redo cluster (top bar small group)
-============================================================================= */
-const UndoRedoControls = ({ undo, redo, duplicateObject, downloadPDF }) => (
-  <div className="flex gap-2">
-    <IconButton onClick={undo} title="Undo">Undo</IconButton>
-    <IconButton onClick={redo} title="Redo">Redo</IconButton>
-    <IconButton onClick={duplicateObject} title="Duplicate">Duplicate</IconButton>
-    <IconButton onClick={downloadPDF} title="Export PDF">PDF</IconButton>
-  </div>
-);
 
 export default CanvasEditor;

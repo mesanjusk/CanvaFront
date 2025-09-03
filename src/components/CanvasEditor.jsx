@@ -1,19 +1,25 @@
-import React, { useEffect, useState, useCallback } from "react"; 
-import toast, { Toaster } from 'react-hot-toast'; 
-import { useCanvasEditor } from "../hooks/useCanvasEditor"; 
-import { useCanvasTools } from "../hooks/useCanvasTools"; 
-import CanvasArea from "./CanvasArea"; 
-import RightPanel from "./RightPanel"; 
-import ImageCropModal from "./ImageCropModal"; 
-import Drawer from "./Drawer"; 
-import TemplatePanel from "./TemplatePanel"; 
-import UndoRedoControls from "./UndoRedoControls"; 
-import LayerPanel from "./LayerPanel"; 
-import BottomToolbar from "./BottomToolbar";
-import FloatingObjectToolbar from "./FloatingObjectToolbar";
-import { getStoredUser, getStoredInstituteUUID} from '../utils/storageUtils';
-import { Button, Stack } from "@mui/material";
-
+import React, { useEffect, useState, useCallback, forwardRef } from "react";
+import toast, { Toaster } from "react-hot-toast";
+import { useCanvasEditor } from "../hooks/useCanvasEditor";
+import { useCanvasTools } from "../hooks/useCanvasTools";
+import { getStoredUser, getStoredInstituteUUID } from "../utils/storageUtils";
+import {
+  Button,
+  Stack,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Slider,
+} from "@mui/material";
+import Cropper from "react-easy-crop";
+import axios from "axios";
+import { useParams } from "react-router-dom";
+import { fabric } from "fabric";
 import {
   RefreshCw,
   Download,
@@ -21,11 +27,266 @@ import {
   Square,
   Circle,
   Image as ImageIcon,
+  Crop,
+  Trash2,
+  Lock,
+  Unlock,
+  Settings,
+  Maximize2,
+  Group,
+  
 } from "lucide-react";
 
-import TextEditToolbar from "./TextEditToolbar";
-import axios from "axios";
-import { useParams } from "react-router-dom";
+// --- Inline components previously imported ---
+const IconButton = ({ onClick, title, children, className = "" }) => (
+  <button
+    onClick={onClick}
+    title={title}
+    className={`p-2 rounded bg-white shadow hover:bg-blue-100 ${className}`.trim()}
+  >
+    {children}
+  </button>
+);
+
+const FontSelector = ({ activeObj, canvas }) => (
+  <select
+    className="border rounded px-2 py-1"
+    onChange={(e) => {
+      activeObj?.set("fontFamily", e.target.value);
+      canvas?.renderAll();
+    }}
+    defaultValue={activeObj?.fontFamily || "Arial"}
+  >
+    {["Arial", "Roboto", "Lobster"].map((f) => (
+      <option key={f} value={f} style={{ fontFamily: f }}>
+        {f}
+      </option>
+    ))}
+  </select>
+);
+
+const CanvasArea = forwardRef(({ width, height }, ref) => {
+  useEffect(() => {
+    const canvas = new fabric.Canvas("main-canvas", {
+      width,
+      height,
+      backgroundColor: "#fff",
+      preserveObjectStacking: true,
+    });
+    if (ref) ref.current = canvas;
+
+    return () => {
+      canvas.dispose();
+    };
+  }, [width, height, ref]);
+
+  return (
+    <div className="bg-white shadow border">
+      <canvas id="main-canvas" />
+    </div>
+  );
+});
+
+const defaultTemplates = [
+  { name: "Blank", data: { version: "5.2.4", objects: [] }, image: null },
+];
+
+const TemplateCard = ({ template, onSelect }) => (
+  <div
+    className="cursor-pointer rounded overflow-hidden shadow hover:shadow-lg bg-white dark:bg-gray-700"
+    onClick={() =>
+      onSelect(template.layout ? JSON.parse(template.layout) : template.data)
+    }
+  >
+    {template.image && (
+      <img
+        src={template.image}
+        alt={template.title || template.name}
+        className="w-full h-24 object-cover"
+      />
+    )}
+    <div className="p-2 text-center text-sm">
+      {template.title || template.name}
+    </div>
+  </div>
+);
+
+const TemplatePanel = ({ loadTemplate }) => {
+  const [saved, setSaved] = useState([]);
+
+  useEffect(() => {
+    axios
+      .get("https://canvaback.onrender.com/api/templatelayout")
+      .then((res) => setSaved(res.data))
+      .catch((err) => console.error("Failed to load templates", err));
+  }, []);
+
+  const templates = defaultTemplates.concat(saved);
+
+  return (
+    <div className="grid grid-cols-2 gap-2 w-48 sm:w-56">
+      {templates.map((t, idx) => (
+        <TemplateCard key={idx} template={t} onSelect={loadTemplate} />
+      ))}
+    </div>
+  );
+};
+
+const UndoRedoControls = ({ undo, redo, duplicateObject, downloadPDF }) => (
+  <div className="flex gap-2">
+    <IconButton onClick={undo}>Undo</IconButton>
+    <IconButton onClick={redo}>Redo</IconButton>
+    <IconButton onClick={duplicateObject}>Duplicate</IconButton>
+    <IconButton onClick={downloadPDF}>PDF</IconButton>
+  </div>
+);
+
+const FloatingObjectToolbar = ({
+  activeObj,
+  cropImage,
+  handleDelete,
+  toggleLock,
+  setShowSettings,
+  fitCanvasToObject,
+  isLocked,
+  multipleSelected,
+  groupObjects,
+  ungroupObjects,
+  canvas,
+  children,
+}) => {
+  return (
+    <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-white shadow-lg rounded px-3 py-2 flex gap-3 items-center">
+      <IconButton onClick={cropImage} title="Crop"><Crop size={24} /></IconButton>
+      <IconButton onClick={handleDelete} title="Delete"><Trash2 size={24} /></IconButton>
+      <IconButton onClick={() => toggleLock(activeObj)} title={isLocked ? "Unlock" : "Lock"}>
+        {isLocked ? <Unlock size={24} /> : <Lock size={24} />}
+      </IconButton>
+      <IconButton onClick={() => setShowSettings(true)} title="Settings"><Settings size={24} /></IconButton>
+      <IconButton onClick={fitCanvasToObject} title="Fit Canvas"><Maximize2 size={24} /></IconButton>
+      {multipleSelected && <IconButton onClick={groupObjects} title="Group"><Group size={24} /></IconButton>}
+      {activeObj?.type === "group" && <IconButton onClick={ungroupObjects} title="Ungroup"><RefreshCw size={24} /></IconButton>}
+      <FontSelector activeObj={activeObj} canvas={canvas} />
+      {children}
+    </div>
+  );
+};
+
+function getCroppedImg(src, croppedAreaPixels) {
+  return new Promise((resolve, reject) => {
+    const image = new window.Image();
+    image.crossOrigin = "anonymous";
+    image.src = src;
+    image.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = croppedAreaPixels.width;
+      canvas.height = croppedAreaPixels.height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(
+        image,
+        croppedAreaPixels.x,
+        croppedAreaPixels.y,
+        croppedAreaPixels.width,
+        croppedAreaPixels.height,
+        0,
+        0,
+        croppedAreaPixels.width,
+        croppedAreaPixels.height
+      );
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error("Canvas is empty"));
+          return;
+        }
+        const reader = new FileReader();
+        reader.readAsDataURL(blob);
+        reader.onloadend = () => resolve(reader.result);
+      }, "image/png");
+    };
+    image.onerror = (e) => reject(e);
+  });
+}
+
+const aspectOptions = {
+  Free: undefined,
+  "1:1": 1 / 1,
+  "4:3": 4 / 3,
+  "16:9": 16 / 9,
+  "3:4": 3 / 4,
+};
+
+const ImageCropModal = ({ src, onCancel, onConfirm }) => {
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [aspect, setAspect] = useState(undefined);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+
+  const onCropComplete = useCallback((_, croppedPixels) => {
+    setCroppedAreaPixels(croppedPixels);
+  }, []);
+
+  const handleConfirm = async () => {
+    try {
+      const croppedImgUrl = await getCroppedImg(src, croppedAreaPixels);
+      onConfirm(croppedImgUrl);
+    } catch (e) {
+      alert("Crop failed: " + e.message);
+    }
+  };
+
+  return (
+    <Dialog open onClose={onCancel} maxWidth="sm" fullWidth>
+      <DialogTitle>Crop Image</DialogTitle>
+      <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        <FormControl variant="standard">
+          <InputLabel id="aspect-label">Aspect Ratio</InputLabel>
+          <Select
+            labelId="aspect-label"
+            value={aspect ?? "Free"}
+            onChange={(e) => {
+              const value = e.target.value;
+              setAspect(value === "Free" ? undefined : Number(value));
+            }}
+          >
+            {Object.entries(aspectOptions).map(([label, value]) => (
+              <MenuItem key={label} value={value ?? "Free"}>
+                {label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <div
+          style={{ position: "relative", width: "100%", height: 350, background: "#333" }}
+        >
+          <Cropper
+            image={src}
+            crop={crop}
+            zoom={zoom}
+            aspect={aspect}
+            cropShape="rect"
+            showGrid={false}
+            onCropChange={setCrop}
+            onZoomChange={setZoom}
+            onCropComplete={onCropComplete}
+          />
+        </div>
+        <Slider
+          value={zoom}
+          min={1}
+          max={3}
+          step={0.01}
+          onChange={(_, value) => setZoom(value)}
+        />
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={handleConfirm} variant="contained" color="primary">
+          Confirm
+        </Button>
+        <Button onClick={onCancel}>Cancel</Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
 
 const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false }) => {
   const { templateId: routeId } = useParams();
@@ -50,27 +311,16 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
   
   const {
     canvasRef,
-    fillColor, setFillColor,
-    fontSize, setFontSize,
-    strokeColor, setStrokeColor,
-    strokeWidth, setStrokeWidth,
-    canvasWidth, setCanvasWidth,
-    canvasHeight, setCanvasHeight,
-    cropSrc, setCropSrc,
+    canvasWidth,
+    canvasHeight,
+    cropSrc,
+    setCropSrc,
     cropCallbackRef,
     addText,
     addRect,
     addCircle,
     addImage,
     cropImage,
-    alignLeft,
-    alignCenter,
-    alignRight,
-    alignTop,
-    alignMiddle,
-    alignBottom,
-    bringToFront,
-    sendToBack,
   } = useCanvasTools({ width: 400, height: 550 });
 
   const {

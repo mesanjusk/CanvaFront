@@ -284,7 +284,6 @@ import { getThemeColor } from '../utils/storageUtils';
 
         const studentData = studentResponse.data.data;
         const student_uuid = studentData.uuid || studentData._id;
-        console.log("✅ Student saved:", student_uuid);
 
         // Step 2: Create/Update admission
         const admissionPayload = {
@@ -315,7 +314,6 @@ import { getThemeColor } from '../utils/storageUtils';
 
         const admissionData = admissionResponse.data.data;
         const admission_uuid = admissionData.uuid;
-        console.log("✅ Admission saved:", admission_uuid);
 
         // Step 3: Create/Update fees/emi record
         const feesPayload = {
@@ -334,7 +332,6 @@ import { getThemeColor } from '../utils/storageUtils';
         };
 
         const feesResponse = await axios.post(`${BASE_URL}/api/fees`, feesPayload);
-        console.log("✅ Fees saved:", feesResponse.data.data);
 
         // Step 3: Create/Update lead record
         const leadPayload = {
@@ -354,7 +351,6 @@ import { getThemeColor } from '../utils/storageUtils';
         };
 
         const leadResponse = await axios.post(`${BASE_URL}/api/leads`, leadPayload);
-        console.log("✅ Lead saved:", leadResponse.data.data);
 
           // Step 3: Create/Update account record
         const accountPayload = {
@@ -365,7 +361,6 @@ import { getThemeColor } from '../utils/storageUtils';
         };
 
         const accountResponse = await axios.post(`${BASE_URL}/api/account/addAccount`, accountPayload);
-        console.log("✅ Account saved:", accountResponse.data.data);
 
         toast.success('All records saved successfully');
 

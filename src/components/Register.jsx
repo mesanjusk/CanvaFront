@@ -94,7 +94,6 @@ const Signup = () => {
       } else if (data.message === 'success') {
         toast.success('Signup successful. You are now on a 14-day trial.');
 
-        // ✅ Save in localStorage
         localStorage.setItem('name', form.center_head_name);
         localStorage.setItem('institute_title', data.institute_title);
         localStorage.setItem('institute_uuid', data.institute_uuid);
@@ -108,10 +107,8 @@ const Signup = () => {
           localStorage.setItem('trialExpiresAt', data.trialExpiresAt);
         }
 
-        // ✅ Apply theme color
         document.documentElement.style.setProperty('--theme-color', data.theme_color || '#5b5b5b');
 
-        // ✅ Update Context globally
         if (window.updateAppContext) {
           window.updateAppContext({
             user: {

@@ -603,8 +603,11 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
         img.field = "studentPhoto";
         img.shape = shapeType;
         img.clipPath = createClipShape(shapeType, phWidth, phHeight);
-        img.on("selected", () => setActiveStudentPhoto(img));
-        img.on("deselected", () => setActiveStudentPhoto(null));
+
+         // ✅ Detect selection
+    img.on("selected", () => setActiveStudentPhoto(img));
+    img.on("deselected", () => setActiveStudentPhoto(null));
+
         canvas.add(img);
         studentObjectsRef.current.push(img);
         img.on("mousedown", () => handlePhotoUpload(img));

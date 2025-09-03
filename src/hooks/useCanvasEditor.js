@@ -75,10 +75,13 @@ export function useCanvasEditor(canvasRef, canvasWidth, canvasHeight) {
   const downloadPDF = () => {
     if (!canvas) return;
     sanitizeTextStyles();
+    const prevVpt = canvas.viewportTransform.slice();
+    canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
     const dataUrl = canvas.toDataURL({ format: "png" });
     const pdf = new jsPDF("l", "px", [canvasWidth, canvasHeight]);
     pdf.addImage(dataUrl, "PNG", 0, 0, canvasWidth, canvasHeight);
     pdf.save("design.pdf");
+    canvas.setViewportTransform(prevVpt);
   };
 
  const downloadHighRes = () => {
@@ -86,6 +89,8 @@ export function useCanvasEditor(canvasRef, canvasWidth, canvasHeight) {
   sanitizeTextStyles();
   canvas.discardActiveObject();
   canvas.renderAll();
+  const prevVpt = canvas.viewportTransform.slice();
+  canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
 
   requestAnimationFrame(() => {
     const dataUrl = canvas.toDataURL({
@@ -97,6 +102,8 @@ export function useCanvasEditor(canvasRef, canvasWidth, canvasHeight) {
     link.download = "canvas-image.png";
     link.href = dataUrl;
     link.click();
+    canvas.setViewportTransform(prevVpt);
+    canvas.requestRenderAll();
   });
 };
 

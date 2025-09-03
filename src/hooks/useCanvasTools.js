@@ -101,10 +101,14 @@ export function useCanvasTools({ width, height }) {
   const download = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    const prevVpt = canvas.viewportTransform.slice();
+    canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
     const link = document.createElement("a");
     link.href = canvas.toDataURL({ format: "png" });
     link.download = "canvas.png";
     link.click();
+    canvas.setViewportTransform(prevVpt);
+    canvas.requestRenderAll();
   };
 
   const cropImage = () => {

@@ -97,7 +97,7 @@ const CanvasArea = forwardRef(({ width, height }, ref) => {
   }, [width, height, ref]);
 
   return (
-    <div className="bg-white shadow border">
+    <div className="bg-white shadow border w-full h-full">
       <canvas id="main-canvas" />
     </div>
   );
@@ -382,6 +382,7 @@ const applyMaskAndFrame = (canvas, imageObj, shapeType, options) => {
 
   // Build overlay
   const overlay = buildOverlayShape(shapeType, w, h, { rx, stroke, strokeWidth, dashed: false });
+  overlay.set({ selectable: true });
   overlay.followImage = followImage;
   overlay.isFrameOverlay = true;
   overlay.isFrameSlot = false;
@@ -402,6 +403,21 @@ const applyMaskAndFrame = (canvas, imageObj, shapeType, options) => {
     moveOverlayAboveImage(canvas, imageObj, overlay);
   };
 
+  const syncImageGeom = () => {
+    imageObj.set({
+      left: overlay.left,
+      top: overlay.top,
+      scaleX: overlay.scaleX,
+      scaleY: overlay.scaleY,
+      angle: overlay.angle,
+      originX: overlay.originX,
+      originY: overlay.originY,
+    });
+    imageObj.setCoords();
+    moveOverlayAboveImage(canvas, imageObj, overlay);
+    canvas.requestRenderAll();
+  };
+
   if (!absolute) syncOverlayGeom();
   else {
     overlay.set({
@@ -420,6 +436,7 @@ const applyMaskAndFrame = (canvas, imageObj, shapeType, options) => {
   imageObj.frameOverlay = overlay;
   moveOverlayAboveImage(canvas, imageObj, overlay);
 
+  let handlers = {};
   if (!absolute && followImage) {
     const onMove = () => syncOverlayGeom();
     const onScale = () => syncOverlayGeom();
@@ -434,14 +451,43 @@ const applyMaskAndFrame = (canvas, imageObj, shapeType, options) => {
       imageObj.off("scaling", onScale);
       imageObj.off("rotating", onRotate);
       imageObj.off("removed", onRemoved);
+      if (handlers.onOverlayMove) {
+        overlay.off("moving", handlers.onOverlayMove);
+        overlay.off("scaling", handlers.onOverlayScale);
+        overlay.off("rotating", handlers.onOverlayRotate);
+        overlay.off("removed", handlers.onOverlayRemoved);
+      }
       imageObj._overlayHandlers = null;
     };
     imageObj.on("moving", onMove);
     imageObj.on("scaling", onScale);
     imageObj.on("rotating", onRotate);
     imageObj.on("removed", onRemoved);
-    imageObj._overlayHandlers = { onMove, onScale, onRotate, onRemoved };
+    handlers = { onMove, onScale, onRotate, onRemoved };
   }
+
+  const onOverlayMove = () => syncImageGeom();
+  const onOverlayScale = () => syncImageGeom();
+  const onOverlayRotate = () => syncImageGeom();
+  const onOverlayRemoved = () => {
+    overlay.off("moving", onOverlayMove);
+    overlay.off("scaling", onOverlayScale);
+    overlay.off("rotating", onOverlayRotate);
+    overlay.off("removed", onOverlayRemoved);
+    if (imageObj.frameOverlay === overlay) imageObj.frameOverlay = null;
+  };
+  overlay.on("moving", onOverlayMove);
+  overlay.on("scaling", onOverlayScale);
+  overlay.on("rotating", onOverlayRotate);
+  overlay.on("removed", onOverlayRemoved);
+  handlers = {
+    ...handlers,
+    onOverlayMove,
+    onOverlayScale,
+    onOverlayRotate,
+    onOverlayRemoved,
+  };
+  imageObj._overlayHandlers = handlers;
 
   canvas.requestRenderAll();
 };
@@ -449,24 +495,40 @@ const applyMaskAndFrame = (canvas, imageObj, shapeType, options) => {
 const removeMaskAndFrame = (canvas, imageObj, keepSlot = false) => {
   if (!imageObj) return;
   imageObj.clipPath = undefined;
-  if (imageObj.frameOverlay) {
-    if (keepSlot && imageObj.frameOverlay) {
-      const slot = imageObj.frameOverlay;
+  const overlayRef = imageObj.frameOverlay;
+  if (overlayRef) {
+    if (keepSlot) {
+      const slot = overlayRef;
       slot.isFrameOverlay = false;
       slot.isFrameSlot = true;
       slot.ownerImage = null;
       slot.set({ selectable: true, evented: true, strokeDashArray: [6, 4] });
     } else {
-      canvas.remove(imageObj.frameOverlay);
+      canvas.remove(overlayRef);
     }
     imageObj.frameOverlay = null;
   }
   if (imageObj._overlayHandlers) {
-    const { onMove, onScale, onRotate, onRemoved } = imageObj._overlayHandlers;
-    imageObj.off("moving", onMove);
-    imageObj.off("scaling", onScale);
-    imageObj.off("rotating", onRotate);
-    imageObj.off("removed", onRemoved);
+    const {
+      onMove,
+      onScale,
+      onRotate,
+      onRemoved,
+      onOverlayMove,
+      onOverlayScale,
+      onOverlayRotate,
+      onOverlayRemoved,
+    } = imageObj._overlayHandlers;
+    if (onMove) imageObj.off("moving", onMove);
+    if (onScale) imageObj.off("scaling", onScale);
+    if (onRotate) imageObj.off("rotating", onRotate);
+    if (onRemoved) imageObj.off("removed", onRemoved);
+    if (overlayRef) {
+      if (onOverlayMove) overlayRef.off("moving", onOverlayMove);
+      if (onOverlayScale) overlayRef.off("scaling", onOverlayScale);
+      if (onOverlayRotate) overlayRef.off("rotating", onOverlayRotate);
+      if (onOverlayRemoved) overlayRef.off("removed", onOverlayRemoved);
+    }
     imageObj._overlayHandlers = null;
   }
   canvas.requestRenderAll();
@@ -553,6 +615,8 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     canvasRef,
     canvasWidth,
     canvasHeight,
+    setCanvasWidth,
+    setCanvasHeight,
     cropSrc,
     setCropSrc,
     cropCallbackRef,
@@ -576,6 +640,22 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     saveHistory,
     resetHistory,
   } = useCanvasEditor(canvasRef, canvasWidth, canvasHeight);
+
+  // Fit canvas into 90vh view using zoom + viewport transform
+  useEffect(() => {
+    if (!canvas) return;
+    const updateViewport = () => {
+      const viewH = window.innerHeight * 0.9;
+      const viewW = window.innerWidth;
+      const scale = Math.min(viewW / canvasWidth, viewH / canvasHeight);
+      const offsetX = (viewW - canvasWidth * scale) / 2;
+      const offsetY = (viewH - canvasHeight * scale) / 2;
+      canvas.setViewportTransform([scale, 0, 0, scale, offsetX, offsetY]);
+    };
+    updateViewport();
+    window.addEventListener("resize", updateViewport);
+    return () => window.removeEventListener("resize", updateViewport);
+  }, [canvas, canvasWidth, canvasHeight]);
 
   const getSavedProps = useCallback(
     (field) => savedPlaceholders.find((p) => p.field === field) || null,
@@ -658,6 +738,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
       img.frameOverlay.ownerImage = img;
       img.frameOverlay.followImage = img.frameOverlay.followImage ?? false;
     }
+    if (img.frameOverlay) img.frameOverlay.set({ selectable: false });
     setAdjustMode(true);
     canvas.setActiveObject(img);
     canvas.requestRenderAll();
@@ -678,6 +759,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     } else {
       if (img.clipPath) img.clipPath.absolutePositioned = true;
     }
+    if (img.frameOverlay) img.frameOverlay.set({ selectable: true });
     setAdjustMode(false);
     canvas.requestRenderAll();
   };
@@ -861,6 +943,8 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
               });
               img.customId = "templateBg";
               setTemplateImage(img);
+              setCanvasWidth(img.width);
+              setCanvasHeight(img.height);
             },
             { crossOrigin: "anonymous" }
           );
@@ -1661,12 +1745,15 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
 
       {/* CANVAS CENTER */}
       <main
-        className={`absolute top-14 bottom-10 right-0 overflow-auto flex items-center justify-center p-3 md:p-4 ${
+        className={`absolute top-14 bottom-10 right-0 overflow-hidden flex items-center justify-center p-3 md:p-4 ${
           isSidebarOpen ? "left-0 md:left-80" : "left-0 md:left-80"
         }`}
       >
-        <div className="relative shadow-lg border bg-white" style={{ width: "400px", height: "550px" }}>
-          <CanvasArea ref={canvasRef} width={400} height={550} />
+        <div
+          className="relative shadow-lg border bg-white overflow-hidden w-full"
+          style={{ height: "90vh" }}
+        >
+          <CanvasArea ref={canvasRef} width={canvasWidth} height={canvasHeight} />
         </div>
 
         {cropSrc && (

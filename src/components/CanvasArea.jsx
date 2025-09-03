@@ -17,7 +17,7 @@ const CanvasArea = forwardRef(({ width, height }, ref) => {
   }, [width, height, ref]);
 
   return (
-    <div className="bg-white shadow border">
+    <div className="bg-white shadow border w-full h-full">
       <canvas id="main-canvas" />
     </div>
   );

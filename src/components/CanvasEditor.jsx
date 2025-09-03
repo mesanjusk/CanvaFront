@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, forwardRef } from "react";
+import React, { useEffect, useState, useCallback, forwardRef, useRef } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import { useCanvasEditor } from "../hooks/useCanvasEditor";
 import { useCanvasTools } from "../hooks/useCanvasTools";
@@ -304,10 +304,10 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
   const [admissions, setAdmissions] = useState([]);
   const [templateImage, setTemplateImage] = useState(null);
   const [activeStudentPhoto, setActiveStudentPhoto] = useState(null);
-  const studentObjectsRef = React.useRef([]);
-  const bgRef = React.useRef(null);
-  const logoRef = React.useRef(null);
-  const signatureRef = React.useRef(null);
+  const studentObjectsRef = useRef([]);
+  const bgRef = useRef(null);
+  const logoRef = useRef(null);
+  const signatureRef = useRef(null);
   
   const {
     canvasRef,

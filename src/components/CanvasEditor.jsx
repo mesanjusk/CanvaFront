@@ -36,6 +36,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Images,
+  FileDown,
 } from "lucide-react";
 import IconButton from "./IconButton";
 import CanvasArea from "./CanvasArea";
@@ -106,8 +107,8 @@ const buildClipShape = (shapeType, w, h, options = {}) => {
       return new fabric.Polygon(
         [
           { x: 0, y: -h / 2 },
-        { x: -w / 2, y: h / 2 },
-        { x: w / 2, y: h / 2 },
+          { x: -w / 2, y: h / 2 },
+          { x: w / 2, y: h / 2 },
         ],
         { originX: "center", originY: "center" }
       );
@@ -409,6 +410,12 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
   const [frameCorner, setFrameCorner] = useState(24);
   const [adjustMode, setAdjustMode] = useState(false);
 
+  // Collapsible sections
+  const [showFilters, setShowFilters] = useState(true);
+  const [showFrames, setShowFrames] = useState(true);
+  const [showSelectedSection, setShowSelectedSection] = useState(true);
+  const [showImageTools, setShowImageTools] = useState(true);
+
   const studentObjectsRef = useRef([]);
   const bgRef = useRef(null);
   const logoRef = useRef(null);
@@ -435,7 +442,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     undo,
     redo,
     duplicateObject,
-    downloadPDF,
+    downloadPDF,       // existing single-page exporter
     downloadHighRes,
     multipleSelected,
     saveHistory,
@@ -700,14 +707,13 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
   const handleStudentSelect = (uuid) => {
     const student = filteredStudents.find((s) => s.uuid === uuid);
     setSelectedStudent(student || null);
-    // if bulk mode not enabled, keep single; if bulk enabled we will sync via carousel index
   };
 
   useEffect(() => {
     const fetchInstitute = async () => {
       try {
         const user = getStoredUser();
-        const institute_uuid = user?.institute_uuid || getStoredInstituteUUID();
+               const institute_uuid = user?.institute_uuid || getStoredInstituteUUID();
         if (institute_uuid) {
           const res = await axios.get(
             `https://canvaback.onrender.com/api/institute/${institute_uuid}`
@@ -1269,6 +1275,8 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
   };
 
   /* ============================== Downloads =============================== */
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
   const downloadCurrentPNG = () => {
     const current = bulkMode
       ? filteredStudents.find((s) => s?.uuid === bulkList[bulkIndex]) || selectedStudent
@@ -1288,20 +1296,64 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     toast("Starting bulk export…");
     for (let i = 0; i < bulkList.length; i++) {
       gotoIndex(i);
-      // allow render settle
-      // eslint-disable-next-line no-await-in-loop
-      await new Promise((r) => setTimeout(r, 350));
+      await sleep(350);
       const st = filteredStudents.find((s) => s.uuid === bulkList[i]);
       const name =
         st?.firstName || st?.lastName
           ? `${(st?.firstName || "").trim()}_${(st?.lastName || "").trim()}`
           : `canvas_${i + 1}`;
       downloadHighRes?.(tplSize.w, tplSize.h, `${name}.png`);
-      // small pacing between downloads
-      // eslint-disable-next-line no-await-in-loop
-      await new Promise((r) => setTimeout(r, 300));
+      await sleep(300);
     }
     toast.success("Bulk export complete.");
+  };
+
+  // NEW: Bulk multi-page PDF
+  const downloadBulkPDF = async () => {
+    if (!bulkMode || !bulkList.length) {
+      toast.error("Enable Bulk mode with students filtered");
+      return;
+    }
+    try {
+      // dynamic import; same dep your single-page PDF likely uses
+      const { jsPDF } = await import("jspdf");
+      const pdf = new jsPDF({
+        orientation: "p",
+        unit: "px",
+        format: [tplSize.w, tplSize.h],
+        compress: true,
+      });
+
+      toast("Creating PDF…");
+      // ensure no active selection outlines
+      canvas.discardActiveObject();
+      canvas.requestRenderAll();
+
+      for (let i = 0; i < bulkList.length; i++) {
+        gotoIndex(i);
+        // Allow render settle
+        await sleep(350);
+        canvas.discardActiveObject();
+        canvas.requestRenderAll();
+
+        // export current canvas page
+        const dataUrl = canvas.toDataURL({
+          format: "png",
+          enableRetinaScaling: true,
+          multiplier: 1,
+        });
+
+        if (i > 0) pdf.addPage([tplSize.w, tplSize.h], "p");
+        pdf.addImage(dataUrl, "PNG", 0, 0, tplSize.w, tplSize.h);
+      }
+
+      const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+      pdf.save(`Bulk_${tplSize.w}x${tplSize.h}_${ts}.pdf`);
+      toast.success("PDF ready.");
+    } catch (err) {
+      console.error(err);
+      toast.error("PDF export failed.");
+    }
   };
 
   /* ================================= UI =================================== */
@@ -1453,14 +1505,25 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
               <Download size={18} />
             </button>
 
-            {/* Bulk download */}
+            {/* Bulk download PNGs */}
             <button
-              title="Download All (Bulk)"
+              title="Download All (PNGs)"
               onClick={downloadBulkPNGs}
               className="hidden sm:flex items-center gap-1 px-3 py-2 rounded-full bg-indigo-600 text-white shadow hover:bg-indigo-700 text-sm"
             >
               <Images size={16} /> Download All
             </button>
+
+            {/* NEW: Bulk multi-page PDF */}
+            {bulkMode && (
+              <button
+                title="Download PDF (All)"
+                onClick={downloadBulkPDF}
+                className="hidden sm:flex items-center gap-1 px-3 py-2 rounded-full bg-purple-600 text-white shadow hover:bg-purple-700 text-sm"
+              >
+                <FileDown size={16} /> Download PDF (All)
+              </button>
+            )}
 
             {/* Save template layout */}
             <button
@@ -1489,310 +1552,345 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
           isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         }`}
       >
-        {/* Filters */}
-        <div className="p-3 border-b">
-          <div className="text-sm font-semibold mb-2">Filters</div>
-          <label className="block text-xs mb-1">Course</label>
-          <select
-            className="w-full border rounded px-2 py-1 mb-2"
-            value={selectedCourse}
-            onChange={(e) => setSelectedCourse(e.target.value)}
+        {/* Filters (collapsible) */}
+        <div className="border-b">
+          <button
+            className="w-full text-left p-3 text-sm font-semibold"
+            onClick={() => setShowFilters((v) => !v)}
           >
-            <option value="">Select course</option>
-            {courses.map((c) => (
-              <option key={c._id} value={c.Course_uuid}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-
-          <label className="block text-xs mb-1">Batch</label>
-          <select
-            className="w-full border rounded px-2 py-1 mb-2"
-            value={selectedBatch}
-            onChange={(e) => setSelectedBatch(e.target.value)}
-          >
-            <option value="">Select batch</option>
-            {batches.map((b) => (
-              <option key={b._id} value={b.name}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-
-          <label className="block text-xs mb-1">Student</label>
-          <select
-            className="w-full border rounded px-2 py-1"
-            onChange={(e) => handleStudentSelect(e.target.value)}
-            value={selectedStudent?.uuid || ""}
-            disabled={bulkMode}
-          >
-            <option value="">Select a student</option>
-            {filteredStudents.map((s) => (
-              <option key={s.uuid} value={s.uuid}>
-                {s.firstName} {s.lastName}
-              </option>
-            ))}
-          </select>
-
-          {/* Bulk info */}
-          <div className="text-[11px] text-gray-500 mt-2">
-            Bulk mode uses the filtered list above. Use **Prev/Next** or swipe on mobile.
-          </div>
-        </div>
-
-        {/* Frames */}
-        <div className="p-3 border-b">
-          <div className="text-sm font-semibold mb-2">Add Frame</div>
-          <div className="grid grid-cols-4 gap-2">
-            <IconButton title="Rectangle Frame" onClick={() => addFrameSlot("rect")}><Square size={18} /></IconButton>
-            <IconButton title="Rounded Frame" onClick={() => addFrameSlot("rounded")}><Square size={18} /></IconButton>
-            <IconButton title="Circle Frame" onClick={() => addFrameSlot("circle")}><Circle size={18} /></IconButton>
-            <IconButton title="Triangle Frame" onClick={() => addFrameSlot("triangle")}><Triangle size={18} /></IconButton>
-            <IconButton title="Hexagon Frame" onClick={() => addFrameSlot("hexagon")}><Hexagon size={18} /></IconButton>
-            <IconButton title="Star Frame" onClick={() => addFrameSlot("star")}><Star size={18} /></IconButton>
-            <IconButton title="Heart Frame" onClick={() => addFrameSlot("heart")}><Heart size={18} /></IconButton>
-          </div>
-          <div className="text-[11px] text-gray-500 mt-2">
-            Tip: Drag an image over a dashed frame to snap & mask it. Double-click an image to adjust inside the frame.
-          </div>
-        </div>
-
-        {/* Selected object */}
-        {activeObj && (
-          <div className="p-3 border-b">
-            <div className="text-sm font-semibold mb-2">Selected Object</div>
-            <div className="flex flex-wrap gap-2">
-              <IconButton onClick={cropImage} title="Crop"><Crop size={18} /></IconButton>
-
-              <IconButton
-                onClick={() => {
-                  const obj = activeObj;
-                  if (!obj) return;
-                  if (obj.type === "image" && obj.frameOverlay) {
-                    removeMaskAndFrame(canvas, obj, true);
-                    canvas.remove(obj);
-                  } else {
-                    canvas.remove(obj);
-                  }
-                  setActiveObj(null);
-                  setActiveStudentPhoto(null);
-                  saveHistory();
-                }}
-                title="Delete"
+            Filters
+          </button>
+          {showFilters && (
+            <div className="px-3 pb-3">
+              <label className="block text-xs mb-1">Course</label>
+              <select
+                className="w-full border rounded px-2 py-1 mb-2"
+                value={selectedCourse}
+                onChange={(e) => setSelectedCourse(e.target.value)}
               >
-                <Trash2 size={18} />
-              </IconButton>
+                <option value="">Select course</option>
+                {courses.map((c) => (
+                  <option key={c._id} value={c.Course_uuid}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
 
-              <IconButton
-                onClick={() => {
-                  const locked = !!activeObj.lockMovementX;
-                  activeObj.set({
-                    lockMovementX: !locked,
-                    lockMovementY: !locked,
-                    lockScalingX: !locked,
-                    lockScalingY: !locked,
-                    lockRotation: !locked,
-                    hasControls: locked,
-                  });
-                  canvas.renderAll();
-                }}
-                title="Lock/Unlock"
+              <label className="block text-xs mb-1">Batch</label>
+              <select
+                className="w-full border rounded px-2 py-1 mb-2"
+                value={selectedBatch}
+                onChange={(e) => setSelectedBatch(e.target.value)}
               >
-                {activeObj?.lockMovementX ? <Unlock size={18} /> : <Lock size={18} />}
-              </IconButton>
+                <option value="">Select batch</option>
+                {batches.map((b) => (
+                  <option key={b._id} value={b.name}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
 
-              {/* Extract image from frame */}
-              {activeObj?.type === "image" && activeObj?.frameOverlay && (
-                <IconButton onClick={extractActiveImage} title="Extract Image (remove frame)">
-                  <Move size={18} />
-                </IconButton>
-              )}
+              <label className="block text-xs mb-1">Student</label>
+              <select
+                className="w-full border rounded px-2 py-1"
+                onChange={(e) => handleStudentSelect(e.target.value)}
+                value={selectedStudent?.uuid || ""}
+                disabled={bulkMode}
+              >
+                <option value="">Select a student</option>
+                {filteredStudents.map((s) => (
+                  <option key={s.uuid} value={s.uuid}>
+                    {s.firstName} {s.lastName}
+                  </option>
+                ))}
+              </select>
+
+              <div className="text-[11px] text-gray-500 mt-2">
+                Bulk mode uses the filtered list above. Use Prev/Next or swipe on mobile.
+              </div>
             </div>
+          )}
+        </div>
 
-            {/* Student photo quick zooms */}
-            {activeStudentPhoto && (
-              <Stack direction="row" spacing={1} justifyContent="start" className="mt-3">
-                <Button
-                  variant="contained"
-                  size="small"
-                  onClick={() =>
-                    setImageZoom(
-                      activeStudentPhoto,
-                      (activeStudentPhoto.scaleX || 1) * 1.1
-                    )
-                  }
-                >
-                  Zoom In
-                </Button>
-                <Button
-                  variant="contained"
-                  size="small"
-                  onClick={() =>
-                    setImageZoom(
-                      activeStudentPhoto,
-                      (activeStudentPhoto.scaleX || 1) * 0.9
-                    )
-                  }
-                >
-                  Zoom Out
-                </Button>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={() => {
-                    const box = getOverlayBox(activeStudentPhoto);
-                    if (!box) return;
-                    const scale = Math.min(
-                      box.w / activeStudentPhoto.width,
-                      box.h / activeStudentPhoto.height
-                    );
-                    activeStudentPhoto.set({
-                      scaleX: scale,
-                      scaleY: scale,
-                      left: box.cx,
-                      top: box.cy,
-                      originX: "center",
-                      originY: "center",
-                    });
-                    canvas.requestRenderAll();
-                  }}
-                >
-                  Reset Fit
-                </Button>
-              </Stack>
+        {/* Frames (collapsible) */}
+        <div className="border-b">
+          <button
+            className="w-full text-left p-3 text-sm font-semibold"
+            onClick={() => setShowFrames((v) => !v)}
+          >
+            Add Frame
+          </button>
+          {showFrames && (
+            <div className="px-3 pb-3">
+              <div className="grid grid-cols-4 gap-2">
+                <IconButton title="Rectangle Frame" onClick={() => addFrameSlot("rect")}><Square size={18} /></IconButton>
+                <IconButton title="Rounded Frame" onClick={() => addFrameSlot("rounded")}><Square size={18} /></IconButton>
+                <IconButton title="Circle Frame" onClick={() => addFrameSlot("circle")}><Circle size={18} /></IconButton>
+                <IconButton title="Triangle Frame" onClick={() => addFrameSlot("triangle")}><Triangle size={18} /></IconButton>
+                <IconButton title="Hexagon Frame" onClick={() => addFrameSlot("hexagon")}><Hexagon size={18} /></IconButton>
+                <IconButton title="Star Frame" onClick={() => addFrameSlot("star")}><Star size={18} /></IconButton>
+                <IconButton title="Heart Frame" onClick={() => addFrameSlot("heart")}><Heart size={18} /></IconButton>
+              </div>
+              <div className="text-[11px] text-gray-500 mt-2">
+                Tip: Drag an image over a dashed frame to snap & mask it. Double-click an image to adjust inside the frame.
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Selected object (collapsible) */}
+        {activeObj && (
+          <div className="border-b">
+            <button
+              className="w-full text-left p-3 text-sm font-semibold"
+              onClick={() => setShowSelectedSection((v) => !v)}
+            >
+              Selected Object
+            </button>
+            {showSelectedSection && (
+              <div className="px-3 pb-3">
+                <div className="flex flex-wrap gap-2">
+                  <IconButton onClick={cropImage} title="Crop"><Crop size={18} /></IconButton>
+
+                  <IconButton
+                    onClick={() => {
+                      const obj = activeObj;
+                      if (!obj) return;
+                      if (obj.type === "image" && obj.frameOverlay) {
+                        removeMaskAndFrame(canvas, obj, true);
+                        canvas.remove(obj);
+                      } else {
+                        canvas.remove(obj);
+                      }
+                      setActiveObj(null);
+                      setActiveStudentPhoto(null);
+                      saveHistory();
+                    }}
+                    title="Delete"
+                  >
+                    <Trash2 size={18} />
+                  </IconButton>
+
+                  <IconButton
+                    onClick={() => {
+                      const locked = !!activeObj.lockMovementX;
+                      activeObj.set({
+                        lockMovementX: !locked,
+                        lockMovementY: !locked,
+                        lockScalingX: !locked,
+                        lockScalingY: !locked,
+                        lockRotation: !locked,
+                        hasControls: locked,
+                      });
+                      canvas.renderAll();
+                    }}
+                    title="Lock/Unlock"
+                  >
+                    {activeObj?.lockMovementX ? <Unlock size={18} /> : <Lock size={18} />}
+                  </IconButton>
+
+                  {/* Extract image from frame */}
+                  {activeObj?.type === "image" && activeObj?.frameOverlay && (
+                    <IconButton onClick={extractActiveImage} title="Extract Image (remove frame)">
+                      <Move size={18} />
+                    </IconButton>
+                  )}
+                </div>
+
+                {/* Student photo quick zooms */}
+                {activeStudentPhoto && (
+                  <Stack direction="row" spacing={1} justifyContent="start" className="mt-3">
+                    <Button
+                      variant="contained"
+                      size="small"
+                      onClick={() =>
+                        setImageZoom(
+                          activeStudentPhoto,
+                          (activeStudentPhoto.scaleX || 1) * 1.1
+                        )
+                      }
+                    >
+                      Zoom In
+                    </Button>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      onClick={() =>
+                        setImageZoom(
+                          activeStudentPhoto,
+                          (activeStudentPhoto.scaleX || 1) * 0.9
+                        )
+                      }
+                    >
+                      Zoom Out
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => {
+                        const box = getOverlayBox(activeStudentPhoto);
+                        if (!box) return;
+                        const scale = Math.min(
+                          box.w / activeStudentPhoto.width,
+                          box.h / activeStudentPhoto.height
+                        );
+                        activeStudentPhoto.set({
+                          scaleX: scale,
+                          scaleY: scale,
+                          left: box.cx,
+                          top: box.cy,
+                          originX: "center",
+                          originY: "center",
+                        });
+                        canvas.requestRenderAll();
+                      }}
+                    >
+                      Reset Fit
+                    </Button>
+                  </Stack>
+                )}
+              </div>
             )}
           </div>
         )}
 
-        {/* Image tools */}
+        {/* Image tools (collapsible) */}
         {activeObj && activeObj.type === "image" && (
-          <div className="p-3">
-            <div className="text-sm font-semibold mb-2">Mask & Frame</div>
-            <div className="grid grid-cols-4 gap-2 mb-3">
-              {["rect","rounded","circle","triangle","hexagon","star","heart"].map((shape) => {
-                const Icon = {rect:Square, rounded:Square, circle:Circle, triangle:Triangle, hexagon:Hexagon, star:Star, heart:Heart}[shape];
-                return (
-                  <IconButton key={shape} title={shape} onClick={() => {
-                    setFrameShape(shape);
-                    applyMaskAndFrame(canvas, activeObj, shape, {
-                      stroke: frameBorder, strokeWidth: frameWidth, rx: frameCorner,
-                      absolute: adjustMode, followImage: !adjustMode
-                    });
-                    if (adjustMode) fitImageToFrame(activeObj, "cover");
-                    saveHistory();
-                  }}>
-                    <Icon size={18} />
+          <div className="border-b">
+            <button
+              className="w-full text-left p-3 text-sm font-semibold"
+              onClick={() => setShowImageTools((v) => !v)}
+            >
+              Mask & Frame / Adjust
+            </button>
+            {showImageTools && (
+              <div className="px-3 pb-3">
+                <div className="grid grid-cols-4 gap-2 mb-3">
+                  {["rect","rounded","circle","triangle","hexagon","star","heart"].map((shape) => {
+                    const Icon = {rect:Square, rounded:Square, circle:Circle, triangle:Triangle, hexagon:Hexagon, star:Star, heart:Heart}[shape];
+                    return (
+                      <IconButton key={shape} title={shape} onClick={() => {
+                        setFrameShape(shape);
+                        applyMaskAndFrame(canvas, activeObj, shape, {
+                          stroke: frameBorder, strokeWidth: frameWidth, rx: frameCorner,
+                          absolute: adjustMode, followImage: !adjustMode
+                        });
+                        if (adjustMode) fitImageToFrame(activeObj, "cover");
+                        saveHistory();
+                      }}>
+                        <Icon size={18} />
+                      </IconButton>
+                    );
+                  })}
+                  <IconButton title="Remove Frame (keep slot)" onClick={() => { removeMaskAndFrame(canvas, activeObj, true); saveHistory(); }}>
+                    <RefreshCw size={18} />
                   </IconButton>
-                );
-              })}
-              <IconButton title="Remove Frame (keep slot)" onClick={() => { removeMaskAndFrame(canvas, activeObj, true); saveHistory(); }}>
-                <RefreshCw size={18} />
-              </IconButton>
-            </div>
+                </div>
 
-            {frameShape === "rounded" && (
-              <div className="mb-2">
-                <label className="block text-xs mb-1">Corner Radius</label>
-                <Slider
-                  min={0}
-                  max={Math.floor(Math.min(activeObj?.width || 100, activeObj?.height || 100) / 2)}
-                  value={frameCorner}
-                  onChange={(_, v) => {
-                    const val = Array.isArray(v) ? v[0] : v;
-                    setFrameCorner(val);
-                    if (activeObj) {
-                      applyMaskAndFrame(canvas, activeObj, "rounded", {
-                        stroke: frameBorder, strokeWidth: frameWidth, rx: val, absolute: adjustMode, followImage: !adjustMode
-                      });
-                      if (adjustMode) fitImageToFrame(activeObj, "cover");
-                    }
-                  }}
-                />
+                {frameShape === "rounded" && (
+                  <div className="mb-2">
+                    <label className="block text-xs mb-1">Corner Radius</label>
+                    <Slider
+                      min={0}
+                      max={Math.floor(Math.min(activeObj?.width || 100, activeObj?.height || 100) / 2)}
+                      value={frameCorner}
+                      onChange={(_, v) => {
+                        const val = Array.isArray(v) ? v[0] : v;
+                        setFrameCorner(val);
+                        if (activeObj) {
+                          applyMaskAndFrame(canvas, activeObj, "rounded", {
+                            stroke: frameBorder, strokeWidth: frameWidth, rx: val, absolute: adjustMode, followImage: !adjustMode
+                          });
+                          if (adjustMode) fitImageToFrame(activeObj, "cover");
+                        }
+                      }}
+                    />
+                  </div>
+                )}
+
+                <div className="mb-2">
+                  <label className="block text-xs mb-1">Border Width</label>
+                  <Slider
+                    min={0}
+                    max={30}
+                    value={frameWidth}
+                    onChange={(_, v) => {
+                      const val = Array.isArray(v) ? v[0] : v;
+                      setFrameWidth(val);
+                      if (activeObj?.frameOverlay) {
+                        activeObj.frameOverlay.set({ strokeWidth: val });
+                        canvas.requestRenderAll();
+                      }
+                    }}
+                  />
+                </div>
+
+                <div className="mb-2">
+                  <label className="block text-xs mb-1">Border Color</label>
+                  <input
+                    type="color"
+                    value={frameBorder}
+                    onChange={(e) => {
+                      const col = e.target.value;
+                      setFrameBorder(col);
+                      if (activeObj?.frameOverlay) {
+                        activeObj.frameOverlay.set({ stroke: col });
+                        canvas.requestRenderAll();
+                      }
+                    }}
+                  />
+                </div>
+
+                {/* Adjust Mode */}
+                <div className="mt-4 p-3 border rounded">
+                  <div className="text-sm font-semibold mb-2">Adjust Image in Frame</div>
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    {!adjustMode ? (
+                      <Button size="small" variant="contained" onClick={() => enterAdjustMode(activeObj)}>
+                        Enter Adjust
+                      </Button>
+                    ) : (
+                      <Button size="small" color="secondary" variant="outlined" onClick={() => exitAdjustMode(activeObj)}>
+                        Done
+                      </Button>
+                    )}
+                    <Button size="small" variant="outlined" onClick={() => fitImageToFrame(activeObj, "contain")} disabled={!adjustMode}>
+                      Fit
+                    </Button>
+                    <Button size="small" variant="outlined" onClick={() => fitImageToFrame(activeObj, "cover")} disabled={!adjustMode}>
+                      Fill
+                    </Button>
+                    <Button size="small" variant="outlined" onClick={() => centerImageInFrame(activeObj)} disabled={!adjustMode}>
+                      Center
+                    </Button>
+                  </div>
+                  <div className="mb-2">
+                    <label className="block text-xs mb-1">Zoom</label>
+                    <Slider
+                      min={0.1}
+                      max={5}
+                      step={0.01}
+                      value={Number((activeObj?.scaleX || 1).toFixed(2))}
+                      onChange={(_, v) => setImageZoom(activeObj, Array.isArray(v) ? v[0] : v)}
+                      disabled={!adjustMode}
+                    />
+                  </div>
+                  <div className="text-[11px] text-gray-500 mt-2">
+                    Double-click an image to enter Adjust. Drag to pan under the mask. Use Fit/Fill/Center/Zoom.
+                  </div>
+                  <div className="mt-3">
+                    <Button size="small" variant="outlined" onClick={replaceActiveImage}>
+                      Replace Image
+                    </Button>
+                    {activeObj?.frameOverlay && (
+                      <Button size="small" variant="text" className="ml-2" onClick={extractActiveImage}>
+                        Extract (remove frame)
+                      </Button>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
-
-            <div className="mb-2">
-              <label className="block text-xs mb-1">Border Width</label>
-              <Slider
-                min={0}
-                max={30}
-                value={frameWidth}
-                onChange={(_, v) => {
-                  const val = Array.isArray(v) ? v[0] : v;
-                  setFrameWidth(val);
-                  if (activeObj?.frameOverlay) {
-                    activeObj.frameOverlay.set({ strokeWidth: val });
-                    canvas.requestRenderAll();
-                  }
-                }}
-              />
-            </div>
-
-            <div className="mb-2">
-              <label className="block text-xs mb-1">Border Color</label>
-              <input
-                type="color"
-                value={frameBorder}
-                onChange={(e) => {
-                  const col = e.target.value;
-                  setFrameBorder(col);
-                  if (activeObj?.frameOverlay) {
-                    activeObj.frameOverlay.set({ stroke: col });
-                    canvas.requestRenderAll();
-                  }
-                }}
-              />
-            </div>
-
-            {/* Adjust Mode */}
-            <div className="mt-4 p-3 border rounded">
-              <div className="text-sm font-semibold mb-2">Adjust Image in Frame</div>
-              <div className="flex flex-wrap items-center gap-2 mb-2">
-                {!adjustMode ? (
-                  <Button size="small" variant="contained" onClick={() => enterAdjustMode(activeObj)}>
-                    Enter Adjust
-                  </Button>
-                ) : (
-                  <Button size="small" color="secondary" variant="outlined" onClick={() => exitAdjustMode(activeObj)}>
-                    Done
-                  </Button>
-                )}
-                <Button size="small" variant="outlined" onClick={() => fitImageToFrame(activeObj, "contain")} disabled={!adjustMode}>
-                  Fit
-                </Button>
-                <Button size="small" variant="outlined" onClick={() => fitImageToFrame(activeObj, "cover")} disabled={!adjustMode}>
-                  Fill
-                </Button>
-                <Button size="small" variant="outlined" onClick={() => centerImageInFrame(activeObj)} disabled={!adjustMode}>
-                  Center
-                </Button>
-              </div>
-              <div className="mb-2">
-                <label className="block text-xs mb-1">Zoom</label>
-                <Slider
-                  min={0.1}
-                  max={5}
-                  step={0.01}
-                  value={Number((activeObj?.scaleX || 1).toFixed(2))}
-                  onChange={(_, v) => setImageZoom(activeObj, Array.isArray(v) ? v[0] : v)}
-                  disabled={!adjustMode}
-                />
-              </div>
-              <div className="text-[11px] text-gray-500 mt-2">
-                Double-click an image to enter Adjust. Drag to pan under the mask. Use Fit/Fill/Center/Zoom.
-              </div>
-              <div className="mt-3">
-                <Button size="small" variant="outlined" onClick={replaceActiveImage}>
-                  Replace Image
-                </Button>
-                {activeObj?.frameOverlay && (
-                  <Button size="small" variant="text" className="ml-2" onClick={extractActiveImage}>
-                    Extract (remove frame)
-                  </Button>
-                )}
-              </div>
-            </div>
           </div>
         )}
       </aside>

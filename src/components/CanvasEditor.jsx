@@ -197,6 +197,7 @@ const applyMaskAndFrame = (canvas, imageObj, shapeType, options) => {
 
   // Build overlay
   const overlay = buildOverlayShape(shapeType, w, h, { rx, stroke, strokeWidth, dashed: false });
+  overlay.set({ selectable: true, evented: true });
   overlay.followImage = followImage;
   overlay.isFrameOverlay = true;
   overlay.isFrameSlot = false;
@@ -216,7 +217,21 @@ const applyMaskAndFrame = (canvas, imageObj, shapeType, options) => {
     overlay.setCoords();
     moveOverlayAboveImage(canvas, imageObj, overlay);
   };
-
+const syncImageGeom = () => {
+    const img = overlay.ownerImage;
+    if (!img) return;
+    img.set({
+      left: overlay.left,
+      top: overlay.top,
+      scaleX: overlay.scaleX,
+      scaleY: overlay.scaleY,
+      angle: overlay.angle,
+      originX: overlay.originX,
+      originY: overlay.originY,
+    });
+    img.setCoords();
+    moveOverlayAboveImage(canvas, img, overlay);
+  };
   if (!absolute) syncOverlayGeom();
   else {
     overlay.set({
@@ -235,6 +250,12 @@ const applyMaskAndFrame = (canvas, imageObj, shapeType, options) => {
   imageObj.frameOverlay = overlay;
   moveOverlayAboveImage(canvas, imageObj, overlay);
 
+ if (followImage) {
+    overlay.on("moving", syncImageGeom);
+    overlay.on("scaling", syncImageGeom);
+    overlay.on("rotating", syncImageGeom);
+  }
+  
   if (!absolute && followImage) {
     const onMove = () => syncOverlayGeom();
     const onScale = () => syncOverlayGeom();

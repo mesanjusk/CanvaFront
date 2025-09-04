@@ -25,6 +25,7 @@ import {
   Star,
   Heart,
   Check,
+  Move,
 } from "lucide-react";
 import IconButton from "./IconButton";
 import CanvasArea from "./CanvasArea";
@@ -33,7 +34,7 @@ import BottomToolbar from "./BottomToolbar";
 import UndoRedoControls from "./UndoRedoControls";
 
 /* =============================================================================
-   Frame + Adjust helpers  (unchanged structural logic)
+   Shapes & helpers
 ============================================================================= */
 const buildRegularPolygon = (sides, radius) => {
   const pts = [];
@@ -65,6 +66,7 @@ const buildHeartPath = (w, h) => {
   heart.set({ scaleX: w / 100, scaleY: h / 90 });
   return heart;
 };
+
 const buildClipShape = (shapeType, w, h, options = {}) => {
   const { rx = Math.min(w, h) * 0.12 } = options;
   switch (shapeType) {
@@ -95,6 +97,7 @@ const buildClipShape = (shapeType, w, h, options = {}) => {
       return new fabric.Rect({ width: w, height: h, originX: "center", originY: "center" });
   }
 };
+
 const buildOverlayShape = (shapeType, w, h, { rx, stroke, strokeWidth, dashed = false }) => {
   let overlay;
   const common = {
@@ -137,24 +140,31 @@ const buildOverlayShape = (shapeType, w, h, { rx, stroke, strokeWidth, dashed = 
   }
   overlay.set({
     selectable: false,
-    evented: true,
-    hoverCursor: "pointer",
+    evented: false, // important: filled frames are frozen unless slot
+    hoverCursor: "default",
     excludeFromExport: false,
   });
   overlay.isFrameOverlay = false;
   overlay.isFrameSlot = !!dashed;
-  if (dashed) overlay.set({ strokeDashArray: [6, 4] });
+  if (dashed) overlay.set({ strokeDashArray: [6, 4], selectable: true, evented: true, hoverCursor: "move" });
   return overlay;
 };
+
 const moveOverlayAboveImage = (canvas, imageObj, overlay) => {
   const idx = canvas.getObjects().indexOf(imageObj);
   if (idx >= 0) canvas.moveTo(overlay, idx + 1);
 };
+
+/**
+ * Apply or re-apply mask + overlay.
+ * absolute=false, followImage=true  -> move whole unit together (default, like Canva normal mode)
+ * absolute=true,  followImage=false -> freeze frame, move image under it (Adjust mode)
+ */
 const applyMaskAndFrame = (canvas, imageObj, shapeType, options) => {
   const { stroke, strokeWidth, rx, absolute = false, followImage = true } = options || {};
   if (!imageObj || imageObj.type !== "image") return;
 
-  // remove prior overlay/handlers
+  // remove any previous overlay
   if (imageObj.frameOverlay && canvas) {
     imageObj.frameOverlay.ownerImage = null;
     canvas.remove(imageObj.frameOverlay);
@@ -186,21 +196,17 @@ const applyMaskAndFrame = (canvas, imageObj, shapeType, options) => {
 
   // overlay
   const overlay = buildOverlayShape(shapeType, w, h, { rx, stroke, strokeWidth, dashed: false });
-  overlay.set({ selectable: true, evented: true });
+  overlay.set({
+    selectable: false,
+    evented: false,
+    hoverCursor: "default",
+  });
   overlay.followImage = followImage;
   overlay.isFrameOverlay = true;
   overlay.isFrameSlot = false;
   overlay.ownerImage = imageObj;
 
-  // forward overlay selection to its image (prevents confusion)
-  overlay.on("selected", () => {
-    if (overlay.ownerImage) {
-      canvas.discardActiveObject();
-      canvas.setActiveObject(overlay.ownerImage);
-      canvas.requestRenderAll();
-    }
-  });
-
+  // keep overlay above
   const syncOverlayGeom = () => {
     overlay.set({
       left: imageObj.left,
@@ -248,11 +254,7 @@ const applyMaskAndFrame = (canvas, imageObj, shapeType, options) => {
   imageObj.frameOverlay = overlay;
   moveOverlayAboveImage(canvas, imageObj, overlay);
 
-  if (followImage) {
-    overlay.on("moving", syncImageGeom);
-    overlay.on("scaling", syncImageGeom);
-    overlay.on("rotating", syncImageGeom);
-  }
+  // When followImage=true (normal mode), moving/scaling image moves frame too.
   if (!absolute && followImage) {
     const onMove = () => syncOverlayGeom();
     const onScale = () => syncOverlayGeom();
@@ -278,6 +280,7 @@ const applyMaskAndFrame = (canvas, imageObj, shapeType, options) => {
 
   canvas.requestRenderAll();
 };
+
 const removeMaskAndFrame = (canvas, imageObj, keepSlot = false) => {
   if (!imageObj) return;
   imageObj.clipPath = undefined;
@@ -287,7 +290,7 @@ const removeMaskAndFrame = (canvas, imageObj, keepSlot = false) => {
       slot.isFrameOverlay = false;
       slot.isFrameSlot = true;
       slot.ownerImage = null;
-      slot.set({ selectable: true, evented: true, strokeDashArray: [6, 4] });
+      slot.set({ selectable: true, evented: true, strokeDashArray: [6, 4], hoverCursor: "move" });
     } else {
       canvas.remove(imageObj.frameOverlay);
     }
@@ -305,48 +308,33 @@ const removeMaskAndFrame = (canvas, imageObj, keepSlot = false) => {
 };
 
 /* =============================================================================
-   Main editor with Canva-like responsive preview
+   Main Editor
 ============================================================================= */
 const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false }) => {
   const { templateId: routeId } = useParams();
   const templateId = propTemplateId || routeId;
 
-  /** -------------------- Template-driven size (key part) ------------------- **/
-  const [tplSize, setTplSize] = useState({ w: 400, h: 550 }); // default
+  // template-driven size + responsive fit
+  const [tplSize, setTplSize] = useState({ w: 400, h: 550 });
   const [templateImage, setTemplateImage] = useState(null);
-
-  // viewport fitting
-  const viewportRef = useRef(null); // the gray center area
-  const stageRef = useRef(null); // fixed-size artboard wrapper we scale
+  const viewportRef = useRef(null);
+  const stageRef = useRef(null);
   const [scale, setScale] = useState(1);
 
-  // compute paddings (top bar 56px, bottom 56px, sidebars)
-  const sidebarWidth = 320; // md left panel ~80*4; we use 320 to match your CSS
-  const topBarH = hideHeader ? 0 : 56;
-  const bottomBarH = 56;
-
-  // responsive fit like Canva
   useLayoutEffect(() => {
     if (!viewportRef.current) return;
     const ro = new ResizeObserver(() => {
       const vp = viewportRef.current;
-      if (!vp) return;
-
-      // available area (subtract internal paddings if any)
       const availableW = vp.clientWidth;
       const availableH = vp.clientHeight;
-
-      const targetW = tplSize.w;
-      const targetH = tplSize.h;
-
-      const s = Math.min(availableW / targetW, availableH / targetH);
+      const s = Math.min(availableW / tplSize.w, availableH / tplSize.h);
       setScale(Number.isFinite(s) ? Math.max(0.05, Math.min(s, 3)) : 1);
     });
     ro.observe(viewportRef.current);
     return () => ro.disconnect();
   }, [tplSize.w, tplSize.h]);
 
-  /** ------------------------------ Data ----------------------------------- **/
+  // data
   const [students, setStudents] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [courses, setCourses] = useState([]);
@@ -358,7 +346,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
   const [activeStudentPhoto, setActiveStudentPhoto] = useState(null);
   const [selectedInstitute, setSelectedInstitute] = useState(null);
 
-  // UI state
+  // UI
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [frameShape, setFrameShape] = useState("rounded");
   const [frameBorder, setFrameBorder] = useState("#ffffff");
@@ -371,7 +359,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
   const logoRef = useRef(null);
   const signatureRef = useRef(null);
 
-  // hooks — now pass template-driven size
+  // hooks
   const {
     canvasRef,
     canvasWidth,
@@ -384,7 +372,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     addCircle,
     addImage,
     cropImage,
-    setCanvasSize, // << ensure your hook exposes this to resize Fabric canvas
+    setCanvasSize,
   } = useCanvasTools({ width: tplSize.w, height: tplSize.h });
 
   const {
@@ -406,7 +394,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     [savedPlaceholders]
   );
 
-  /** -------------------- Adjust helpers (unchanged) ------------------------ **/
+  /* ============================ Adjust helpers ============================ */
   const getOverlayBox = (img) => {
     const ov = img?.frameOverlay;
     if (!img || !ov) return null;
@@ -451,11 +439,14 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     img.setCoords();
     canvas.requestRenderAll();
   };
+
+  // Canva-like: Adjust mode freezes frame; image draggable/scalable inside
   const enterAdjustMode = (img) => {
     if (!img) return;
     const stroke = img.frameOverlay?.stroke ?? frameBorder;
     const strokeWidth = img.frameOverlay?.strokeWidth ?? frameWidth;
     const rx = frameCorner;
+
     const w = img.frameOverlay ? img.frameOverlay.getScaledWidth() : img.getScaledWidth();
     const h = img.frameOverlay ? img.frameOverlay.getScaledHeight() : img.getScaledHeight();
     const clip = buildClipShape(img.shape || frameShape, w, h, { rx });
@@ -468,6 +459,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
       angle: img.frameOverlay ? img.frameOverlay.angle : img.angle,
     });
     img.clipPath = clip;
+
     if (!img.frameOverlay) {
       applyMaskAndFrame(canvas, img, img.shape || frameShape, {
         stroke,
@@ -479,33 +471,57 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     } else {
       img.frameOverlay.isFrameOverlay = true;
       img.frameOverlay.ownerImage = img;
-      img.frameOverlay.followImage = img.frameOverlay.followImage ?? false;
+      img.frameOverlay.followImage = false; // freeze while adjusting
+      img.frameOverlay.set({ selectable: false, evented: false, hoverCursor: "default" });
     }
+
+    // Now image moves freely under mask
+    img.set({
+      lockMovementX: false,
+      lockMovementY: false,
+      lockScalingX: false,
+      lockScalingY: false,
+      lockRotation: false,
+      hasControls: true,
+      selectable: true,
+      evented: true,
+    });
+
     setAdjustMode(true);
     canvas.setActiveObject(img);
     canvas.requestRenderAll();
   };
+
   const exitAdjustMode = (img) => {
     if (!img) return;
     const stroke = img.frameOverlay?.stroke ?? frameBorder;
     const strokeWidth = img.frameOverlay?.strokeWidth ?? frameWidth;
     const rx = frameCorner;
-    if (img.frameOverlay?.followImage) {
-      applyMaskAndFrame(canvas, img, img.shape || frameShape, {
-        stroke,
-        strokeWidth,
-        rx,
-        absolute: false,
-        followImage: true,
-      });
-    } else {
-      if (img.clipPath) img.clipPath.absolutePositioned = true;
-    }
+
+    // Back to normal: overlay follows image (move whole unit)
+    applyMaskAndFrame(canvas, img, img.shape || frameShape, {
+      stroke,
+      strokeWidth,
+      rx,
+      absolute: false,
+      followImage: true,
+    });
+
+    // lock relative adjustments outside Adjust, but allow moving/scaling whole unit
+    img.set({
+      lockMovementX: false,
+      lockMovementY: false,
+      lockScalingX: false,
+      lockScalingY: false,
+      lockRotation: false,
+      hasControls: true,
+    });
+
     setAdjustMode(false);
     canvas.requestRenderAll();
   };
 
-  /** -------------------- Frames & snapping (unchanged) --------------------- **/
+  /* ====================== Frame slot creation & snapping =================== */
   const addFrameSlot = (shapeType) => {
     if (!canvas) return;
     const w = 240, h = 240;
@@ -522,12 +538,15 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
       originY: "center",
       selectable: true,
       evented: true,
+      hoverCursor: "move",
     });
     overlay.shapeType = shapeType;
     canvas.add(overlay);
     canvas.setActiveObject(overlay);
     canvas.requestRenderAll();
+    saveHistory();
   };
+
   const intersects = (a, b) => {
     const r1 = a.getBoundingRect(true, true);
     const r2 = b.getBoundingRect(true, true);
@@ -538,18 +557,21 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
       r2.top + r2.height < r1.top
     );
   };
+
+  // When dropped over a slot: bind, and allow moving the whole unit later
   const snapImageToNearestSlot = (img) => {
     if (!canvas) return;
     const slots = canvas.getObjects().filter((o) => o.isFrameSlot);
     if (!slots.length) return;
+
     const hit = slots.find((slot) => intersects(img, slot));
     if (!hit) return;
 
     hit.isFrameSlot = false;
     hit.isFrameOverlay = true;
     hit.ownerImage = img;
-    hit.followImage = false;
-    hit.set({ strokeDashArray: null, selectable: false, evented: true });
+    hit.followImage = true; // IMPORTANT: now frame follows image (unit moves)
+    hit.set({ strokeDashArray: null, selectable: false, evented: false, hoverCursor: "default" });
 
     const w = hit.getScaledWidth();
     const h = hit.getScaledHeight();
@@ -577,13 +599,16 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     img.frameOverlay = hit;
     moveOverlayAboveImage(canvas, img, hit);
 
-    setAdjustMode(true);
+    // Outside adjust: allow moving/scale the whole unit
+    exitAdjustMode(img);
+
+    setAdjustMode(false);
     canvas.setActiveObject(img);
     canvas.requestRenderAll();
     saveHistory();
   };
 
-  /** ---------------------- Data loading (same) ----------------------------- **/
+  /* ============================== Data loading ============================ */
   useEffect(() => {
     const fetchCoursesAndBatches = async () => {
       try {
@@ -599,12 +624,14 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     };
     fetchCoursesAndBatches();
   }, []);
+
   useEffect(() => {
     axios
       .get("https://canvaback.onrender.com/api/students")
       .then((res) => setStudents(res.data.data))
       .catch(() => {});
   }, []);
+
   useEffect(() => {
     if (!selectedCourse || !selectedBatch) {
       setFilteredStudents([]);
@@ -651,7 +678,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     fetchInstitute();
   }, []);
 
-  // Fetch template -> size + bg + placeholders
+  // Fetch template (size + bg + placeholders)
   useEffect(() => {
     if (!templateId) return;
     let cancelled = false;
@@ -664,11 +691,9 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
         if (cancelled) return;
 
         setSavedPlaceholders(res.data?.placeholders || []);
-
         const w = Number(res.data?.width) || 400;
         const h = Number(res.data?.height) || 550;
         setTplSize({ w, h });
-        // Resize Fabric canvas to template size
         setCanvasSize?.(w, h);
 
         if (res.data?.image) {
@@ -691,18 +716,14 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
         } else {
           setTemplateImage(null);
         }
-      } catch {
-        // continue without bg
-      }
+      } catch {}
     };
 
     fetchTemplate();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [templateId, setCanvasSize]);
 
-  /** -------------------- Render template + student ------------------------- **/
+  /* ==================== Render template + student objects ================== */
   useEffect(() => {
     if (!canvas) return;
 
@@ -717,7 +738,6 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     signatureRef.current = null;
 
     const load = async () => {
-      // background (template image scaled to canvas size)
       if (templateImage) {
         const bg = fabric.util.object.clone(templateImage);
         bg.scaleX = canvas.width / bg.width;
@@ -737,7 +757,6 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
         );
       };
 
-      // student name
       if (selectedStudent) {
         const savedName = getSavedProps("studentName");
         const nameText = new fabric.IText(
@@ -780,6 +799,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
           img.customId = "studentPhoto";
           img.field = "studentPhoto";
 
+          // Normal mode: overlay follows the image (move/scale unit)
           applyMaskAndFrame(canvas, img, savedShape, {
             stroke: frameBorder,
             strokeWidth: frameWidth,
@@ -788,12 +808,28 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
             followImage: true,
           });
 
+          // default selection allows moving/scaling entire unit
+          img.set({
+            lockMovementX: false,
+            lockMovementY: false,
+            lockScalingX: false,
+            lockScalingY: false,
+            lockRotation: false,
+            hasControls: true,
+            selectable: true,
+            evented: true,
+          });
+
           img.on("selected", () => {
             setActiveStudentPhoto(img);
+          });
+          img.on("deselected", () => setActiveStudentPhoto(null));
+
+          // Double-click to enter Adjust (move image inside mask)
+          img.on("mousedblclick", () => {
             enterAdjustMode(img);
             fitImageToFrame(img, "cover");
           });
-          img.on("deselected", () => setActiveStudentPhoto(null));
 
           canvas.add(img);
           studentObjectsRef.current.push(img);
@@ -865,22 +901,26 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     frameCorner,
   ]);
 
-  /** ------------------------ Canvas events -------------------------------- **/
+  /* ============================= Canvas events ============================ */
+  // Double-click via fabric events already attached to images; also global dblclick fallback
   useEffect(() => {
     if (!canvas) return;
     const onDbl = (e) => {
       const t = e.target;
       if (!t) return;
-      if (t.isFrameOverlay && t.ownerImage) {
+      if (t.type === "image") {
+        enterAdjustMode(t);
+        fitImageToFrame(t, "cover");
+      } else if (t.isFrameOverlay && t.ownerImage) {
         enterAdjustMode(t.ownerImage);
         canvas.setActiveObject(t.ownerImage);
-      } else if (t.type === "image") {
-        enterAdjustMode(t);
       }
     };
     canvas.on("mouse:dblclick", onDbl);
     return () => canvas.off("mouse:dblclick", onDbl);
   }, [canvas]);
+
+  // Snap image to frame slot on mouse up
   useEffect(() => {
     if (!canvas) return;
     const onUp = () => {
@@ -890,25 +930,57 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     canvas.on("mouse:up", onUp);
     return () => canvas.off("mouse:up", onUp);
   }, [canvas]);
+
+  // Save history on modifications so undo/redo works reliably
+  useEffect(() => {
+    if (!canvas) return;
+    const onModified = () => saveHistory();
+    const onAdded = () => saveHistory();
+    const onRemoved = () => saveHistory();
+    canvas.on("object:modified", onModified);
+    canvas.on("object:added", onAdded);
+    canvas.on("object:removed", onRemoved);
+    return () => {
+      canvas.off("object:modified", onModified);
+      canvas.off("object:added", onAdded);
+      canvas.off("object:removed", onRemoved);
+    };
+  }, [canvas, saveHistory]);
+
+  // Keyboard shortcuts: delete/backspace, undo/redo
   useEffect(() => {
     const onKey = (e) => {
-      if (!adjustMode || !canvas) return;
-      const obj = canvas.getActiveObject();
-      if (!obj || obj.type !== "image") return;
-      const step = e.shiftKey ? 10 : 2;
-      if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+      const cmd = e.metaKey || e.ctrlKey;
+
+      if (cmd && (e.key === "z" || e.key === "Z")) {
         e.preventDefault();
-        if (e.key === "ArrowUp") nudgeImage(obj, 0, -step);
-        if (e.key === "ArrowDown") nudgeImage(obj, 0, step);
-        if (e.key === "ArrowLeft") nudgeImage(obj, -step, 0);
-        if (e.key === "ArrowRight") nudgeImage(obj, step, 0);
+        if (e.shiftKey) redo();
+        else undo();
+        return;
+      }
+
+      if (e.key === "Delete" || e.key === "Backspace") {
+        const obj = canvas?.getActiveObject();
+        if (!obj) return;
+
+        // For masked images, delete should keep the slot
+        if (obj.type === "image" && obj.frameOverlay) {
+          removeMaskAndFrame(canvas, obj, true /* keepSlot */);
+          canvas.remove(obj);
+        } else {
+          canvas?.remove(obj);
+        }
+        setActiveObj(null);
+        setActiveStudentPhoto(null);
+        saveHistory();
+        e.preventDefault();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [adjustMode, canvas]);
+  }, [canvas, undo, redo, saveHistory, setActiveObj]);
 
-  /** ---------------------- Replace image ---------------------------------- **/
+  /* ============================ Replace / Extract ========================== */
   const replaceActiveImage = () => {
     if (!canvas) return;
     const obj = canvas.getActiveObject();
@@ -931,34 +1003,15 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
         obj.setSrc(
           ev.target.result,
           () => {
-            const followImage = obj.frameOverlay?.followImage ?? false;
-            const absolute = !followImage;
+            // normal mode after replace
             applyMaskAndFrame(canvas, obj, prevShape, {
               stroke,
               strokeWidth,
               rx: frameCorner,
-              absolute,
-              followImage,
+              absolute: false,
+              followImage: true,
             });
-            if (absolute && obj.frameOverlay) {
-              const w = obj.frameOverlay.getScaledWidth();
-              const h = obj.frameOverlay.getScaledHeight();
-              const clip = buildClipShape(prevShape, w, h, { rx: frameCorner });
-              clip.set({
-                absolutePositioned: true,
-                originX: "center",
-                originY: "center",
-                left: obj.frameOverlay.left,
-                top: obj.frameOverlay.top,
-                angle: obj.frameOverlay.angle || 0,
-              });
-              obj.clipPath = clip;
-              const sx = w / obj.width;
-              const sy = h / obj.height;
-              const scale = Math.max(sx, sy);
-              obj.set({ scaleX: scale, scaleY: scale, left: obj.frameOverlay.left, top: obj.frameOverlay.top });
-            }
-            setAdjustMode(true);
+            setAdjustMode(false);
             canvas.requestRenderAll();
             saveHistory();
           },
@@ -970,7 +1023,28 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     input.click();
   };
 
-  /** ---------------------- Save placeholders -------------------------------- **/
+  const extractActiveImage = () => {
+    if (!canvas) return;
+    const obj = canvas.getActiveObject();
+    if (!obj || obj.type !== "image") {
+      toast.error("Select an image to extract");
+      return;
+    }
+    // remove mask + overlay and keep the image
+    removeMaskAndFrame(canvas, obj, false /* no slot */);
+    obj.set({
+      lockMovementX: false,
+      lockMovementY: false,
+      lockScalingX: false,
+      lockScalingY: false,
+      lockRotation: false,
+      hasControls: true,
+    });
+    canvas.requestRenderAll();
+    saveHistory();
+  };
+
+  /* =========================== Save placeholders =========================== */
   const saveTemplateLayout = async () => {
     if (!canvas) return;
     const placeholders = canvas
@@ -1023,7 +1097,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     }
   };
 
-  /** ---------------------- Align & z-index helpers -------------------------- **/
+  /* ============================ Align & Z-index ============================ */
   const withActive = (fn) => () => {
     if (!canvas) return;
     const obj = canvas.getActiveObject();
@@ -1063,7 +1137,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     if (obj.type === "image" && obj.frameOverlay) moveOverlayAboveImage(canvas, obj, obj.frameOverlay);
   });
 
-  /** ---------------------- UI Layout (Canva-like fit) ---------------------- **/
+  /* ================================= UI =================================== */
   return (
     <div className="h-screen w-screen overflow-hidden bg-gray-100">
       <Toaster position="top-right" />
@@ -1092,6 +1166,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
                 <Circle size={20} />
               </button>
 
+              {/* Upload new image */}
               <input
                 type="file"
                 accept="image/*"
@@ -1109,11 +1184,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
                   }
                 }}
               />
-              <label
-                htmlFor="upload-image"
-                className="p-2 rounded bg-white shadow hover:bg-blue-100 cursor-pointer"
-                title="Upload Image"
-              >
+              <label htmlFor="upload-image" className="p-2 rounded bg-white shadow hover:bg-blue-100 cursor-pointer" title="Upload Image">
                 <ImageIcon size={20} />
               </label>
 
@@ -1206,10 +1277,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
           </select>
 
           <label className="block text-xs mb-1">Student</label>
-          <select
-            className="w-full border rounded px-2 py-1"
-            onChange={(e) => handleStudentSelect(e.target.value)}
-          >
+          <select className="w-full border rounded px-2 py-1" onChange={(e) => handleStudentSelect(e.target.value)}>
             <option value="">Select a student</option>
             {filteredStudents.map((s) => (
               <option key={s.uuid} value={s.uuid}>
@@ -1232,42 +1300,47 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
             <IconButton title="Heart Frame" onClick={() => addFrameSlot("heart")}><Heart size={18} /></IconButton>
           </div>
           <div className="text-[11px] text-gray-500 mt-2">
-            Tip: Drag an image over a dashed frame to snap & mask it. Double-click the frame or image to adjust.
+            Tip: Drag an image over a dashed frame to snap & mask it. Double-click an image to adjust inside the frame.
           </div>
         </div>
 
-        {/* Selected object tools */}
+        {/* Selected object */}
         {activeObj && (
           <div className="p-3 border-b">
             <div className="text-sm font-semibold mb-2">Selected Object</div>
             <div className="flex flex-wrap gap-2">
               <IconButton onClick={cropImage} title="Crop"><Crop size={18} /></IconButton>
+
+              {/* Delete uses keyboard too; this button mirrors that */}
               <IconButton
                 onClick={() => {
                   const obj = activeObj;
-                  canvas?.remove(obj);
+                  if (!obj) return;
                   if (obj.type === "image" && obj.frameOverlay) {
-                    obj.frameOverlay && (obj.frameOverlay.isFrameSlot = true, obj.frameOverlay.isFrameOverlay = false, obj.frameOverlay.ownerImage = null, obj.frameOverlay.set({ selectable: true, evented: true, strokeDashArray: [6,4] }));
-                    obj.frameOverlay = null;
+                    removeMaskAndFrame(canvas, obj, true);
+                    canvas.remove(obj);
+                  } else {
+                    canvas.remove(obj);
                   }
                   setActiveObj(null);
-                  if (adjustMode) setAdjustMode(false);
+                  setActiveStudentPhoto(null);
                   saveHistory();
                 }}
                 title="Delete"
               >
                 <Trash2 size={18} />
               </IconButton>
+
               <IconButton
                 onClick={() => {
                   const locked = !!activeObj.lockMovementX;
                   activeObj.set({
                     lockMovementX: !locked,
                     lockMovementY: !locked,
-                    hasControls: locked,
                     lockScalingX: !locked,
                     lockScalingY: !locked,
                     lockRotation: !locked,
+                    hasControls: locked,
                   });
                   canvas.renderAll();
                 }}
@@ -1275,8 +1348,16 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
               >
                 {activeObj?.lockMovementX ? <Unlock size={18} /> : <Lock size={18} />}
               </IconButton>
+
+              {/* Extract image from frame */}
+              {activeObj?.type === "image" && activeObj?.frameOverlay && (
+                <IconButton onClick={extractActiveImage} title="Extract Image (remove frame)">
+                  <Move size={18} />
+                </IconButton>
+              )}
             </div>
 
+            {/* Student photo quick zooms */}
             {activeStudentPhoto && (
               <Stack direction="row" spacing={1} justifyContent="start" className="mt-3">
                 <Button variant="contained" size="small" onClick={() => setImageZoom(activeStudentPhoto, (activeStudentPhoto.scaleX || 1) * 1.1)}>
@@ -1320,7 +1401,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
                   </IconButton>
                 );
               })}
-              <IconButton title="Remove Frame" onClick={() => { removeMaskAndFrame(canvas, activeObj, true); saveHistory(); }}>
+              <IconButton title="Remove Frame (keep slot)" onClick={() => { removeMaskAndFrame(canvas, activeObj, true); saveHistory(); }}>
                 <RefreshCw size={18} />
               </IconButton>
             </div>
@@ -1413,32 +1494,29 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
                   disabled={!adjustMode}
                 />
               </div>
-              <div className="flex items-center gap-2">
-                <Button size="small" onClick={() => nudgeImage(activeObj, 0, -2)} disabled={!adjustMode}>↑</Button>
-                <Button size="small" onClick={() => nudgeImage(activeObj, -2, 0)} disabled={!adjustMode}>←</Button>
-                <Button size="small" onClick={() => nudgeImage(activeObj, 2, 0)} disabled={!adjustMode}>→</Button>
-                <Button size="small" onClick={() => nudgeImage(activeObj, 0, 2)} disabled={!adjustMode}>↓</Button>
-              </div>
               <div className="text-[11px] text-gray-500 mt-2">
-                Double-click the image or its frame to enter Adjust. Drag to pan under the mask. Use Fit/Fill/Center/Zoom/Nudge.
+                Double-click an image to enter Adjust. Drag to pan under the mask. Use Fit/Fill/Center/Zoom.
               </div>
-            </div>
-
-            <div className="mt-3">
-              <Button size="small" variant="outlined" onClick={replaceActiveImage}>
-                Replace Image
-              </Button>
+              <div className="mt-3">
+                <Button size="small" variant="outlined" onClick={replaceActiveImage}>
+                  Replace Image
+                </Button>
+                {activeObj?.frameOverlay && (
+                  <Button size="small" variant="text" className="ml-2" onClick={extractActiveImage}>
+                    Extract (remove frame)
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         )}
       </aside>
 
-      {/* CENTER — Canva-like preview area */}
+      {/* CENTER / Canva-like viewport */}
       <main
         ref={viewportRef}
         className={`absolute bg-gray-100 top-14 right-0 ${isSidebarOpen ? "left-0 md:left-80" : "left-0 md:left-80"} bottom-14 md:bottom-16 overflow-hidden flex items-center justify-center`}
       >
-        {/* Scaled stage wrapper */}
         <div
           ref={stageRef}
           style={{
@@ -1464,7 +1542,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
         )}
       </main>
 
-      {/* BOTTOM BAR (sticky) */}
+      {/* BOTTOM BAR */}
       <BottomToolbar
         alignLeft={alignLeft}
         alignCenter={alignCenter}

@@ -4,7 +4,7 @@ import toast, { Toaster } from "react-hot-toast";
 import { useCanvasEditor } from "../hooks/useCanvasEditor";
 import { useCanvasTools } from "../hooks/useCanvasTools";
 import { getStoredUser, getStoredInstituteUUID } from "../utils/storageUtils";
-import { Button, Stack } from "@mui/material";
+import { Button, Stack, Slider } from "@mui/material";
 import axios from "axios";
 import { useParams } from "react-router-dom";
 import { fabric } from "fabric";

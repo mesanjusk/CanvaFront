@@ -1,10 +1,17 @@
 // CanvasEditor.jsx
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+} from "react";
 import toast, { Toaster } from "react-hot-toast";
 import { useCanvasEditor } from "../hooks/useCanvasEditor";
 import { useCanvasTools } from "../hooks/useCanvasTools";
 import { getStoredUser, getStoredInstituteUUID } from "../utils/storageUtils";
-import { Button, Stack, Slider } from "@mui/material";
+import { Button, Stack, Slider, Switch, FormControlLabel } from "@mui/material";
 import axios from "axios";
 import { useParams } from "react-router-dom";
 import { fabric } from "fabric";
@@ -26,6 +33,9 @@ import {
   Heart,
   Check,
   Move,
+  ChevronLeft,
+  ChevronRight,
+  Images,
 } from "lucide-react";
 import IconButton from "./IconButton";
 import CanvasArea from "./CanvasArea";
@@ -71,14 +81,34 @@ const buildClipShape = (shapeType, w, h, options = {}) => {
   const { rx = Math.min(w, h) * 0.12 } = options;
   switch (shapeType) {
     case "rect":
-      return new fabric.Rect({ width: w, height: h, originX: "center", originY: "center" });
+      return new fabric.Rect({
+        width: w,
+        height: h,
+        originX: "center",
+        originY: "center",
+      });
     case "rounded":
-      return new fabric.Rect({ width: w, height: h, rx, ry: rx, originX: "center", originY: "center" });
+      return new fabric.Rect({
+        width: w,
+        height: h,
+        rx,
+        ry: rx,
+        originX: "center",
+        originY: "center",
+      });
     case "circle":
-      return new fabric.Circle({ radius: Math.min(w, h) / 2, originX: "center", originY: "center" });
+      return new fabric.Circle({
+        radius: Math.min(w, h) / 2,
+        originX: "center",
+        originY: "center",
+      });
     case "triangle":
       return new fabric.Polygon(
-        [{ x: 0, y: -h / 2 }, { x: -w / 2, y: h / 2 }, { x: w / 2, y: h / 2 }],
+        [
+          { x: 0, y: -h / 2 },
+        { x: -w / 2, y: h / 2 },
+        { x: w / 2, y: h / 2 },
+        ],
         { originX: "center", originY: "center" }
       );
     case "hexagon":
@@ -98,7 +128,12 @@ const buildClipShape = (shapeType, w, h, options = {}) => {
   }
 };
 
-const buildOverlayShape = (shapeType, w, h, { rx, stroke, strokeWidth, dashed = false }) => {
+const buildOverlayShape = (
+  shapeType,
+  w,
+  h,
+  { rx, stroke, strokeWidth, dashed = false }
+) => {
   let overlay;
   const common = {
     originX: "center",
@@ -119,7 +154,11 @@ const buildOverlayShape = (shapeType, w, h, { rx, stroke, strokeWidth, dashed = 
       break;
     case "triangle":
       overlay = new fabric.Polygon(
-        [{ x: 0, y: -h / 2 }, { x: -w / 2, y: h / 2 }, { x: w / 2, y: h / 2 }],
+        [
+          { x: 0, y: -h / 2 },
+          { x: -w / 2, y: h / 2 },
+          { x: w / 2, y: h / 2 },
+        ],
         common
       );
       break;
@@ -140,13 +179,19 @@ const buildOverlayShape = (shapeType, w, h, { rx, stroke, strokeWidth, dashed = 
   }
   overlay.set({
     selectable: false,
-    evented: false, // important: filled frames are frozen unless slot
+    evented: false,
     hoverCursor: "default",
     excludeFromExport: false,
   });
   overlay.isFrameOverlay = false;
   overlay.isFrameSlot = !!dashed;
-  if (dashed) overlay.set({ strokeDashArray: [6, 4], selectable: true, evented: true, hoverCursor: "move" });
+  if (dashed)
+    overlay.set({
+      strokeDashArray: [6, 4],
+      selectable: true,
+      evented: true,
+      hoverCursor: "move",
+    });
   return overlay;
 };
 
@@ -157,11 +202,12 @@ const moveOverlayAboveImage = (canvas, imageObj, overlay) => {
 
 /**
  * Apply or re-apply mask + overlay.
- * absolute=false, followImage=true  -> move whole unit together (default, like Canva normal mode)
+ * absolute=false, followImage=true  -> move whole unit together (default)
  * absolute=true,  followImage=false -> freeze frame, move image under it (Adjust mode)
  */
 const applyMaskAndFrame = (canvas, imageObj, shapeType, options) => {
-  const { stroke, strokeWidth, rx, absolute = false, followImage = true } = options || {};
+  const { stroke, strokeWidth, rx, absolute = false, followImage = true } =
+    options || {};
   if (!imageObj || imageObj.type !== "image") return;
 
   // remove any previous overlay
@@ -195,7 +241,12 @@ const applyMaskAndFrame = (canvas, imageObj, shapeType, options) => {
   imageObj.shape = shapeType;
 
   // overlay
-  const overlay = buildOverlayShape(shapeType, w, h, { rx, stroke, strokeWidth, dashed: false });
+  const overlay = buildOverlayShape(shapeType, w, h, {
+    rx,
+    stroke,
+    strokeWidth,
+    dashed: false,
+  });
   overlay.set({
     selectable: false,
     evented: false,
@@ -219,21 +270,6 @@ const applyMaskAndFrame = (canvas, imageObj, shapeType, options) => {
     });
     overlay.setCoords();
     moveOverlayAboveImage(canvas, imageObj, overlay);
-  };
-  const syncImageGeom = () => {
-    const img = overlay.ownerImage;
-    if (!img) return;
-    img.set({
-      left: overlay.left,
-      top: overlay.top,
-      scaleX: overlay.scaleX,
-      scaleY: overlay.scaleY,
-      angle: overlay.angle,
-      originX: overlay.originX,
-      originY: overlay.originY,
-    });
-    img.setCoords();
-    moveOverlayAboveImage(canvas, img, overlay);
   };
 
   if (!absolute) syncOverlayGeom();
@@ -290,7 +326,12 @@ const removeMaskAndFrame = (canvas, imageObj, keepSlot = false) => {
       slot.isFrameOverlay = false;
       slot.isFrameSlot = true;
       slot.ownerImage = null;
-      slot.set({ selectable: true, evented: true, strokeDashArray: [6, 4], hoverCursor: "move" });
+      slot.set({
+        selectable: true,
+        evented: true,
+        strokeDashArray: [6, 4],
+        hoverCursor: "move",
+      });
     } else {
       canvas.remove(imageObj.frameOverlay);
     }
@@ -346,8 +387,22 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
   const [activeStudentPhoto, setActiveStudentPhoto] = useState(null);
   const [selectedInstitute, setSelectedInstitute] = useState(null);
 
+  // templates (right sidebar)
+  const [templates, setTemplates] = useState([]);
+  const [activeTemplateId, setActiveTemplateId] = useState(templateId || null);
+  const [loadingTemplate, setLoadingTemplate] = useState(false);
+
+  // bulk mode
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkList, setBulkList] = useState([]); // array of student uuids
+  const [bulkIndex, setBulkIndex] = useState(0);
+
+  // swipe handlers
+  const touchRef = useRef({ x: 0, y: 0, active: false });
+
   // UI
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // left
+  const [isRightbarOpen, setIsRightbarOpen] = useState(true); // right
   const [frameShape, setFrameShape] = useState("rounded");
   const [frameBorder, setFrameBorder] = useState("#ffffff");
   const [frameWidth, setFrameWidth] = useState(6);
@@ -362,8 +417,6 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
   // hooks
   const {
     canvasRef,
-    canvasWidth,
-    canvasHeight,
     cropSrc,
     setCropSrc,
     cropCallbackRef,
@@ -430,12 +483,6 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     const box = getOverlayBox(img);
     if (!img || !box) return;
     img.set({ left: box.cx, top: box.cy, originX: "center", originY: "center" });
-    img.setCoords();
-    canvas.requestRenderAll();
-  };
-  const nudgeImage = (img, dx, dy) => {
-    if (!img) return;
-    img.set({ left: (img.left || 0) + dx, top: (img.top || 0) + dy });
     img.setCoords();
     canvas.requestRenderAll();
   };
@@ -507,7 +554,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
       followImage: true,
     });
 
-    // lock relative adjustments outside Adjust, but allow moving/scaling whole unit
+    // allow moving/scaling whole unit
     img.set({
       lockMovementX: false,
       lockMovementY: false,
@@ -524,7 +571,8 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
   /* ====================== Frame slot creation & snapping =================== */
   const addFrameSlot = (shapeType) => {
     if (!canvas) return;
-    const w = 240, h = 240;
+    const w = 240,
+      h = 240;
     const overlay = buildOverlayShape(shapeType, w, h, {
       rx: frameCorner,
       stroke: "#7c3aed",
@@ -558,7 +606,6 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     );
   };
 
-  // When dropped over a slot: bind, and allow moving the whole unit later
   const snapImageToNearestSlot = (img) => {
     if (!canvas) return;
     const slots = canvas.getObjects().filter((o) => o.isFrameSlot);
@@ -570,7 +617,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     hit.isFrameSlot = false;
     hit.isFrameOverlay = true;
     hit.ownerImage = img;
-    hit.followImage = true; // IMPORTANT: now frame follows image (unit moves)
+    hit.followImage = true;
     hit.set({ strokeDashArray: null, selectable: false, evented: false, hoverCursor: "default" });
 
     const w = hit.getScaledWidth();
@@ -599,9 +646,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     img.frameOverlay = hit;
     moveOverlayAboveImage(canvas, img, hit);
 
-    // Outside adjust: allow moving/scale the whole unit
     exitAdjustMode(img);
-
     setAdjustMode(false);
     canvas.setActiveObject(img);
     canvas.requestRenderAll();
@@ -655,6 +700,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
   const handleStudentSelect = (uuid) => {
     const student = filteredStudents.find((s) => s.uuid === uuid);
     setSelectedStudent(student || null);
+    // if bulk mode not enabled, keep single; if bulk enabled we will sync via carousel index
   };
 
   useEffect(() => {
@@ -678,29 +724,33 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     fetchInstitute();
   }, []);
 
-  // Fetch template (size + bg + placeholders)
+  // Templates list (for right sidebar)
   useEffect(() => {
-    if (!templateId) return;
-    let cancelled = false;
-
-    const fetchTemplate = async () => {
+    const loadTemplates = async () => {
       try {
-        const res = await axios.get(
-          `https://canvaback.onrender.com/api/template/${templateId}`
-        );
-        if (cancelled) return;
+        const res = await axios.get("https://canvaback.onrender.com/api/template/list");
+        setTemplates(res.data?.data || res.data || []);
+      } catch {
+        // non-blocking
+      }
+    };
+    loadTemplates();
+  }, []);
 
-        setSavedPlaceholders(res.data?.placeholders || []);
-        const w = Number(res.data?.width) || 400;
-        const h = Number(res.data?.height) || 550;
-        setTplSize({ w, h });
-        setCanvasSize?.(w, h);
+  // helper to load/apply a template by ID
+  const applyTemplateResponse = useCallback(
+    async (data) => {
+      setSavedPlaceholders(data?.placeholders || []);
+      const w = Number(data?.width) || 400;
+      const h = Number(data?.height) || 550;
+      setTplSize({ w, h });
+      setCanvasSize?.(w, h);
 
-        if (res.data?.image) {
+      if (data?.image) {
+        return new Promise((resolve) => {
           fabric.Image.fromURL(
-            res.data.image,
+            data.image,
             (img) => {
-              if (cancelled) return;
               img.set({
                 selectable: false,
                 evented: false,
@@ -710,18 +760,43 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
               });
               img.customId = "templateBg";
               setTemplateImage(img);
+              resolve();
             },
             { crossOrigin: "anonymous" }
           );
-        } else {
-          setTemplateImage(null);
-        }
-      } catch {}
-    };
+        });
+      } else {
+        setTemplateImage(null);
+      }
+    },
+    [setCanvasSize]
+  );
 
-    fetchTemplate();
-    return () => { cancelled = true; };
-  }, [templateId, setCanvasSize]);
+  const loadTemplateById = useCallback(
+    async (id) => {
+      if (!id) return;
+      setLoadingTemplate(true);
+      try {
+        const res = await axios.get(`https://canvaback.onrender.com/api/template/${id}`);
+        await applyTemplateResponse(res.data || {});
+        setActiveTemplateId(id);
+        resetHistory();
+        saveHistory();
+      } catch {
+        toast.error("Failed to load template");
+      } finally {
+        setLoadingTemplate(false);
+      }
+    },
+    [applyTemplateResponse, resetHistory, saveHistory]
+  );
+
+  // Initial template load (from route or prop)
+  useEffect(() => {
+    if (!templateId) return;
+    loadTemplateById(templateId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [templateId]);
 
   /* ==================== Render template + student objects ================== */
   useEffect(() => {
@@ -757,10 +832,15 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
         );
       };
 
-      if (selectedStudent) {
+      // pick current student (single or bulk)
+      const currentStudent = bulkMode
+        ? filteredStudents.find((s) => s?.uuid === bulkList[bulkIndex]) || null
+        : selectedStudent;
+
+      if (currentStudent) {
         const savedName = getSavedProps("studentName");
         const nameText = new fabric.IText(
-          `${selectedStudent.firstName || ""} ${selectedStudent.lastName || ""}`.trim(),
+          `${currentStudent.firstName || ""} ${currentStudent.lastName || ""}`.trim(),
           {
             left: savedName?.left ?? Math.round(canvas.width * 0.33),
             top: savedName?.top ?? Math.round(canvas.height * 0.55),
@@ -775,9 +855,13 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
       }
 
       // student photo
-      const photoUrl = Array.isArray(selectedStudent?.photo)
-        ? selectedStudent.photo[0]
-        : selectedStudent?.photo;
+      const current = bulkMode
+        ? filteredStudents.find((s) => s?.uuid === bulkList[bulkIndex]) || null
+        : selectedStudent;
+
+      const photoUrl = Array.isArray(current?.photo)
+        ? current?.photo[0]
+        : current?.photo;
       const savedPhoto = getSavedProps("studentPhoto");
       const photoLeft = savedPhoto?.left ?? Math.round(canvas.width * 0.5);
       const photoTop = savedPhoto?.top ?? Math.round(canvas.height * 0.33);
@@ -899,10 +983,13 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     frameBorder,
     frameWidth,
     frameCorner,
+    bulkMode,
+    bulkList,
+    bulkIndex,
+    filteredStudents,
   ]);
 
   /* ============================= Canvas events ============================ */
-  // Double-click via fabric events already attached to images; also global dblclick fallback
   useEffect(() => {
     if (!canvas) return;
     const onDbl = (e) => {
@@ -920,7 +1007,6 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     return () => canvas.off("mouse:dblclick", onDbl);
   }, [canvas]);
 
-  // Snap image to frame slot on mouse up
   useEffect(() => {
     if (!canvas) return;
     const onUp = () => {
@@ -931,7 +1017,6 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     return () => canvas.off("mouse:up", onUp);
   }, [canvas]);
 
-  // Save history on modifications so undo/redo works reliably
   useEffect(() => {
     if (!canvas) return;
     const onModified = () => saveHistory();
@@ -963,7 +1048,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
         const obj = canvas?.getActiveObject();
         if (!obj) return;
 
-        // For masked images, delete should keep the slot
+        // For masked images, delete keeps the slot
         if (obj.type === "image" && obj.frameOverlay) {
           removeMaskAndFrame(canvas, obj, true /* keepSlot */);
           canvas.remove(obj);
@@ -1046,7 +1131,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
 
   /* =========================== Save placeholders =========================== */
   const saveTemplateLayout = async () => {
-    if (!canvas) return;
+    if (!canvas || !activeTemplateId) return;
     const placeholders = canvas
       .getObjects()
       .filter((o) => o.customId !== "templateBg" && !o.isFrameSlot)
@@ -1086,7 +1171,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
       });
     try {
       await axios.put(
-        `https://canvaback.onrender.com/api/template/update-canvas/${templateId}`,
+        `https://canvaback.onrender.com/api/template/update-canvas/${activeTemplateId}`,
         { placeholders, width: tplSize.w, height: tplSize.h }
       );
       setSavedPlaceholders(placeholders);
@@ -1137,6 +1222,88 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     if (obj.type === "image" && obj.frameOverlay) moveOverlayAboveImage(canvas, obj, obj.frameOverlay);
   });
 
+  /* ============================= Carousel (bulk) =========================== */
+  const rebuildBulkFromFiltered = () => {
+    const ids = filteredStudents.map((s) => s.uuid);
+    setBulkList(ids);
+    setBulkIndex(0);
+    if (ids.length) {
+      setSelectedStudent(filteredStudents[0]);
+    } else {
+      setSelectedStudent(null);
+    }
+  };
+
+  useEffect(() => {
+    if (bulkMode) rebuildBulkFromFiltered();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bulkMode, filteredStudents]);
+
+  const gotoIndex = (idx) => {
+    if (!bulkList.length) return;
+    const n = ((idx % bulkList.length) + bulkList.length) % bulkList.length;
+    setBulkIndex(n);
+    const uuid = bulkList[n];
+    const st = filteredStudents.find((s) => s.uuid === uuid) || null;
+    setSelectedStudent(st);
+  };
+
+  const prevStudent = () => gotoIndex(bulkIndex - 1);
+  const nextStudent = () => gotoIndex(bulkIndex + 1);
+
+  const onTouchStart = (e) => {
+    if (!bulkMode) return;
+    const t = e.touches[0];
+    touchRef.current = { x: t.clientX, y: t.clientY, active: true };
+  };
+  const onTouchEnd = (e) => {
+    if (!bulkMode || !touchRef.current.active) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - touchRef.current.x;
+    const abs = Math.abs(dx);
+    touchRef.current.active = false;
+    if (abs > 40) {
+      if (dx > 0) prevStudent();
+      else nextStudent();
+    }
+  };
+
+  /* ============================== Downloads =============================== */
+  const downloadCurrentPNG = () => {
+    const current = bulkMode
+      ? filteredStudents.find((s) => s?.uuid === bulkList[bulkIndex]) || selectedStudent
+      : selectedStudent;
+    const name =
+      current?.firstName || current?.lastName
+        ? `${(current?.firstName || "").trim()}_${(current?.lastName || "").trim()}`
+        : "canvas";
+    downloadHighRes?.(tplSize.w, tplSize.h, `${name || "canvas"}.png`);
+  };
+
+  const downloadBulkPNGs = async () => {
+    if (!bulkMode || !bulkList.length) {
+      toast.error("Enable Bulk mode with students filtered");
+      return;
+    }
+    toast("Starting bulk export…");
+    for (let i = 0; i < bulkList.length; i++) {
+      gotoIndex(i);
+      // allow render settle
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((r) => setTimeout(r, 350));
+      const st = filteredStudents.find((s) => s.uuid === bulkList[i]);
+      const name =
+        st?.firstName || st?.lastName
+          ? `${(st?.firstName || "").trim()}_${(st?.lastName || "").trim()}`
+          : `canvas_${i + 1}`;
+      downloadHighRes?.(tplSize.w, tplSize.h, `${name}.png`);
+      // small pacing between downloads
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((r) => setTimeout(r, 300));
+    }
+    toast.success("Bulk export complete.");
+  };
+
   /* ================================= UI =================================== */
   return (
     <div className="h-screen w-screen overflow-hidden bg-gray-100">
@@ -1149,20 +1316,34 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
             <button
               className="md:hidden p-2 rounded hover:bg-gray-100"
               onClick={() => setIsSidebarOpen((s) => !s)}
-              title="Toggle sidebar"
+              title="Toggle left sidebar"
             >
               <MenuIcon size={20} />
             </button>
-            <a href="/" className="font-bold">Framee</a>
+            <a href="/" className="font-bold">
+              Framee
+            </a>
 
             <div className="hidden sm:flex items-center gap-2 ml-2">
-              <button title="Add Text" onClick={addText} className="p-2 rounded bg-white shadow hover:bg-blue-100">
+              <button
+                title="Add Text"
+                onClick={addText}
+                className="p-2 rounded bg-white shadow hover:bg-blue-100"
+              >
                 <Type size={20} />
               </button>
-              <button title="Add Rectangle" onClick={addRect} className="p-2 rounded bg-white shadow hover:bg-blue-100">
+              <button
+                title="Add Rectangle"
+                onClick={addRect}
+                className="p-2 rounded bg-white shadow hover:bg-blue-100"
+              >
                 <Square size={20} />
               </button>
-              <button title="Add Circle" onClick={addCircle} className="p-2 rounded bg-white shadow hover:bg-blue-100">
+              <button
+                title="Add Circle"
+                onClick={addCircle}
+                className="p-2 rounded bg-white shadow hover:bg-blue-100"
+              >
                 <Circle size={20} />
               </button>
 
@@ -1184,7 +1365,11 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
                   }
                 }}
               />
-              <label htmlFor="upload-image" className="p-2 rounded bg-white shadow hover:bg-blue-100 cursor-pointer" title="Upload Image">
+              <label
+                htmlFor="upload-image"
+                className="p-2 rounded bg-white shadow hover:bg-blue-100 cursor-pointer"
+                title="Upload Image"
+              >
                 <ImageIcon size={20} />
               </label>
 
@@ -1197,7 +1382,43 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
             </div>
           </div>
 
-          <div className="flex gap-2 items-center">
+          <div className="flex items-center gap-2">
+            {/* Bulk toggle */}
+            <FormControlLabel
+              sx={{ mr: 1 }}
+              control={
+                <Switch
+                  checked={bulkMode}
+                  onChange={(e) => setBulkMode(e.target.checked)}
+                  size="small"
+                />
+              }
+              label={<span className="text-sm">Bulk</span>}
+            />
+
+            {/* Carousel controls (visible when bulk) */}
+            {bulkMode && (
+              <div className="flex items-center gap-1">
+                <button
+                  className="p-2 rounded-full bg-white border hover:bg-gray-100"
+                  title="Previous"
+                  onClick={prevStudent}
+                >
+                  <ChevronLeft size={18} />
+                </button>
+                <div className="px-2 text-xs text-gray-600">
+                  {bulkList.length ? `${bulkIndex + 1}/${bulkList.length}` : "0/0"}
+                </div>
+                <button
+                  className="p-2 rounded-full bg-white border hover:bg-gray-100"
+                  title="Next"
+                  onClick={nextStudent}
+                >
+                  <ChevronRight size={18} />
+                </button>
+              </div>
+            )}
+
             {adjustMode && (
               <button
                 title="Done"
@@ -1210,6 +1431,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
                 <Check size={16} /> Done
               </button>
             )}
+
             <button
               title="Reset Canvas"
               onClick={() => {
@@ -1221,19 +1443,41 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
             >
               <RefreshCw size={18} />
             </button>
+
+            {/* Download current */}
             <button
               title="Download PNG"
-              onClick={() => downloadHighRes?.(tplSize.w, tplSize.h)}
+              onClick={downloadCurrentPNG}
               className="p-2 rounded-full bg-green-600 text-white shadow hover:bg-green-700"
             >
               <Download size={18} />
             </button>
+
+            {/* Bulk download */}
+            <button
+              title="Download All (Bulk)"
+              onClick={downloadBulkPNGs}
+              className="hidden sm:flex items-center gap-1 px-3 py-2 rounded-full bg-indigo-600 text-white shadow hover:bg-indigo-700 text-sm"
+            >
+              <Images size={16} /> Download All
+            </button>
+
+            {/* Save template layout */}
             <button
               title="Save Template"
               onClick={saveTemplateLayout}
               className="px-3 py-2 rounded-full bg-blue-600 text-white shadow hover:bg-blue-700 text-sm"
             >
               Save
+            </button>
+
+            {/* Right sidebar toggle */}
+            <button
+              className="md:hidden p-2 rounded hover:bg-gray-100"
+              onClick={() => setIsRightbarOpen((s) => !s)}
+              title="Toggle template sidebar"
+            >
+              <MenuIcon size={20} />
             </button>
           </div>
         </header>
@@ -1277,7 +1521,12 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
           </select>
 
           <label className="block text-xs mb-1">Student</label>
-          <select className="w-full border rounded px-2 py-1" onChange={(e) => handleStudentSelect(e.target.value)}>
+          <select
+            className="w-full border rounded px-2 py-1"
+            onChange={(e) => handleStudentSelect(e.target.value)}
+            value={selectedStudent?.uuid || ""}
+            disabled={bulkMode}
+          >
             <option value="">Select a student</option>
             {filteredStudents.map((s) => (
               <option key={s.uuid} value={s.uuid}>
@@ -1285,6 +1534,11 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
               </option>
             ))}
           </select>
+
+          {/* Bulk info */}
+          <div className="text-[11px] text-gray-500 mt-2">
+            Bulk mode uses the filtered list above. Use **Prev/Next** or swipe on mobile.
+          </div>
         </div>
 
         {/* Frames */}
@@ -1311,7 +1565,6 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
             <div className="flex flex-wrap gap-2">
               <IconButton onClick={cropImage} title="Crop"><Crop size={18} /></IconButton>
 
-              {/* Delete uses keyboard too; this button mirrors that */}
               <IconButton
                 onClick={() => {
                   const obj = activeObj;
@@ -1360,19 +1613,51 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
             {/* Student photo quick zooms */}
             {activeStudentPhoto && (
               <Stack direction="row" spacing={1} justifyContent="start" className="mt-3">
-                <Button variant="contained" size="small" onClick={() => setImageZoom(activeStudentPhoto, (activeStudentPhoto.scaleX || 1) * 1.1)}>
+                <Button
+                  variant="contained"
+                  size="small"
+                  onClick={() =>
+                    setImageZoom(
+                      activeStudentPhoto,
+                      (activeStudentPhoto.scaleX || 1) * 1.1
+                    )
+                  }
+                >
                   Zoom In
                 </Button>
-                <Button variant="contained" size="small" onClick={() => setImageZoom(activeStudentPhoto, (activeStudentPhoto.scaleX || 1) * 0.9)}>
+                <Button
+                  variant="contained"
+                  size="small"
+                  onClick={() =>
+                    setImageZoom(
+                      activeStudentPhoto,
+                      (activeStudentPhoto.scaleX || 1) * 0.9
+                    )
+                  }
+                >
                   Zoom Out
                 </Button>
-                <Button variant="outlined" size="small" onClick={() => {
-                  const box = getOverlayBox(activeStudentPhoto);
-                  if (!box) return;
-                  const scale = Math.min(box.w / activeStudentPhoto.width, box.h / activeStudentPhoto.height);
-                  activeStudentPhoto.set({ scaleX: scale, scaleY: scale, left: box.cx, top: box.cy, originX: "center", originY: "center" });
-                  canvas.requestRenderAll();
-                }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => {
+                    const box = getOverlayBox(activeStudentPhoto);
+                    if (!box) return;
+                    const scale = Math.min(
+                      box.w / activeStudentPhoto.width,
+                      box.h / activeStudentPhoto.height
+                    );
+                    activeStudentPhoto.set({
+                      scaleX: scale,
+                      scaleY: scale,
+                      left: box.cx,
+                      top: box.cy,
+                      originX: "center",
+                      originY: "center",
+                    });
+                    canvas.requestRenderAll();
+                  }}
+                >
                   Reset Fit
                 </Button>
               </Stack>
@@ -1515,7 +1800,11 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
       {/* CENTER / Canva-like viewport */}
       <main
         ref={viewportRef}
-        className={`absolute bg-gray-100 top-14 right-0 ${isSidebarOpen ? "left-0 md:left-80" : "left-0 md:left-80"} bottom-14 md:bottom-16 overflow-hidden flex items-center justify-center`}
+        className={`absolute bg-gray-100 top-14 right-0 ${
+          isSidebarOpen ? "left-0 md:left-80" : "left-0 md:left-80"
+        } ${isRightbarOpen ? "md:right-80" : "right-0"} bottom-14 md:bottom-16 overflow-hidden flex items-center justify-center`}
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
       >
         <div
           ref={stageRef}
@@ -1527,6 +1816,25 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
           }}
           className="shadow-lg border bg-white relative"
         >
+          {/* Mobile overlay carousel arrows in bulk mode */}
+          {bulkMode && (
+            <>
+              <button
+                className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-white/90 rounded-full shadow md:hidden"
+                onClick={prevStudent}
+                title="Previous"
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <button
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-white/90 rounded-full shadow md:hidden"
+                onClick={nextStudent}
+                title="Next"
+              >
+                <ChevronRight size={18} />
+              </button>
+            </>
+          )}
           <CanvasArea ref={canvasRef} width={tplSize.w} height={tplSize.h} />
         </div>
 
@@ -1541,6 +1849,64 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
           />
         )}
       </main>
+
+      {/* RIGHT SIDEBAR – Template Switcher */}
+      <aside
+        className={`fixed top-14 bottom-14 md:bottom-16 right-0 md:w-80 w-72 bg-white border-l z-30 overflow-y-auto transform transition-transform duration-200 ${
+          isRightbarOpen ? "translate-x-0" : "translate-x-full md:translate-x-0"
+        }`}
+      >
+        <div className="p-3 border-b flex items-center justify-between">
+          <div className="text-sm font-semibold">Templates</div>
+          <button
+            className="md:hidden p-2 rounded hover:bg-gray-100"
+            onClick={() => setIsRightbarOpen((s) => !s)}
+            title="Close"
+          >
+            <MenuIcon size={18} />
+          </button>
+        </div>
+
+        <div className="p-3">
+          {loadingTemplate && (
+            <div className="text-xs text-gray-500 mb-2">Loading template…</div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            {templates.map((t) => (
+              <button
+                key={t._id || t.id}
+                onClick={() => loadTemplateById(t._id || t.id)}
+                className={`border rounded overflow-hidden text-left hover:shadow focus:ring-2 focus:ring-indigo-500 ${
+                  (t._id || t.id) === activeTemplateId ? "ring-2 ring-indigo-500" : ""
+                }`}
+                title={t.name || "Template"}
+              >
+                <div className="aspect-[4/5] bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
+                  {t.thumbnail ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={t.thumbnail}
+                      alt={t.name || "template thumbnail"}
+                      className="w-full h-full object-cover"
+                      crossOrigin="anonymous"
+                    />
+                  ) : (
+                    <span>Preview</span>
+                  )}
+                </div>
+                <div className="px-2 py-1">
+                  <div className="text-xs font-medium truncate">
+                    {t.name || "Untitled"}
+                  </div>
+                  <div className="text-[10px] text-gray-500">
+                    {t.width || t.w || 400}×{t.height || t.h || 550}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </aside>
 
       {/* BOTTOM BAR */}
       <BottomToolbar

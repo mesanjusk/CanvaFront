@@ -15,7 +15,7 @@ import {
   Settings,
 } from "lucide-react";
 
-const Toolbar = ({
+const Toolbar = React.memo(({
   onAddText,
   onAddRect,
   onAddCircle,

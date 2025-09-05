@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import TemplateCard from "./TemplateCard";
 
 const defaultTemplates = [
   {
@@ -9,29 +10,7 @@ const defaultTemplates = [
   },
 ];
 
-const TemplateCard = ({ template, onSelect }) => (
-  <div
-    className="cursor-pointer rounded overflow-hidden shadow hover:shadow-lg bg-white dark:bg-gray-700"
-    onClick={() =>
-      onSelect(
-        template.layout ? JSON.parse(template.layout) : template.data
-      )
-    }
-  >
-    {template.image && (
-      <img
-        src={template.image}
-        alt={template.title || template.name}
-        className="w-full h-24 object-cover"
-      />
-    )}
-    <div className="p-2 text-center text-sm">
-      {template.title || template.name}
-    </div>
-  </div>
-);
-
-const TemplatePanel = ({ loadTemplate }) => {
+const TemplateSidebar = ({ loadTemplate }) => {
   const [saved, setSaved] = useState([]);
 
   useEffect(() => {
@@ -52,4 +31,4 @@ const TemplatePanel = ({ loadTemplate }) => {
   );
 };
 
-export default TemplatePanel;
+export default TemplateSidebar;

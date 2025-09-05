@@ -11,7 +11,7 @@ import {
   ArrowDownToLine,
 } from "lucide-react";
 
-const BottomToolbar = ({
+const BottomToolbar = React.memo(({
   alignLeft,
   alignCenter,
   alignRight,

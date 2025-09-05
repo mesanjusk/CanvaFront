@@ -45,6 +45,7 @@ import ImageCropModal from "./ImageCropModal";
 import BottomToolbar from "./BottomToolbar";
 import UndoRedoControls from "./UndoRedoControls";
 import { jsPDF } from "jspdf";
+import TemplateLayout from "../Pages/addTemplateLayout";
 
 /* =============================================================================
    Shapes & helpers
@@ -1285,58 +1286,6 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     saveHistory();
   };
 
-  /* =========================== Save placeholders =========================== */
-  const saveTemplateLayout = async () => {
-    if (!canvas || !activeTemplateId) return;
-    const placeholders = canvas
-      .getObjects()
-      .filter((o) => o.customId !== "templateBg" && !o.isFrameSlot)
-      .map((obj) => {
-        const rawW = obj.width || 0;
-        const rawH = obj.height || 0;
-        const scaleX = obj.scaleX || 1;
-        const scaleY = obj.scaleY || 1;
-        return {
-          field: obj.field || obj.customId || "unknown",
-          type: obj.type,
-          left: obj.left,
-          top: obj.top,
-          scaleX,
-          scaleY,
-          angle: obj.angle || 0,
-          renderedWidth: rawW * scaleX,
-          renderedHeight: rawH * scaleY,
-          text: obj.text || null,
-          fontSize: obj.fontSize || null,
-          fill: obj.fill || null,
-          fontFamily: obj.fontFamily || null,
-          fontWeight: obj.fontWeight || null,
-          textAlign: obj.textAlign || null,
-          src: obj.type === "image" && obj._element ? obj._element.src : null,
-          shape: obj.type === "image" ? obj.shape || null : null,
-          frame:
-            obj.type === "image" && obj.frameOverlay
-              ? {
-                  stroke: obj.frameOverlay.stroke,
-                  strokeWidth: obj.frameOverlay.strokeWidth,
-                  rx: frameCorner,
-                  fixed: !obj.frameOverlay.followImage,
-                }
-              : null,
-        };
-      });
-    try {
-      await axios.put(
-        `https://canvaback.onrender.com/api/template/update-canvas/${activeTemplateId}`,
-        { placeholders, width: tplSize.w, height: tplSize.h }
-      );
-      setSavedPlaceholders(placeholders);
-      toast.success("Template layout saved!");
-      onSaved?.();
-    } catch {
-      toast.error("Save failed!");
-    }
-  };
 
   /* ============================ Align & Z-index ============================ */
   const withActive = (fn) => () => {
@@ -1807,13 +1756,13 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
             )}
 
             {/* Save template layout */}
-            <button
-              title="Save Template"
-              onClick={saveTemplateLayout}
-              className="px-3 py-2 rounded-full bg-blue-600 text-white shadow hover:bg-blue-700 text-sm"
-            >
-              Save
-            </button>
+           <TemplateLayout
+  canvas={canvas}
+  activeTemplateId={activeTemplateId}
+  tplSize={tplSize}
+  setSavedPlaceholders={setSavedPlaceholders}
+  frameCorner={frameCorner}
+/>
 
             {/* Right sidebar toggle */}
             <button

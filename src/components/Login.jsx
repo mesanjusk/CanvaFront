@@ -25,7 +25,7 @@ const Login = () => {
     const user = localStorage.getItem('user');
     const insti = localStorage.getItem('institute');
     if (user && insti) {
-      navigate('/dashboard');
+      navigate('/home');
     }
   }, [navigate, branding]);
 

@@ -667,13 +667,14 @@ const debouncedSaveHistory = useMemo(() => debounce(saveHistory, 300), [saveHist
     if (!img || !ov) return null;
     return { w: ov.getScaledWidth(), h: ov.getScaledHeight(), cx: ov.left, cy: ov.top };
   };
-  const setImageZoom = (img, zoom) => {
+  function setImageZoom(img, zoom) {
     if (!img) return;
     img.set({ scaleX: zoom, scaleY: zoom });
     img.setCoords();
     canvas.requestRenderAll();
-  };
-  const fitImageToFrame = (img, mode = "contain") => {
+  }
+
+  function fitImageToFrame(img, mode = "contain") {
     if (!img) return;
     const box = getOverlayBox(img);
     if (!box) return;
@@ -692,14 +693,16 @@ const debouncedSaveHistory = useMemo(() => debounce(saveHistory, 300), [saveHist
     });
     img.setCoords();
     canvas.requestRenderAll();
-  };
-  const centerImageInFrame = (img) => {
+  }
+
+  function centerImageInFrame(img) {
     const box = getOverlayBox(img);
     if (!img || !box) return;
     img.set({ left: box.cx, top: box.cy, originX: "center", originY: "center" });
     img.setCoords();
     canvas.requestRenderAll();
-  };
+  }
+
 
   // Canva-like: Adjust mode freezes frame; image draggable/scalable inside
   const enterAdjustMode = (img) => {
@@ -753,7 +756,7 @@ const debouncedSaveHistory = useMemo(() => debounce(saveHistory, 300), [saveHist
     canvas.requestRenderAll();
   };
 
-  const exitAdjustMode = (img) => {
+  function exitAdjustMode(img) {
     if (!img) return;
     const stroke = img.frameOverlay?.stroke ?? frameBorder;
     const strokeWidth = img.frameOverlay?.strokeWidth ?? frameWidth;
@@ -780,10 +783,11 @@ const debouncedSaveHistory = useMemo(() => debounce(saveHistory, 300), [saveHist
 
     setAdjustMode(false);
     canvas.requestRenderAll();
-  };
+  }
+
 
   /* ====================== Frame slot creation & snapping =================== */
-  const addFrameSlot = (shapeType) => {
+  function addFrameSlot(shapeType) {
     if (!canvas) return;
     const w = 240,
       h = 240;
@@ -807,7 +811,8 @@ const debouncedSaveHistory = useMemo(() => debounce(saveHistory, 300), [saveHist
     canvas.setActiveObject(overlay);
     canvas.requestRenderAll();
     saveHistory();
-  };
+  }
+
 
   const intersects = (a, b) => {
     const r1 = a.getBoundingRect(true, true);
@@ -1374,7 +1379,7 @@ const debouncedSaveHistory = useMemo(() => debounce(saveHistory, 300), [saveHist
     input.click();
   };
 
-  const extractActiveImage = () => {
+  function extractActiveImage() {
     if (!canvas) return;
     const obj = canvas.getActiveObject();
     if (!obj || obj.type !== "image") {
@@ -1393,7 +1398,8 @@ const debouncedSaveHistory = useMemo(() => debounce(saveHistory, 300), [saveHist
     });
     canvas.requestRenderAll();
     saveHistory();
-  };
+  }
+
 
   /* =========================== Save placeholders =========================== */
   const saveTemplateLayout = async () => {
@@ -1537,7 +1543,7 @@ const debouncedSaveHistory = useMemo(() => debounce(saveHistory, 300), [saveHist
   /* ============================== Downloads =============================== */
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-  const downloadCurrentPNG = () => {
+  function downloadCurrentPNG() {
     const current = bulkMode
       ? filteredStudents.find((s) => s?.uuid === bulkList[bulkIndex]) || selectedStudent
       : selectedStudent;
@@ -1546,7 +1552,8 @@ const debouncedSaveHistory = useMemo(() => debounce(saveHistory, 300), [saveHist
         ? `${(current?.firstName || "").trim()}_${(current?.lastName || "").trim()}`
         : "canvas";
     downloadHighRes?.(tplSize.w, tplSize.h, `${name || "canvas"}.png`);
-  };
+  }
+
 
   const downloadBulkPNGs = async () => {
     if (!bulkMode || !bulkList.length) {

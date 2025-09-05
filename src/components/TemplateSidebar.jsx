@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, memo } from "react";
 import axios from "axios";
 import TemplateCard from "./TemplateCard";
 
@@ -10,7 +10,7 @@ const defaultTemplates = [
   },
 ];
 
-const TemplateSidebar = ({ loadTemplate }) => {
+const TemplateSidebar = memo(({ loadTemplate }) => {
   const [saved, setSaved] = useState([]);
 
   useEffect(() => {
@@ -29,6 +29,6 @@ const TemplateSidebar = ({ loadTemplate }) => {
       ))}
     </div>
   );
-};
+});
 
 export default TemplateSidebar;

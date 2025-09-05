@@ -1,6 +1,6 @@
-import React from 'react';
+import { memo } from 'react';
 
-const TemplateCard = React.memo(({ template, onSelect }) => (
+const TemplateCard = memo(({ template, onSelect }) => (
   <div
     className="cursor-pointer rounded overflow-hidden shadow hover:shadow-lg bg-white dark:bg-gray-700"
     onClick={() => onSelect(template.layout ? JSON.parse(template.layout) : template.data)}

@@ -1238,11 +1238,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
             >
               <MenuIcon size={20} />
             </button>
-            <a href="/" className="font-bold">
-              Framee
-            </a>
-
-            <div className="hidden sm:flex items-center gap-2 ml-2">
+             <div className="flex items-center gap-2 ml-2 overflow-x-auto scrollbar-thin">
               <button
                 title="Add Text"
                 onClick={addText}
@@ -1432,7 +1428,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
 
       {/* LEFT SIDEBAR */}
       <aside
-        className={`fixed top-14 bottom-14 md:bottom-16 left-0 md:w-80 w-72 bg-white border-r z-30 overflow-y-auto transform transition-transform duration-200 ${
+         className={`fixed top-14 bottom-14 md:bottom-16 left-0 md:w-80 w-72 bg-white border-r z-30 overflow-y-auto transform transition-transform duration-300 ease-in-out ${
           isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         }`}
       >

@@ -48,6 +48,7 @@ import { jsPDF } from "jspdf";
 import TemplateLayout from "../Pages/addTemplateLayout";
 import PrintSettings from "./PrintSettings";
 import FrameSection from "./FrameSection";
+import ShapeStylePanel from "./ShapeStylePanel";
 import { buildClipShape, buildOverlayShape, moveOverlayAboveImage, applyMaskAndFrame, removeMaskAndFrame } from "../utils/shapeUtils";
 import { PRESET_SIZES, mmToPx, pxToMm, drawCropMarks, drawRegistrationMark } from "../utils/printUtils";
 
@@ -1900,6 +1901,10 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
             sendToBack={sendToBack}
           />
         </div>
+      )}
+
+      {activeObj && ["rect", "circle"].includes(activeObj.type) && (
+        <ShapeStylePanel activeObj={activeObj} canvas={canvas} />
       )}
 
     </div>

@@ -46,6 +46,8 @@ import BottomToolbar from "./BottomToolbar";
 import UndoRedoControls from "./UndoRedoControls";
 import { jsPDF } from "jspdf";
 import TemplateLayout from "../Pages/addTemplateLayout";
+import PrintSettings from "./PrintSettings";
+import FrameSection from "./FrameSection";
 
 /* =============================================================================
    Shapes & helpers
@@ -362,7 +364,6 @@ const PRESET_SIZES = {
   Legal: { w_mm: 215.9, h_mm: 355.6 },
   Tabloid: { w_mm: 279.4, h_mm: 431.8 },
 };
-const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 const mmToPx = (mm, dpi) => Math.round((mm * IN_PER_MM) * dpi);
 const pxToMm = (px, dpi) => (px / dpi) / IN_PER_MM;
 
@@ -1782,130 +1783,40 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
           isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         }`}
       >
-
-        {/* NEW: Page Size / DPI */}
-        <div className="border-b">
-          <button className="w-full text-left p-3 text-sm font-semibold" onClick={() => setShowFilters((v) => v)}>
-            Page Size & DPI
-          </button>
-          <div className="px-3 pb-3 space-y-2 text-sm">
-            <label className="flex items-center gap-2 text-xs mb-2"><input type="checkbox" checked={usePrintSizing} onChange={(e)=>setUsePrintSizing(e.target.checked)} /> Enable print sizing</label>
-            <div className="grid grid-cols-2 gap-2">
-              {["ID-1/CR80","A4","Letter","Legal","Tabloid","Custom"].map(key => (
-                <button key={key} onClick={()=>setPagePreset(key)} className={`border rounded px-2 py-1 ${pagePreset===key?"bg-gray-900 text-white":""}`}>{key}</button>
-              ))}
-            </div>
-            {pagePreset==="Custom" && (
-              <div className="grid grid-cols-2 gap-2">
-                <label className="text-xs">Width (mm)
-                  <input type="number" className="w-full border rounded px-2 py-1" value={customPage.w_mm}
-                    onChange={e=>setCustomPage(s=>({...s, w_mm: clamp(parseFloat(e.target.value)||0, 1, 3000)}))}/>
-                </label>
-                <label className="text-xs">Height (mm)
-                  <input type="number" className="w-full border rounded px-2 py-1" value={customPage.h_mm}
-                    onChange={e=>setCustomPage(s=>({...s, h_mm: clamp(parseFloat(e.target.value)||0, 1, 3000)}))}/>
-                </label>
-              </div>
-            )}
-            <div className="grid grid-cols-2 gap-2">
-              <button className={`border rounded px-2 py-1 ${pageOrientation==="portrait"?"bg-gray-900 text-white":""}`} onClick={()=>setPageOrientation("portrait")}>Portrait</button>
-              <button className={`border rounded px-2 py-1 ${pageOrientation==="landscape"?"bg-gray-900 text-white":""}`} onClick={()=>setPageOrientation("landscape")}>Landscape</button>
-            </div>
-            <div>
-              <div className="flex items-center justify-between"><span className="text-xs">DPI</span><span className="text-[11px] opacity-70">{dpi} dpi</span></div>
-              <Slider min={150} max={600} step={50} value={dpi} onChange={(_,v)=>setDpi(Array.isArray(v)?v[0]:v)} />
-            </div>
-          </div>
-        </div>
-
-        {/* NEW: Bleed / Safe / Marks */}
-        <div className="border-b">
-          <button className="w-full text-left p-3 text-sm font-semibold" onClick={() => setShowFilters((v) => v)}>
-            Bleed / Safe / Marks
-          </button>
-          <div className="px-3 pb-3 space-y-2 text-sm">
-            <div className="grid grid-cols-4 gap-2">
-              {["top","right","bottom","left"].map(side => (
-                <label key={side} className="text-xs capitalize">Bleed {side}
-                  <input type="number" className="w-full border rounded px-2 py-1" value={bleed[side]}
-                    onChange={e=>setBleed(prev=>({...prev, [side]: clamp(parseFloat(e.target.value)||0, 0, 50)}))}/>
-                </label>
-              ))}
-            </div>
-            <div className="grid grid-cols-4 gap-2">
-              {["top","right","bottom","left"].map(side => (
-                <label key={side} className="text-xs capitalize">Safe {side}
-                  <input type="number" className="w-full border rounded px-2 py-1" value={safe[side]}
-                    onChange={e=>setSafe(prev=>({...prev, [side]: clamp(parseFloat(e.target.value)||0, 0, 100)}))}/>
-                </label>
-              ))}
-            </div>
-            <div className="flex items-center gap-3">
-              <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={showMarks} onChange={e=>setShowMarks(e.target.checked)}/> Crop marks</label>
-              <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={showReg} onChange={e=>setShowReg(e.target.checked)}/> Registration mark</label>
-            </div>
-          </div>
-        </div>
-
-        {/* NEW: Imposition */}
-        <div className="border-b">
-          <button className="w-full text-left p-3 text-sm font-semibold" onClick={() => setShowFilters((v) => v)}>
-            Imposition (n‑up)
-          </button>
-          <div className="px-3 pb-3 space-y-2 text-sm">
-            <label className="flex items-center gap-2 text-xs">
-              <input type="checkbox" checked={imposeOn} onChange={e=>setImposeOn(e.target.checked)}/> Enable Imposition on Sheet
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {["A4","Letter","Legal","Tabloid","Custom"].map(key => (
-                <button key={key} className={`border rounded px-2 py-1 ${sheetPreset===key?"bg-gray-900 text-white":""}`} onClick={()=>setSheetPreset(key)}>{key}</button>
-              ))}
-            </div>
-            {sheetPreset==="Custom" && (
-              <div className="grid grid-cols-2 gap-2">
-                <label className="text-xs">Sheet W (mm)
-                  <input type="number" className="w-full border rounded px-2 py-1" value={sheetCustom.w_mm}
-                    onChange={e=>setSheetCustom(s=>({...s, w_mm: clamp(parseFloat(e.target.value)||0, 30, 3000)}))}/>
-                </label>
-                <label className="text-xs">Sheet H (mm)
-                  <input type="number" className="w-full border rounded px-2 py-1" value={sheetCustom.h_mm}
-                    onChange={e=>setSheetCustom(s=>({...s, h_mm: clamp(parseFloat(e.target.value)||0, 30, 3000)}))}/>
-                </label>
-              </div>
-            )}
-            <div className="grid grid-cols-2 gap-2">
-              <label className="text-xs">Rows
-                <input type="number" className="w-full border rounded px-2 py-1" value={rows}
-                  onChange={e=>setRows(clamp(parseInt(e.target.value)||1,1,20))}/>
-              </label>
-              <label className="text-xs">Columns
-                <input type="number" className="w-full border rounded px-2 py-1" value={cols}
-                  onChange={e=>setCols(clamp(parseInt(e.target.value)||1,1,20))}/>
-              </label>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <label className="text-xs">Gap X (mm)
-                <input type="number" className="w-full border rounded px-2 py-1" value={gap.x_mm}
-                  onChange={e=>setGap(g=>({...g, x_mm: clamp(parseFloat(e.target.value)||0,0,100)}))}/>
-              </label>
-              <label className="text-xs">Gap Y (mm)
-                <input type="number" className="w-full border rounded px-2 py-1" value={gap.y_mm}
-                  onChange={e=>setGap(g=>({...g, y_mm: clamp(parseFloat(e.target.value)||0,0,100)}))}/>
-              </label>
-            </div>
-            <div className="grid grid-cols-4 gap-2">
-              {["top","right","bottom","left"].map(side => (
-                <label key={side} className="text-xs capitalize">Outer {side}
-                  <input type="number" className="w-full border rounded px-2 py-1" value={outer[side]}
-                    onChange={e=>setOuter(prev=>({...prev, [side]: clamp(parseFloat(e.target.value)||0,0,200)}))}/>
-                </label>
-              ))}
-            </div>
-            <div className="text-[11px] text-gray-500">
-              When Bulk + Imposition are on, we tile across the sheet using your filtered students.
-            </div>
-          </div>
-        </div>
+        <PrintSettings
+          usePrintSizing={usePrintSizing}
+          setUsePrintSizing={setUsePrintSizing}
+          pagePreset={pagePreset}
+          setPagePreset={setPagePreset}
+          customPage={customPage}
+          setCustomPage={setCustomPage}
+          pageOrientation={pageOrientation}
+          setPageOrientation={setPageOrientation}
+          dpi={dpi}
+          setDpi={setDpi}
+          bleed={bleed}
+          setBleed={setBleed}
+          safe={safe}
+          setSafe={setSafe}
+          showMarks={showMarks}
+          setShowMarks={setShowMarks}
+          showReg={showReg}
+          setShowReg={setShowReg}
+          imposeOn={imposeOn}
+          setImposeOn={setImposeOn}
+          sheetPreset={sheetPreset}
+          setSheetPreset={setSheetPreset}
+          sheetCustom={sheetCustom}
+          setSheetCustom={setSheetCustom}
+          rows={rows}
+          setRows={setRows}
+          cols={cols}
+          setCols={setCols}
+          gap={gap}
+          setGap={setGap}
+          outer={outer}
+          setOuter={setOuter}
+        />
         {/* Filters (collapsible) */}
         <div className="border-b">
           <button
@@ -1966,31 +1877,11 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
           )}
         </div>
 
-        {/* Frames (collapsible) */}
-        <div className="border-b">
-          <button
-            className="w-full text-left p-3 text-sm font-semibold"
-            onClick={() => setShowFrames((v) => !v)}
-          >
-            Add Frame
-          </button>
-          {showFrames && (
-            <div className="px-3 pb-3">
-              <div className="grid grid-cols-4 gap-2">
-                <IconButton title="Rectangle Frame" onClick={() => addFrameSlot("rect")}><Square size={18} /></IconButton>
-                <IconButton title="Rounded Frame" onClick={() => addFrameSlot("rounded")}><Square size={18} /></IconButton>
-                <IconButton title="Circle Frame" onClick={() => addFrameSlot("circle")}><Circle size={18} /></IconButton>
-                <IconButton title="Triangle Frame" onClick={() => addFrameSlot("triangle")}><Triangle size={18} /></IconButton>
-                <IconButton title="Hexagon Frame" onClick={() => addFrameSlot("hexagon")}><Hexagon size={18} /></IconButton>
-                <IconButton title="Star Frame" onClick={() => addFrameSlot("star")}><Star size={18} /></IconButton>
-                <IconButton title="Heart Frame" onClick={() => addFrameSlot("heart")}><Heart size={18} /></IconButton>
-              </div>
-              <div className="text-[11px] text-gray-500 mt-2">
-                Tip: Drag an image over a dashed frame to snap & mask it. Double-click an image to adjust inside the frame.
-              </div>
-            </div>
-          )}
-        </div>
+        <FrameSection
+          showFrames={showFrames}
+          setShowFrames={setShowFrames}
+          addFrameSlot={addFrameSlot}
+        />
 
         {/* Selected object (collapsible) */}
         {activeObj && (

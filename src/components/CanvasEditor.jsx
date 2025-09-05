@@ -38,11 +38,13 @@ import {
   Images,
   FileDown,
 } from "lucide-react";
+import { Layout as LayoutIcon, Ruler, BookOpen, Scissors } from "lucide-react";
 import IconButton from "./IconButton";
 import CanvasArea from "./CanvasArea";
 import ImageCropModal from "./ImageCropModal";
 import BottomToolbar from "./BottomToolbar";
 import UndoRedoControls from "./UndoRedoControls";
+import { jsPDF } from "jspdf";
 
 /* =============================================================================
    Shapes & helpers
@@ -349,6 +351,52 @@ const removeMaskAndFrame = (canvas, imageObj, keepSlot = false) => {
   canvas.requestRenderAll();
 };
 
+
+/* ========================= PRINT/IMPOSE HELPERS (NEW) ========================= */
+const IN_PER_MM = 1 / 25.4;
+const PRESET_SIZES = {
+  "ID-1/CR80": { w_mm: 85.6, h_mm: 54.0 },
+  A4: { w_mm: 210, h_mm: 297 },
+  Letter: { w_mm: 215.9, h_mm: 279.4 },
+  Legal: { w_mm: 215.9, h_mm: 355.6 },
+  Tabloid: { w_mm: 279.4, h_mm: 431.8 },
+};
+const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+const mmToPx = (mm, dpi) => Math.round((mm * IN_PER_MM) * dpi);
+const pxToMm = (px, dpi) => (px / dpi) / IN_PER_MM;
+
+function drawCropMarks(ctx, W, H, markLenPx, offsetPx, stroke = "#000", lw = 1) {
+  ctx.save();
+  ctx.strokeStyle = stroke;
+  ctx.lineWidth = lw;
+  // TL
+  ctx.beginPath(); ctx.moveTo(offsetPx, 0); ctx.lineTo(offsetPx, markLenPx);
+  ctx.moveTo(0, offsetPx); ctx.lineTo(markLenPx, offsetPx); ctx.stroke();
+  // TR
+  ctx.beginPath(); ctx.moveTo(W - offsetPx, 0); ctx.lineTo(W - offsetPx, markLenPx);
+  ctx.moveTo(W - markLenPx, offsetPx); ctx.lineTo(W, offsetPx); ctx.stroke();
+  // BL
+  ctx.beginPath(); ctx.moveTo(offsetPx, H - markLenPx); ctx.lineTo(offsetPx, H);
+  ctx.moveTo(0, H - offsetPx); ctx.lineTo(markLenPx, H - offsetPx); ctx.stroke();
+  // BR
+  ctx.beginPath(); ctx.moveTo(W - offsetPx, H - markLenPx); ctx.lineTo(W - offsetPx, H);
+  ctx.moveTo(W - markLenPx, H - offsetPx); ctx.lineTo(W, H - offsetPx); ctx.stroke();
+  ctx.restore();
+}
+
+function drawRegistrationMark(ctx, cx, cy, size = 10, lw = 1, stroke = "#000") {
+  ctx.save();
+  ctx.strokeStyle = stroke;
+  ctx.lineWidth = lw;
+  ctx.beginPath();
+  ctx.arc(cx, cy, size, 0, Math.PI * 2);
+  ctx.moveTo(cx - size * 1.5, cy); ctx.lineTo(cx + size * 1.5, cy);
+  ctx.moveTo(cx, cy - size * 1.5); ctx.lineTo(cx, cy + size * 1.5);
+  ctx.stroke();
+  ctx.restore();
+}
+/* ============================================================================ */
+
 /* =============================================================================
    Main Editor
 ============================================================================= */
@@ -415,6 +463,53 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
   const [showFrames, setShowFrames] = useState(true);
   const [showSelectedSection, setShowSelectedSection] = useState(true);
   const [showImageTools, setShowImageTools] = useState(true);
+  /* ========================= PRINT & IMPOSITION (NEW) ========================= */
+  const [pagePreset, setPagePreset] = useState("A4");
+  const [pageOrientation, setPageOrientation] = useState("portrait"); // portrait|landscape
+  const [dpi, setDpi] = useState(300); // 150–600
+  const [customPage, setCustomPage] = useState({ w_mm: 210, h_mm: 297 });
+
+  const [bleed, setBleed] = useState({ top: 3, right: 3, bottom: 3, left: 3 });   // mm
+  const [safe, setSafe] = useState({ top: 3, right: 3, bottom: 3, left: 3 });     // mm
+  const [showMarks, setShowMarks] = useState(true);
+  const [showReg, setShowReg] = useState(false);
+
+  // Imposition (sheet)
+  const [imposeOn, setImposeOn] = useState(false);
+  const [sheetPreset, setSheetPreset] = useState("A4");
+  const [sheetCustom, setSheetCustom] = useState({ w_mm: 210, h_mm: 297 });
+  const [rows, setRows] = useState(2);
+  const [cols, setCols] = useState(2);
+  const [gap, setGap] = useState({ x_mm: 5, y_mm: 5 });
+  const [outer, setOuter] = useState({ top: 10, right: 10, bottom: 10, left: 10 });
+
+  // Derived page size (mm) and pixel size per DPI
+  const pageMM = useMemo(() => {
+    const base = pagePreset === "Custom" ? customPage : PRESET_SIZES[pagePreset] || PRESET_SIZES.A4;
+    const { w_mm, h_mm } = base;
+    return pageOrientation === "portrait" ? { w_mm, h_mm } : { w_mm: h_mm, h_mm: w_mm };
+  }, [pagePreset, pageOrientation, customPage]);
+
+  const contentPx = useMemo(() => ({
+    W: mmToPx(pageMM.w_mm, dpi),
+    H: mmToPx(pageMM.h_mm, dpi),
+  }), [pageMM, dpi]);
+
+  const bleedPx = useMemo(() => ({
+    top: mmToPx(bleed.top, dpi),
+    right: mmToPx(bleed.right, dpi),
+    bottom: mmToPx(bleed.bottom, dpi),
+    left: mmToPx(bleed.left, dpi),
+  }), [bleed, dpi]);
+
+  const safePx = useMemo(() => ({
+    top: mmToPx(safe.top, dpi),
+    right: mmToPx(safe.right, dpi),
+    bottom: mmToPx(safe.bottom, dpi),
+    left: mmToPx(safe.left, dpi),
+  }), [safe, dpi]);
+  /* ========================================================================== */
+
 
   const studentObjectsRef = useRef([]);
   const bgRef = useRef(null);
@@ -1071,7 +1166,73 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     return () => window.removeEventListener("keydown", onKey);
   }, [canvas, undo, redo, saveHistory, setActiveObj]);
 
-  /* ============================ Replace / Extract ========================== */
+  
+  // Update design canvas to match selected page size (in pixels at selected DPI)
+  useEffect(() => {
+    if (!canvas) return;
+    const W = contentPx.W, H = contentPx.H;
+    setTplSize({ w: W, h: H });
+    setCanvasSize?.(W, H);
+  }, [canvas, contentPx.W, contentPx.H, setCanvasSize]);
+
+  // Draw bleed/safe/crop marks as Fabric overlay
+  useEffect(() => {
+    if (!canvas) return;
+    canvas._renderOverlay = (ctx) => {
+      const W = canvas.getWidth();
+      const H = canvas.getHeight();
+
+      // page border (bleed edge)
+      ctx.save();
+      ctx.strokeStyle = "rgba(255,0,0,0.6)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
+      ctx.restore();
+
+      // trim box (inside bleed)
+      const trimX = bleedPx.left;
+      const trimY = bleedPx.top;
+      const trimW = W - bleedPx.left - bleedPx.right;
+      const trimH = H - bleedPx.top - bleedPx.bottom;
+      ctx.save();
+      ctx.strokeStyle = "rgba(0,0,0,0.6)";
+      ctx.setLineDash([6, 4]);
+      ctx.strokeRect(trimX + 0.5, trimY + 0.5, trimW - 1, trimH - 1);
+      ctx.restore();
+
+      // safe area (inside trim)
+      const safeX = trimX + safePx.left;
+      const safeY = trimY + safePx.top;
+      const safeW = trimW - safePx.left - safePx.right;
+      const safeH = trimH - safePx.top - safePx.bottom;
+      ctx.save();
+      ctx.strokeStyle = "rgba(34,197,94,0.8)";
+      ctx.setLineDash([2, 2]);
+      ctx.strokeRect(safeX + 0.5, safeY + 0.5, safeW - 1, safeH - 1);
+      ctx.restore();
+
+      if (showMarks) {
+        const markLen = mmToPx(4, dpi);
+        const off = mmToPx(1.5, dpi);
+        drawCropMarks(ctx, W, H, markLen, off, "#000", 1);
+      }
+      if (showReg) {
+        drawRegistrationMark(ctx, W / 2, H / 2, 8, 1);
+        drawRegistrationMark(ctx, W / 2, mmToPx(10, dpi), 6, 1);
+        drawRegistrationMark(ctx, W / 2, H - mmToPx(10, dpi), 6, 1);
+        drawRegistrationMark(ctx, mmToPx(10, dpi), H / 2, 6, 1);
+        drawRegistrationMark(ctx, W - mmToPx(10, dpi), H / 2, 6, 1);
+      }
+    };
+    canvas.requestRenderAll();
+    return () => {
+      if (!canvas) return;
+      canvas._renderOverlay = null;
+      canvas.requestRenderAll();
+    };
+  }, [canvas, bleedPx, safePx, showMarks, showReg, dpi]);
+
+/* ============================ Replace / Extract ========================== */
   const replaceActiveImage = () => {
     if (!canvas) return;
     const obj = canvas.getActiveObject();
@@ -1356,7 +1517,120 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     }
   };
 
-  /* ================================= UI =================================== */
+  
+  /* ============================ PRINT EXPORTS (NEW) ============================ */
+  const getTrimBoundsPx = useCallback(() => {
+    const W = contentPx.W;
+    const H = contentPx.H;
+    return {
+      x: bleedPx.left,
+      y: bleedPx.top,
+      w: W - bleedPx.left - bleedPx.right,
+      h: H - bleedPx.top - bleedPx.bottom,
+    };
+  }, [contentPx, bleedPx]);
+
+  const exportSinglePNG = () => {
+    const dataUrl = canvas.toDataURL({ format: "png", quality: 1 });
+    const a = document.createElement("a");
+    a.href = dataUrl;
+    a.download = `design_${pagePreset}_${pageOrientation}_${dpi}dpi.png`;
+    a.click();
+  };
+
+  const exportSinglePDF = () => {
+    const { w_mm, h_mm } = pageMM;
+    const doc = new jsPDF({ orientation: w_mm > h_mm ? "l" : "p", unit: "mm", format: [w_mm, h_mm] });
+    canvas.discardActiveObject();
+    canvas.requestRenderAll();
+    const png = canvas.toDataURL({ format: "png", quality: 1 });
+    doc.addImage(png, "PNG", 0, 0, w_mm, h_mm);
+
+    if (showMarks) {
+      const trim = getTrimBoundsPx();
+      const toMM = (px) => pxToMm(px, dpi);
+      const markLen = 4, off = 1.5;
+      doc.setLineWidth(0.2);
+      const line = (x1,y1,x2,y2) => doc.line(x1,y1,x2,y2);
+      const tx = toMM(trim.x), ty = toMM(trim.y), tw = toMM(trim.w), th = toMM(trim.h);
+      // TL
+      line(tx - off, ty, tx - off, ty + markLen); line(tx, ty - off, tx + markLen, ty - off);
+      // TR
+      line(tx + tw + off, ty, tx + tw + off, ty + markLen); line(tx + tw - markLen, ty - off, tx + tw, ty - off);
+      // BL
+      line(tx - off, ty + th - markLen, tx - off, ty + th); line(tx, ty + th + off, tx + markLen, ty + th + off);
+      // BR
+      line(tx + tw + off, ty + th - markLen, tx + tw + off, ty + th); line(tx + tw - markLen, ty + th + off, tx + tw, ty + th + off);
+      if (showReg) {
+        const cx = w_mm / 2, cy = h_mm / 2;
+        doc.circle(cx, cy, 2);
+        doc.line(cx - 3, cy, cx + 3, cy);
+        doc.line(cx, cy - 3, cx, cy + 3);
+      }
+    }
+
+    const ts = new Date().toISOString().slice(0,19).replace(/[:T]/g,"-");
+    doc.save(`design_${pagePreset}_${pageOrientation}_${dpi}dpi_${ts}.pdf`);
+  };
+
+  const exportImposedPDF = async () => {
+    if (!imposeOn) {
+      toast.error("Enable Imposition in the left sidebar.");
+      return;
+    }
+    const SHEET = sheetPreset === "Custom" ? sheetCustom : PRESET_SIZES[sheetPreset] || PRESET_SIZES.A4;
+    const sheetW = SHEET.w_mm, sheetH = SHEET.h_mm;
+    const doc = new jsPDF({ orientation: sheetW > sheetH ? "l" : "p", unit: "mm", format: [sheetW, sheetH] });
+
+    // Determine list of records to tile
+    const baseList = (bulkMode && bulkList.length) ? bulkList : [null];
+
+    // Trim size in mm
+    const trim = getTrimBoundsPx();
+    const trimWmm = pxToMm(trim.w, dpi);
+    const trimHmm = pxToMm(trim.h, dpi);
+
+    const gapX = gap.x_mm, gapY = gap.y_mm;
+    const m = outer;
+
+    let tileIndex = 0;
+    for (let i = 0; i < baseList.length; i++) {
+      if (bulkMode && baseList[i]) {
+        // Jump canvas to that student page
+        const idx = bulkList.indexOf(baseList[i]);
+        if (idx >= 0) gotoIndex(idx);
+        await new Promise(r=>setTimeout(r, 250));
+        canvas.discardActiveObject();
+        canvas.requestRenderAll();
+      }
+      const img = canvas.toDataURL({ format: "png", quality: 1 });
+
+      const r = Math.floor(tileIndex / cols);
+      const c = tileIndex % cols;
+      const x = m.left + c * (trimWmm + gapX);
+      const y = m.top + r * (trimHmm + gapY);
+
+      doc.addImage(
+        img, "PNG",
+        x - pxToMm(bleedPx.left, dpi),
+        y - pxToMm(bleedPx.top, dpi),
+        trimWmm + pxToMm(bleedPx.left + bleedPx.right, dpi),
+        trimHmm + pxToMm(bleedPx.top + bleedPx.bottom, dpi)
+      );
+
+      tileIndex++;
+      if (tileIndex >= rows * cols && (i < baseList.length - 1)) {
+        doc.addPage([sheetW, sheetH], sheetW > sheetH ? "l" : "p");
+        tileIndex = 0;
+      }
+    }
+
+    const ts = new Date().toISOString().slice(0,19).replace(/[:T]/g,"-");
+    doc.save(`imposed_${rows}x${cols}_${sheetPreset}_${ts}.pdf`);
+  };
+  /* ============================================================================ */
+
+/* ================================= UI =================================== */
   return (
     <div className="h-screen w-screen overflow-hidden bg-gray-100">
       <Toaster position="top-right" />
@@ -1505,6 +1779,24 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
               <Download size={18} />
             </button>
 
+            {/* NEW: Print Exports */}
+            <button
+              title="Export Single PDF (with bleed/marks)"
+              onClick={exportSinglePDF}
+              className="hidden sm:flex items-center gap-1 px-3 py-2 rounded-full bg-purple-600 text-white shadow hover:bg-purple-700 text-sm"
+            >
+              <FileDown size={16} /> Single PDF
+            </button>
+            <button
+              title="Export Imposed Sheet PDF"
+              onClick={exportImposedPDF}
+              className={`hidden sm:flex items-center gap-1 px-3 py-2 rounded-full ${imposeOn ? "bg-rose-600 hover:bg-rose-700" : "bg-rose-300 cursor-not-allowed"} text-white shadow text-sm`}
+              disabled={!imposeOn}
+            >
+              <BookOpen size={16} /> Imposed PDF
+            </button>
+    
+
             {/* Bulk download PNGs */}
             <button
               title="Download All (PNGs)"
@@ -1552,6 +1844,129 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
           isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         }`}
       >
+
+        {/* NEW: Page Size / DPI */}
+        <div className="border-b">
+          <button className="w-full text-left p-3 text-sm font-semibold" onClick={() => setShowFilters((v) => v)}>
+            Page Size & DPI
+          </button>
+          <div className="px-3 pb-3 space-y-2 text-sm">
+            <div className="grid grid-cols-2 gap-2">
+              {["ID-1/CR80","A4","Letter","Legal","Tabloid","Custom"].map(key => (
+                <button key={key} onClick={()=>setPagePreset(key)} className={`border rounded px-2 py-1 ${pagePreset===key?"bg-gray-900 text-white":""}`}>{key}</button>
+              ))}
+            </div>
+            {pagePreset==="Custom" && (
+              <div className="grid grid-cols-2 gap-2">
+                <label className="text-xs">Width (mm)
+                  <input type="number" className="w-full border rounded px-2 py-1" value={customPage.w_mm}
+                    onChange={e=>setCustomPage(s=>({...s, w_mm: clamp(parseFloat(e.target.value)||0, 1, 3000)}))}/>
+                </label>
+                <label className="text-xs">Height (mm)
+                  <input type="number" className="w-full border rounded px-2 py-1" value={customPage.h_mm}
+                    onChange={e=>setCustomPage(s=>({...s, h_mm: clamp(parseFloat(e.target.value)||0, 1, 3000)}))}/>
+                </label>
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-2">
+              <button className={`border rounded px-2 py-1 ${pageOrientation==="portrait"?"bg-gray-900 text-white":""}`} onClick={()=>setPageOrientation("portrait")}>Portrait</button>
+              <button className={`border rounded px-2 py-1 ${pageOrientation==="landscape"?"bg-gray-900 text-white":""}`} onClick={()=>setPageOrientation("landscape")}>Landscape</button>
+            </div>
+            <div>
+              <div className="flex items-center justify-between"><span className="text-xs">DPI</span><span className="text-[11px] opacity-70">{dpi} dpi</span></div>
+              <Slider min={150} max={600} step={50} value={dpi} onChange={(_,v)=>setDpi(Array.isArray(v)?v[0]:v)} />
+            </div>
+          </div>
+        </div>
+
+        {/* NEW: Bleed / Safe / Marks */}
+        <div className="border-b">
+          <button className="w-full text-left p-3 text-sm font-semibold" onClick={() => setShowFilters((v) => v)}>
+            Bleed / Safe / Marks
+          </button>
+          <div className="px-3 pb-3 space-y-2 text-sm">
+            <div className="grid grid-cols-4 gap-2">
+              {["top","right","bottom","left"].map(side => (
+                <label key={side} className="text-xs capitalize">Bleed {side}
+                  <input type="number" className="w-full border rounded px-2 py-1" value={bleed[side]}
+                    onChange={e=>setBleed(prev=>({...prev, [side]: clamp(parseFloat(e.target.value)||0, 0, 50)}))}/>
+                </label>
+              ))}
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              {["top","right","bottom","left"].map(side => (
+                <label key={side} className="text-xs capitalize">Safe {side}
+                  <input type="number" className="w-full border rounded px-2 py-1" value={safe[side]}
+                    onChange={e=>setSafe(prev=>({...prev, [side]: clamp(parseFloat(e.target.value)||0, 0, 100)}))}/>
+                </label>
+              ))}
+            </div>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={showMarks} onChange={e=>setShowMarks(e.target.checked)}/> Crop marks</label>
+              <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={showReg} onChange={e=>setShowReg(e.target.checked)}/> Registration mark</label>
+            </div>
+          </div>
+        </div>
+
+        {/* NEW: Imposition */}
+        <div className="border-b">
+          <button className="w-full text-left p-3 text-sm font-semibold" onClick={() => setShowFilters((v) => v)}>
+            Imposition (n‑up)
+          </button>
+          <div className="px-3 pb-3 space-y-2 text-sm">
+            <label className="flex items-center gap-2 text-xs">
+              <input type="checkbox" checked={imposeOn} onChange={e=>setImposeOn(e.target.checked)}/> Enable Imposition on Sheet
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {["A4","Letter","Legal","Tabloid","Custom"].map(key => (
+                <button key={key} className={`border rounded px-2 py-1 ${sheetPreset===key?"bg-gray-900 text-white":""}`} onClick={()=>setSheetPreset(key)}>{key}</button>
+              ))}
+            </div>
+            {sheetPreset==="Custom" && (
+              <div className="grid grid-cols-2 gap-2">
+                <label className="text-xs">Sheet W (mm)
+                  <input type="number" className="w-full border rounded px-2 py-1" value={sheetCustom.w_mm}
+                    onChange={e=>setSheetCustom(s=>({...s, w_mm: clamp(parseFloat(e.target.value)||0, 30, 3000)}))}/>
+                </label>
+                <label className="text-xs">Sheet H (mm)
+                  <input type="number" className="w-full border rounded px-2 py-1" value={sheetCustom.h_mm}
+                    onChange={e=>setSheetCustom(s=>({...s, h_mm: clamp(parseFloat(e.target.value)||0, 30, 3000)}))}/>
+                </label>
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-2">
+              <label className="text-xs">Rows
+                <input type="number" className="w-full border rounded px-2 py-1" value={rows}
+                  onChange={e=>setRows(clamp(parseInt(e.target.value)||1,1,20))}/>
+              </label>
+              <label className="text-xs">Columns
+                <input type="number" className="w-full border rounded px-2 py-1" value={cols}
+                  onChange={e=>setCols(clamp(parseInt(e.target.value)||1,1,20))}/>
+              </label>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="text-xs">Gap X (mm)
+                <input type="number" className="w-full border rounded px-2 py-1" value={gap.x_mm}
+                  onChange={e=>setGap(g=>({...g, x_mm: clamp(parseFloat(e.target.value)||0,0,100)}))}/>
+              </label>
+              <label className="text-xs">Gap Y (mm)
+                <input type="number" className="w-full border rounded px-2 py-1" value={gap.y_mm}
+                  onChange={e=>setGap(g=>({...g, y_mm: clamp(parseFloat(e.target.value)||0,0,100)}))}/>
+              </label>
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              {["top","right","bottom","left"].map(side => (
+                <label key={side} className="text-xs capitalize">Outer {side}
+                  <input type="number" className="w-full border rounded px-2 py-1" value={outer[side]}
+                    onChange={e=>setOuter(prev=>({...prev, [side]: clamp(parseFloat(e.target.value)||0,0,200)}))}/>
+                </label>
+              ))}
+            </div>
+            <div className="text-[11px] text-gray-500">
+              When Bulk + Imposition are on, we tile across the sheet using your filtered students.
+            </div>
+          </div>
+        </div>
         {/* Filters (collapsible) */}
         <div className="border-b">
           <button

@@ -353,44 +353,6 @@ const removeMaskAndFrame = (canvas, imageObj, keepSlot = false) => {
 
 
 
-// Overlay guides on after:render (no private Fabric API)
-useEffect(() => {
-  if (!canvas) return;
-  const render = () => {
-    if (!usePrintSizing) return;
-    const ctx = (canvas.getSelectionContext && canvas.getSelectionContext()) || (canvas.upperCanvasEl && canvas.upperCanvasEl.getContext('2d'));
-    if (!ctx) return;
-    const W = canvas.getWidth();
-    const H = canvas.getHeight();
-    ctx.save();
-    if (showMarks) {
-      ctx.strokeStyle = '#f43f5e';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(bleedPx.left, bleedPx.top, W - bleedPx.left - bleedPx.right, H - bleedPx.top - bleedPx.bottom);
-      ctx.strokeStyle = '#10b981';
-      ctx.strokeRect(safePx.left, safePx.top, W - safePx.left - safePx.right, H - safePx.top - safePx.bottom);
-      // simple crop marks
-      const mark = Math.round(Math.min(W,H)*0.03);
-      const off = Math.round(Math.min(W,H)*0.01);
-      // TL
-      ctx.beginPath(); ctx.moveTo(off, 0); ctx.lineTo(off, mark); ctx.moveTo(0, off); ctx.lineTo(mark, off); ctx.stroke();
-      // TR
-      ctx.beginPath(); ctx.moveTo(W-off, 0); ctx.lineTo(W-off, mark); ctx.moveTo(W-mark, off); ctx.lineTo(W, off); ctx.stroke();
-      // BL
-      ctx.beginPath(); ctx.moveTo(off, H-mark); ctx.lineTo(off, H); ctx.moveTo(0, H-off); ctx.lineTo(mark, H-off); ctx.stroke();
-      // BR
-      ctx.beginPath(); ctx.moveTo(W-off, H-mark); ctx.lineTo(W-off, H); ctx.moveTo(W-mark, H-off); ctx.lineTo(W, H-off); ctx.stroke();
-    }
-    if (showReg) {
-      const cx = W/2, cy = H/2, size = 8;
-      ctx.beginPath(); ctx.arc(cx, cy, size, 0, Math.PI*2); ctx.moveTo(cx-size*1.5, cy); ctx.lineTo(cx+size*1.5, cy); ctx.moveTo(cx, cy-size*1.5); ctx.lineTo(cx, cy+size*1.5); ctx.stroke();
-    }
-    ctx.restore();
-  };
-  canvas.on('after:render', render);
-  return () => canvas.off('after:render', render);
-}, [canvas, usePrintSizing, showMarks, showReg, bleedPx, safePx]);
-
 /* ========================= PRINT/IMPOSE HELPERS (NEW) ========================= */
 const IN_PER_MM = 1 / 25.4;
 const PRESET_SIZES = {
@@ -654,7 +616,45 @@ const applyOverridesFor = useCallback((studentUuid) => {
     resetHistory,
   } = useCanvasEditor(canvasRef, tplSize.w, tplSize.h);
 
-  const debouncedSaveHistory = useMemo(() => debounce(saveHistory, 300), [saveHistory]);
+  
+
+// Overlay guides on after:render (no private Fabric API)
+useEffect(() => {
+  if (!canvas) return;
+  const render = () => {
+    if (!usePrintSizing) return;
+    const ctx = (canvas.getSelectionContext && canvas.getSelectionContext()) || (canvas.upperCanvasEl && canvas.upperCanvasEl.getContext('2d'));
+    if (!ctx) return;
+    const W = canvas.getWidth();
+    const H = canvas.getHeight();
+    ctx.save();
+    if (showMarks) {
+      ctx.strokeStyle = '#f43f5e';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(bleedPx.left, bleedPx.top, W - bleedPx.left - bleedPx.right, H - bleedPx.top - bleedPx.bottom);
+      ctx.strokeStyle = '#10b981';
+      ctx.strokeRect(safePx.left, safePx.top, W - safePx.left - safePx.right, H - safePx.top - safePx.bottom);
+      const mark = Math.round(Math.min(W,H)*0.03);
+      const off = Math.round(Math.min(W,H)*0.01);
+      // TL
+      ctx.beginPath(); ctx.moveTo(off, 0); ctx.lineTo(off, mark); ctx.moveTo(0, off); ctx.lineTo(mark, off); ctx.stroke();
+      // TR
+      ctx.beginPath(); ctx.moveTo(W-off, 0); ctx.lineTo(W-off, mark); ctx.moveTo(W-mark, off); ctx.lineTo(W, off); ctx.stroke();
+      // BL
+      ctx.beginPath(); ctx.moveTo(off, H-mark); ctx.lineTo(off, H); ctx.moveTo(0, H-off); ctx.lineTo(mark, H-off); ctx.stroke();
+      // BR
+      ctx.beginPath(); ctx.moveTo(W-off, H-mark); ctx.lineTo(W-off, H); ctx.moveTo(W-mark, H-off); ctx.lineTo(W, H-off); ctx.stroke();
+    }
+    if (showReg) {
+      const cx = W/2, cy = H/2, size = 8;
+      ctx.beginPath(); ctx.arc(cx, cy, size, 0, Math.PI*2); ctx.moveTo(cx-size*1.5, cy); ctx.lineTo(cx+size*1.5, cy); ctx.moveTo(cx, cy-size*1.5); ctx.lineTo(cx, cy+size*1.5); ctx.stroke();
+    }
+    ctx.restore();
+  };
+  canvas.on('after:render', render);
+  return () => canvas.off('after:render', render);
+}, [canvas, usePrintSizing, showMarks, showReg, bleedPx, safePx]);
+const debouncedSaveHistory = useMemo(() => debounce(saveHistory, 300), [saveHistory]);
 
   const getSavedProps = useCallback(
     (field) => savedPlaceholders.find((p) => p.field === field) || null,

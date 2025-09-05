@@ -421,7 +421,22 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
       setScale(Number.isFinite(s) ? Math.max(0.05, Math.min(s, 3)) : 1);
     });
     ro.observe(viewportRef.current);
-    return () => ro.disconnect();
+    
+  /* TEMPLATE CLICK DELEGATE (NEW) */
+  useEffect(() => {
+    const handler = (e) => {
+      const el = e.target && e.target.closest ? e.target.closest('[data-template-id]') : null;
+      if (!el) return;
+      const tid = el.getAttribute('data-template-id');
+      if (tid && typeof loadTemplateById === 'function') {
+        e.preventDefault();
+        loadTemplateById(tid);
+      }
+    };
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, [loadTemplateById]);
+return () => ro.disconnect();
   }, [tplSize.w, tplSize.h]);
 
   // data
@@ -442,6 +457,80 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
   const [loadingTemplate, setLoadingTemplate] = useState(false);
 
   // bulk mode
+  // ==== Per-student edit persistence (NEW) ====
+  const editsByStudentRef = useRef(new Map());
+
+  const getCurrentStudentUUID = () => {
+    if (bulkMode && bulkList.length) return bulkList[bulkIndex] || null;
+    return selectedStudent?.uuid || null;
+  };
+
+  const snapshotCurrentEdits = () => {
+    if (!canvas) return;
+    const uuid = getCurrentStudentUUID();
+    if (!uuid) return;
+    const snapshot = {};
+    canvas.getObjects().forEach((o) => {
+      if (o.customId === "templateBg" || o.isFrameSlot) return;
+      const key = o.field || o.customId;
+      if (!key) return;
+      snapshot[key] = {
+        left: o.left, top: o.top, angle: o.angle || 0,
+        scaleX: o.scaleX || 1, scaleY: o.scaleY || 1,
+        originX: o.originX, originY: o.originY,
+        fill: o.fill || null, fontSize: o.fontSize || null,
+        fontFamily: o.fontFamily || null, fontWeight: o.fontWeight || null,
+        text: typeof o.text === "string" ? o.text : null,
+        shape: o.type === "image" ? (o.shape || null) : null,
+      };
+    });
+    editsByStudentRef.current.set(uuid, snapshot);
+  };
+
+  const applyEditsForStudent = (studentUUID) => {
+    if (!studentUUID || !canvas) return;
+    const snap = editsByStudentRef.current.get(studentUUID);
+    if (!snap) return;
+    canvas.getObjects().forEach((o) => {
+      if (o.customId === "templateBg" || o.isFrameSlot) return;
+      const key = o.field || o.customId;
+      if (!key) return;
+      const s = snap[key];
+      if (!s) return;
+      o.set({
+        left: s.left ?? o.left,
+        top: s.top ?? o.top,
+        angle: s.angle ?? o.angle,
+        scaleX: s.scaleX ?? o.scaleX,
+        scaleY: s.scaleY ?? o.scaleY,
+        originX: s.originX ?? o.originX,
+        originY: s.originY ?? o.originY,
+      });
+      if (o.type === "i-text" || o.type === "textbox" || o.type === "text") {
+        if (s.fill != null) o.set({ fill: s.fill });
+        if (s.fontSize != null) o.set({ fontSize: s.fontSize });
+        if (s.fontFamily != null) o.set({ fontFamily: s.fontFamily });
+        if (s.fontWeight != null) o.set({ fontWeight: s.fontWeight });
+        if (typeof s.text === "string") o.set({ text: s.text });
+      }
+      if (o.type === "image" && s.shape) {
+        try {
+          applyMaskAndFrame(canvas, o, s.shape, {
+            stroke: o.frameOverlay && o.frameOverlay.stroke ? o.frameOverlay.stroke : frameBorder,
+            strokeWidth: o.frameOverlay && o.frameOverlay.strokeWidth ? o.frameOverlay.strokeWidth : frameWidth,
+            rx: frameCorner,
+            absolute: false,
+            followImage: true,
+          });
+        } catch (err) {
+          // non-blocking
+        }
+      }
+      o.setCoords();
+    });
+    canvas.requestRenderAll();
+  };
+
   const [bulkMode, setBulkMode] = useState(false);
   const [bulkList, setBulkList] = useState([]); // array of student uuids
   const [bulkIndex, setBulkIndex] = useState(0);
@@ -1089,8 +1178,16 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     bulkList,
     bulkIndex,
     filteredStudents,
-  ]);
 
+
+  // Re-apply saved edits after template/student page render
+  useEffect(() => {
+    if (!canvas) return;
+    const __uuid = typeof getCurrentStudentUUID === 'function' ? getCurrentStudentUUID() : null;
+    if (__uuid) {
+      try { applyEditsForStudent(__uuid); } catch (e) {}
+    }
+  }, [canvas, bulkMode, bulkList, bulkIndex, selectedStudent, templateImage]);
   /* ============================= Canvas events ============================ */
   useEffect(() => {
     if (!canvas) return;
@@ -1378,33 +1475,21 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
   }, [bulkMode, filteredStudents]);
 
   const gotoIndex = (idx) => {
-    if (!bulkList.length) return;
+    snapshotCurrentEdits();
+if (!bulkList.length) return;
     const n = ((idx % bulkList.length) + bulkList.length) % bulkList.length;
     setBulkIndex(n);
     const uuid = bulkList[n];
     const st = filteredStudents.find((s) => s.uuid === uuid) || null;
     setSelectedStudent(st);
-  };
+};
 
   const prevStudent = () => gotoIndex(bulkIndex - 1);
   const nextStudent = () => gotoIndex(bulkIndex + 1);
 
-  const onTouchStart = (e) => {
-    if (!bulkMode) return;
-    const t = e.touches[0];
-    touchRef.current = { x: t.clientX, y: t.clientY, active: true };
+  const onTouchStart = (e) => { /* swipe disabled */ return; };
   };
-  const onTouchEnd = (e) => {
-    if (!bulkMode || !touchRef.current.active) return;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - touchRef.current.x;
-    const abs = Math.abs(dx);
-    touchRef.current.active = false;
-    if (abs > 40) {
-      if (dx > 0) prevStudent();
-      else nextStudent();
-    }
-  };
+  const onTouchEnd = (e) => { /* swipe disabled */ return; };
 
   /* ============================== Downloads =============================== */
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -2406,6 +2491,6 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
       />
     </div>
   );
-};
+;
 
 export default CanvasEditor;

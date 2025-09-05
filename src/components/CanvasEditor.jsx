@@ -45,6 +45,7 @@ import ImageCropModal from "./ImageCropModal";
 import BottomToolbar from "./BottomToolbar";
 import UndoRedoControls from "./UndoRedoControls";
 import { jsPDF } from "jspdf";
+import TemplateLayout from "../Pages/addTemplateLayout";
 
 /* =============================================================================
    Shapes & helpers
@@ -352,7 +353,6 @@ const removeMaskAndFrame = (canvas, imageObj, keepSlot = false) => {
 };
 
 
-
 /* ========================= PRINT/IMPOSE HELPERS (NEW) ========================= */
 const IN_PER_MM = 1 / 25.4;
 const PRESET_SIZES = {
@@ -397,8 +397,6 @@ function drawRegistrationMark(ctx, cx, cy, size = 10, lw = 1, stroke = "#000") {
   ctx.restore();
 }
 /* ============================================================================ */
-
-const debounce = (fn, wait=250) => { let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), wait); }; };
 
 /* =============================================================================
    Main Editor
@@ -446,70 +444,6 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
   const [loadingTemplate, setLoadingTemplate] = useState(false);
 
   // bulk mode
-
-// Per-student overrides (persist edits between bulk prev/next)
-const overridesRef = useRef(new Map());
-const saveOverridesFor = useCallback((studentUuid) => {
-  if (!canvas || !studentUuid) return;
-  const data = canvas.getObjects().map((o) => {
-    const base = {
-      type: o.type,
-      customId: o.customId || null,
-      field: o.field || null,
-      left: o.left, top: o.top, scaleX: o.scaleX, scaleY: o.scaleY,
-      angle: o.angle, opacity: o.opacity, flipX: o.flipX, flipY: o.flipY,
-    };
-    if (o.type === 'i-text' || o.type === 'IText' || o.type === 'textbox' || o.type === 'text') {
-      base.text = o.text;
-      base.fontSize = o.fontSize;
-      base.fontFamily = o.fontFamily;
-      base.fill = o.fill;
-      base.fontStyle = o.fontStyle;
-      base.fontWeight = o.fontWeight;
-      base.underline = o.underline;
-      base.textAlign = o.textAlign;
-    }
-    if (o.type === 'image') {
-      base.shape = o.shape || null;
-    }
-    if (o.type === 'rect' || o.type === 'circle' || o.type === 'triangle' || o.type === 'polygon') {
-      base.fill = o.fill; base.stroke = o.stroke; base.strokeWidth = o.strokeWidth;
-      base.rx = o.rx || 0; base.ry = o.ry || 0;
-    }
-    return base;
-  });
-  overridesRef.current.set(studentUuid, data);
-}, [canvas]);
-
-const applyOverridesFor = useCallback((studentUuid) => {
-  if (!canvas || !studentUuid) return;
-  const data = overridesRef.current.get(studentUuid);
-  if (!data) return;
-  const objs = canvas.getObjects();
-  data.forEach((saved) => {
-    const match = objs.find(o => (o.field && saved.field && o.field === saved.field) ||
-                                 (o.customId && saved.customId && o.customId === saved.customId) ||
-                                 (o.type === saved.type && (o.field || o.customId)));
-    const o = match;
-    if (!o) return;
-    o.set({
-      left: saved.left, top: saved.top, scaleX: saved.scaleX, scaleY: saved.scaleY,
-      angle: saved.angle, opacity: saved.opacity, flipX: saved.flipX, flipY: saved.flipY,
-    });
-    if (o.type === 'i-text' || o.type === 'IText' || o.type === 'textbox' || o.type === 'text') {
-      o.set({
-        text: saved.text, fontSize: saved.fontSize, fontFamily: saved.fontFamily,
-        fill: saved.fill, fontStyle: saved.fontStyle, fontWeight: saved.fontWeight,
-        underline: saved.underline, textAlign: saved.textAlign
-      });
-    }
-    if (o.type === 'rect' || o.type === 'circle' || o.type === 'triangle' || o.type === 'polygon') {
-      o.set({ fill: saved.fill, stroke: saved.stroke, strokeWidth: saved.strokeWidth, rx: saved.rx, ry: saved.ry });
-    }
-    o.setCoords();
-  });
-  canvas.requestRenderAll();
-}, [canvas]);
   const [bulkMode, setBulkMode] = useState(false);
   const [bulkList, setBulkList] = useState([]); // array of student uuids
   const [bulkIndex, setBulkIndex] = useState(0);
@@ -527,9 +461,6 @@ const applyOverridesFor = useCallback((studentUuid) => {
   const [adjustMode, setAdjustMode] = useState(false);
 
   // Collapsible sections
-
-  const [showPageTools, setShowPageTools] = useState(true);
-  const [showMarksTools, setShowMarksTools] = useState(true);
   const [showFilters, setShowFilters] = useState(true);
   const [showFrames, setShowFrames] = useState(true);
   const [showSelectedSection, setShowSelectedSection] = useState(true);
@@ -616,46 +547,6 @@ const applyOverridesFor = useCallback((studentUuid) => {
     resetHistory,
   } = useCanvasEditor(canvasRef, tplSize.w, tplSize.h);
 
-  
-
-// Overlay guides on after:render (no private Fabric API)
-useEffect(() => {
-  if (!canvas) return;
-  const render = () => {
-    if (!usePrintSizing) return;
-    const ctx = (canvas.getSelectionContext && canvas.getSelectionContext()) || (canvas.upperCanvasEl && canvas.upperCanvasEl.getContext('2d'));
-    if (!ctx) return;
-    const W = canvas.getWidth();
-    const H = canvas.getHeight();
-    ctx.save();
-    if (showMarks) {
-      ctx.strokeStyle = '#f43f5e';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(bleedPx.left, bleedPx.top, W - bleedPx.left - bleedPx.right, H - bleedPx.top - bleedPx.bottom);
-      ctx.strokeStyle = '#10b981';
-      ctx.strokeRect(safePx.left, safePx.top, W - safePx.left - safePx.right, H - safePx.top - safePx.bottom);
-      const mark = Math.round(Math.min(W,H)*0.03);
-      const off = Math.round(Math.min(W,H)*0.01);
-      // TL
-      ctx.beginPath(); ctx.moveTo(off, 0); ctx.lineTo(off, mark); ctx.moveTo(0, off); ctx.lineTo(mark, off); ctx.stroke();
-      // TR
-      ctx.beginPath(); ctx.moveTo(W-off, 0); ctx.lineTo(W-off, mark); ctx.moveTo(W-mark, off); ctx.lineTo(W, off); ctx.stroke();
-      // BL
-      ctx.beginPath(); ctx.moveTo(off, H-mark); ctx.lineTo(off, H); ctx.moveTo(0, H-off); ctx.lineTo(mark, H-off); ctx.stroke();
-      // BR
-      ctx.beginPath(); ctx.moveTo(W-off, H-mark); ctx.lineTo(W-off, H); ctx.moveTo(W-mark, H-off); ctx.lineTo(W, H-off); ctx.stroke();
-    }
-    if (showReg) {
-      const cx = W/2, cy = H/2, size = 8;
-      ctx.beginPath(); ctx.arc(cx, cy, size, 0, Math.PI*2); ctx.moveTo(cx-size*1.5, cy); ctx.lineTo(cx+size*1.5, cy); ctx.moveTo(cx, cy-size*1.5); ctx.lineTo(cx, cy+size*1.5); ctx.stroke();
-    }
-    ctx.restore();
-  };
-  canvas.on('after:render', render);
-  return () => canvas.off('after:render', render);
-}, [canvas, usePrintSizing, showMarks, showReg, bleedPx, safePx]);
-const debouncedSaveHistory = useMemo(() => debounce(saveHistory, 300), [saveHistory]);
-
   const getSavedProps = useCallback(
     (field) => savedPlaceholders.find((p) => p.field === field) || null,
     [savedPlaceholders]
@@ -667,14 +558,13 @@ const debouncedSaveHistory = useMemo(() => debounce(saveHistory, 300), [saveHist
     if (!img || !ov) return null;
     return { w: ov.getScaledWidth(), h: ov.getScaledHeight(), cx: ov.left, cy: ov.top };
   };
-  function setImageZoom(img, zoom) {
+  const setImageZoom = (img, zoom) => {
     if (!img) return;
     img.set({ scaleX: zoom, scaleY: zoom });
     img.setCoords();
     canvas.requestRenderAll();
-  }
-
-  function fitImageToFrame(img, mode = "contain") {
+  };
+  const fitImageToFrame = (img, mode = "contain") => {
     if (!img) return;
     const box = getOverlayBox(img);
     if (!box) return;
@@ -693,16 +583,14 @@ const debouncedSaveHistory = useMemo(() => debounce(saveHistory, 300), [saveHist
     });
     img.setCoords();
     canvas.requestRenderAll();
-  }
-
-  function centerImageInFrame(img) {
+  };
+  const centerImageInFrame = (img) => {
     const box = getOverlayBox(img);
     if (!img || !box) return;
     img.set({ left: box.cx, top: box.cy, originX: "center", originY: "center" });
     img.setCoords();
     canvas.requestRenderAll();
-  }
-
+  };
 
   // Canva-like: Adjust mode freezes frame; image draggable/scalable inside
   const enterAdjustMode = (img) => {
@@ -756,7 +644,7 @@ const debouncedSaveHistory = useMemo(() => debounce(saveHistory, 300), [saveHist
     canvas.requestRenderAll();
   };
 
-  function exitAdjustMode(img) {
+  const exitAdjustMode = (img) => {
     if (!img) return;
     const stroke = img.frameOverlay?.stroke ?? frameBorder;
     const strokeWidth = img.frameOverlay?.strokeWidth ?? frameWidth;
@@ -783,11 +671,10 @@ const debouncedSaveHistory = useMemo(() => debounce(saveHistory, 300), [saveHist
 
     setAdjustMode(false);
     canvas.requestRenderAll();
-  }
-
+  };
 
   /* ====================== Frame slot creation & snapping =================== */
-  function addFrameSlot(shapeType) {
+  const addFrameSlot = (shapeType) => {
     if (!canvas) return;
     const w = 240,
       h = 240;
@@ -811,8 +698,7 @@ const debouncedSaveHistory = useMemo(() => debounce(saveHistory, 300), [saveHist
     canvas.setActiveObject(overlay);
     canvas.requestRenderAll();
     saveHistory();
-  }
-
+  };
 
   const intersects = (a, b) => {
     const r1 = a.getBoundingRect(true, true);
@@ -994,7 +880,7 @@ const debouncedSaveHistory = useMemo(() => debounce(saveHistory, 300), [saveHist
                 top: 0,
               });
               img.customId = "templateBg";
-              img._originalUrl = data.image; setTemplateImage(img);
+              setTemplateImage(img);
               resolve();
             },
             { crossOrigin: "anonymous" }
@@ -1049,7 +935,7 @@ const debouncedSaveHistory = useMemo(() => debounce(saveHistory, 300), [saveHist
 
     const load = async () => {
       if (templateImage) {
-        const bg = await new Promise((resolve)=>{ try { fabric.Image.fromURL(templateImage._originalUrl || (templateImage.getSrc && templateImage.getSrc()) || (templateImage._element && templateImage._element.src) || "", (img)=>resolve(img), { crossOrigin: "anonymous" }); } catch(e){ resolve(templateImage.clone ? templateImage.clone() : templateImage); } });
+        const bg = fabric.util.object.clone(templateImage);
         bg.scaleX = canvas.width / bg.width;
         bg.scaleY = canvas.height / bg.height;
         bg.set({ selectable: false, evented: false });
@@ -1379,7 +1265,7 @@ const debouncedSaveHistory = useMemo(() => debounce(saveHistory, 300), [saveHist
     input.click();
   };
 
-  function extractActiveImage() {
+  const extractActiveImage = () => {
     if (!canvas) return;
     const obj = canvas.getActiveObject();
     if (!obj || obj.type !== "image") {
@@ -1398,61 +1284,8 @@ const debouncedSaveHistory = useMemo(() => debounce(saveHistory, 300), [saveHist
     });
     canvas.requestRenderAll();
     saveHistory();
-  }
-
-
-  /* =========================== Save placeholders =========================== */
-  const saveTemplateLayout = async () => {
-    if (!canvas || !activeTemplateId) return;
-    const placeholders = canvas
-      .getObjects()
-      .filter((o) => o.customId !== "templateBg" && !o.isFrameSlot)
-      .map((obj) => {
-        const rawW = obj.width || 0;
-        const rawH = obj.height || 0;
-        const scaleX = obj.scaleX || 1;
-        const scaleY = obj.scaleY || 1;
-        return {
-          field: obj.field || obj.customId || "unknown",
-          type: obj.type,
-          left: obj.left,
-          top: obj.top,
-          scaleX,
-          scaleY,
-          angle: obj.angle || 0,
-          renderedWidth: rawW * scaleX,
-          renderedHeight: rawH * scaleY,
-          text: obj.text || null,
-          fontSize: obj.fontSize || null,
-          fill: obj.fill || null,
-          fontFamily: obj.fontFamily || null,
-          fontWeight: obj.fontWeight || null,
-          textAlign: obj.textAlign || null,
-          src: obj.type === "image" && obj._element ? obj._element.src : null,
-          shape: obj.type === "image" ? obj.shape || null : null,
-          frame:
-            obj.type === "image" && obj.frameOverlay
-              ? {
-                  stroke: obj.frameOverlay.stroke,
-                  strokeWidth: obj.frameOverlay.strokeWidth,
-                  rx: frameCorner,
-                  fixed: !obj.frameOverlay.followImage,
-                }
-              : null,
-        };
-      });
-    try {
-      await axios.put(
-        `https://canvaback.onrender.com/api/template/update-canvas/${activeTemplateId}`,
-        { placeholders, width: tplSize.w, height: tplSize.h }
-      );
-      setSavedPlaceholders(placeholders);
-      toast.success("Template layout saved!");
-      onSaved?.();
-    } catch {
-      toast.error("Save failed!");
-    }
   };
+
 
   /* ============================ Align & Z-index ============================ */
   const withActive = (fn) => () => {
@@ -1543,7 +1376,7 @@ const debouncedSaveHistory = useMemo(() => debounce(saveHistory, 300), [saveHist
   /* ============================== Downloads =============================== */
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-  function downloadCurrentPNG() {
+  const downloadCurrentPNG = () => {
     const current = bulkMode
       ? filteredStudents.find((s) => s?.uuid === bulkList[bulkIndex]) || selectedStudent
       : selectedStudent;
@@ -1552,8 +1385,7 @@ const debouncedSaveHistory = useMemo(() => debounce(saveHistory, 300), [saveHist
         ? `${(current?.firstName || "").trim()}_${(current?.lastName || "").trim()}`
         : "canvas";
     downloadHighRes?.(tplSize.w, tplSize.h, `${name || "canvas"}.png`);
-  }
-
+  };
 
   const downloadBulkPNGs = async () => {
     if (!bulkMode || !bulkList.length) {
@@ -1583,6 +1415,7 @@ const debouncedSaveHistory = useMemo(() => debounce(saveHistory, 300), [saveHist
     }
     try {
       // dynamic import; same dep your single-page PDF likely uses
+      const { jsPDF } = await import("jspdf");
       const pdf = new jsPDF({
         orientation: "p",
         unit: "px",
@@ -1833,7 +1666,7 @@ const debouncedSaveHistory = useMemo(() => debounce(saveHistory, 300), [saveHist
                 <button
                   className="p-2 rounded-full bg-white border hover:bg-gray-100"
                   title="Previous"
-                  onClick={() => { const cur = bulkList[bulkIndex]; saveOverridesFor(cur); prevStudent(); setTimeout(() => { const nxt = bulkList[bulkIndex]; applyOverridesFor(nxt); }, 0); }}
+                  onClick={prevStudent}
                 >
                   <ChevronLeft size={18} />
                 </button>
@@ -1843,7 +1676,7 @@ const debouncedSaveHistory = useMemo(() => debounce(saveHistory, 300), [saveHist
                 <button
                   className="p-2 rounded-full bg-white border hover:bg-gray-100"
                   title="Next"
-                  onClick={() => { const cur = bulkList[bulkIndex]; saveOverridesFor(cur); nextStudent(); setTimeout(() => { const nxt = bulkList[bulkIndex]; applyOverridesFor(nxt); }, 0); }}
+                  onClick={nextStudent}
                 >
                   <ChevronRight size={18} />
                 </button>
@@ -1923,13 +1756,13 @@ const debouncedSaveHistory = useMemo(() => debounce(saveHistory, 300), [saveHist
             )}
 
             {/* Save template layout */}
-            <button
-              title="Save Template"
-              onClick={saveTemplateLayout}
-              className="px-3 py-2 rounded-full bg-blue-600 text-white shadow hover:bg-blue-700 text-sm"
-            >
-              Save
-            </button>
+           <TemplateLayout
+  canvas={canvas}
+  activeTemplateId={activeTemplateId}
+  tplSize={tplSize}
+  setSavedPlaceholders={setSavedPlaceholders}
+  frameCorner={frameCorner}
+/>
 
             {/* Right sidebar toggle */}
             <button
@@ -1952,7 +1785,7 @@ const debouncedSaveHistory = useMemo(() => debounce(saveHistory, 300), [saveHist
 
         {/* NEW: Page Size / DPI */}
         <div className="border-b">
-          <button className="w-full text-left p-3 text-sm font-semibold" onClick={() => setShowFilters((v) => !v)}>
+          <button className="w-full text-left p-3 text-sm font-semibold" onClick={() => setShowFilters((v) => v)}>
             Page Size & DPI
           </button>
           <div className="px-3 pb-3 space-y-2 text-sm">
@@ -1987,7 +1820,7 @@ const debouncedSaveHistory = useMemo(() => debounce(saveHistory, 300), [saveHist
 
         {/* NEW: Bleed / Safe / Marks */}
         <div className="border-b">
-          <button className="w-full text-left p-3 text-sm font-semibold" onClick={() => setShowFilters((v) => !v)}>
+          <button className="w-full text-left p-3 text-sm font-semibold" onClick={() => setShowFilters((v) => v)}>
             Bleed / Safe / Marks
           </button>
           <div className="px-3 pb-3 space-y-2 text-sm">
@@ -2016,7 +1849,7 @@ const debouncedSaveHistory = useMemo(() => debounce(saveHistory, 300), [saveHist
 
         {/* NEW: Imposition */}
         <div className="border-b">
-          <button className="w-full text-left p-3 text-sm font-semibold" onClick={() => setShowFilters((v) => !v)}>
+          <button className="w-full text-left p-3 text-sm font-semibold" onClick={() => setShowFilters((v) => v)}>
             Imposition (n‑up)
           </button>
           <div className="px-3 pb-3 space-y-2 text-sm">
@@ -2168,104 +2001,7 @@ const debouncedSaveHistory = useMemo(() => debounce(saveHistory, 300), [saveHist
             >
               Selected Object
             </button>
-            
-/* Inspector Panel */
-{showToolbar && (
-  <div className="border-b">
-    <button
-      className="w-full text-left p-3 text-sm font-semibold"
-      onClick={() => setShowSelectedSection((v) => !v)}
-    >
-      Inspector
-    </button>
-    {showSelectedSection && (
-      <div className="px-3 pb-3 space-y-3">
-        {/* TEXT TOOLS */}
-        {activeObj && (activeObj.type === 'i-text' || activeObj.type === 'IText' || activeObj.type === 'textbox' || activeObj.type === 'text') && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <label className="text-xs w-24">Font</label>
-              <input className="border rounded px-2 py-1 w-full" defaultValue={activeObj.fontFamily || ''}
-                onChange={(e)=>{ activeObj.set({ fontFamily: e.target.value }); canvas.requestRenderAll(); }}/>
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-xs w-24">Size</label>
-              <input type="number" className="border rounded px-2 py-1 w-24" defaultValue={activeObj.fontSize || 22}
-                onChange={(e)=>{ activeObj.set({ fontSize: parseInt(e.target.value||'0',10) }); canvas.requestRenderAll(); }}/>
-              <label className="text-xs w-16">Color</label>
-              <input type="color" className="h-8 w-10" defaultValue={activeObj.fill || '#000000'}
-                onChange={(e)=>{ activeObj.set({ fill: e.target.value }); canvas.requestRenderAll(); }}/>
-              <button className="px-2 py-1 border rounded" onClick={()=>{ activeObj.set({ fontWeight: activeObj.fontWeight === 'bold' ? 'normal':'bold' }); canvas.requestRenderAll(); }}>B</button>
-              <button className="px-2 py-1 border rounded italic" onClick={()=>{ activeObj.set({ fontStyle: activeObj.fontStyle === 'italic' ? 'normal':'italic' }); canvas.requestRenderAll(); }}>I</button>
-              <button className="px-2 py-1 border rounded underline" onClick={()=>{ activeObj.set({ underline: !activeObj.underline }); canvas.requestRenderAll(); }}>U</button>
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-xs w-24">Align</label>
-              {['left','center','right','justify'].map(a => (
-                <button key={a} className={"px-2 py-1 border rounded " + (activeObj.textAlign===a?'bg-gray-200':'')} onClick={()=>{ activeObj.set({ textAlign:a }); canvas.requestRenderAll(); }}>{a}</button>
-              ))}
-            </div>
-          </div>
-        )}
-        {/* SHAPE TOOLS */}
-        {activeObj && (activeObj.type === 'rect' || activeObj.type === 'circle' || activeObj.type === 'triangle' || activeObj.type === 'polygon') && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <label className="text-xs w-24">Fill</label>
-              <input type="color" className="h-8 w-10" defaultValue={activeObj.fill || '#ffffff'}
-                onChange={(e)=>{ activeObj.set({ fill: e.target.value }); canvas.requestRenderAll(); }}/>
-              <label className="text-xs w-24">Stroke</label>
-              <input type="color" className="h-8 w-10" defaultValue={activeObj.stroke || '#000000'}
-                onChange={(e)=>{ activeObj.set({ stroke: e.target.value }); canvas.requestRenderAll(); }}/>
-              <label className="text-xs w-24">Width</label>
-              <input type="number" className="border rounded px-2 py-1 w-20" defaultValue={activeObj.strokeWidth || 1}
-                onChange={(e)=>{ activeObj.set({ strokeWidth: parseFloat(e.target.value||'0') }); canvas.requestRenderAll(); }}/>
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-xs w-24">Opacity</label>
-              <input type="range" min="0" max="1" step="0.01" defaultValue={activeObj.opacity ?? 1}
-                onChange={(e)=>{ activeObj.set({ opacity: parseFloat(e.target.value) }); canvas.requestRenderAll(); }}/>
-              {activeObj.type === 'rect' && (
-                <>
-                  <label className="text-xs w-24">Corner</label>
-                  <input type="number" className="border rounded px-2 py-1 w-20" defaultValue={activeObj.rx || 0}
-                    onChange={(e)=>{ const v=parseFloat(e.target.value||'0'); activeObj.set({ rx:v, ry:v }); canvas.requestRenderAll(); }}/>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-        {/* IMAGE TOOLS */}
-        {activeObj && activeObj.type === 'image' && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <button className="px-2 py-1 border rounded" onClick={()=>fitImageToFrame(activeObj,'contain')}>Fit</button>
-              <button className="px-2 py-1 border rounded" onClick={()=>fitImageToFrame(activeObj,'cover')}>Fill</button>
-              <button className="px-2 py-1 border rounded" onClick={()=>centerImageInFrame(activeObj)}>Center</button>
-              <label className="text-xs w-20">Zoom</label>
-              <input type="range" min="0.1" max="5" step="0.05" defaultValue={activeObj.scaleX || 1} onChange={(e)=>{ setImageZoom(activeObj, parseFloat(e.target.value)); }}/>
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-xs w-24">Opacity</label>
-              <input type="range" min="0" max="1" step="0.01" defaultValue={activeObj.opacity ?? 1} onChange={(e)=>{ activeObj.set({ opacity: parseFloat(e.target.value) }); canvas.requestRenderAll(); }}/>
-              <button className="px-2 py-1 border rounded" onClick={()=>{ activeObj.set({ flipX: !activeObj.flipX }); canvas.requestRenderAll(); }}>Flip X</button>
-              <button className="px-2 py-1 border rounded" onClick={()=>{ activeObj.set({ flipY: !activeObj.flipY }); canvas.requestRenderAll(); }}>Flip Y</button>
-              <label className="text-xs w-16">Rotate</label>
-              <input type="number" className="border rounded px-2 py-1 w-20" defaultValue={activeObj.angle || 0}
-                onChange={(e)=>{ activeObj.rotate(parseFloat(e.target.value||'0')); canvas.requestRenderAll(); }}/>
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-xs w-24">Replace</label>
-              <input type="file" accept="image/*" onChange={(e)=>{ const f=e.target.files?.[0]; if(!f) return; const reader=new FileReader(); reader.onload=()=>{ fabric.Image.fromURL(reader.result, (img)=>{ activeObj.setElement(img.getElement()); canvas.requestRenderAll(); }, {crossOrigin:'anonymous'}); }; reader.readAsDataURL(f); }}/>
-              <button className="px-2 py-1 border rounded" onClick={()=>{ removeMaskAndFrame(canvas, activeObj, true); canvas.requestRenderAll(); }}>Extract</button>
-            </div>
-          </div>
-        )}
-      </div>
-    )}
-  </div>
-)}
-{showSelectedSection && (
+            {showSelectedSection && (
               <div className="px-3 pb-3">
                 <div className="flex flex-wrap gap-2">
                   <IconButton onClick={cropImage} title="Crop"><Crop size={18} /></IconButton>
@@ -2537,14 +2273,14 @@ const debouncedSaveHistory = useMemo(() => debounce(saveHistory, 300), [saveHist
             <>
               <button
                 className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-white/90 rounded-full shadow md:hidden"
-                onClick={() => { const cur = bulkList[bulkIndex]; saveOverridesFor(cur); prevStudent(); setTimeout(() => { const nxt = bulkList[bulkIndex]; applyOverridesFor(nxt); }, 0); }}
+                onClick={prevStudent}
                 title="Previous"
               >
                 <ChevronLeft size={18} />
               </button>
               <button
                 className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-white/90 rounded-full shadow md:hidden"
-                onClick={() => { const cur = bulkList[bulkIndex]; saveOverridesFor(cur); nextStudent(); setTimeout(() => { const nxt = bulkList[bulkIndex]; applyOverridesFor(nxt); }, 0); }}
+                onClick={nextStudent}
                 title="Next"
               >
                 <ChevronRight size={18} />

@@ -413,21 +413,21 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
   };
 
   useEffect(() => {
-  if (!canvas) return;
+    if (!canvas) return;
 
-  const handleSelect = () => setShowToolbar(true);
-  const handleClear = () => setShowToolbar(false);
+    const handleSelect = () => setShowToolbar(true);
+    const handleClear = () => setShowToolbar(false);
 
-  canvas.on("selection:created", handleSelect);
-  canvas.on("selection:updated", handleSelect);
-  canvas.on("selection:cleared", handleClear);
+    canvas.on("selection:created", handleSelect);
+    canvas.on("selection:updated", handleSelect);
+    canvas.on("selection:cleared", handleClear);
 
-  return () => {
-    canvas.off("selection:created", handleSelect);
-    canvas.off("selection:updated", handleSelect);
-    canvas.off("selection:cleared", handleClear);
-  };
-}, [canvas]);
+    return () => {
+      canvas.off("selection:created", handleSelect);
+      canvas.off("selection:updated", handleSelect);
+      canvas.off("selection:cleared", handleClear);
+    };
+  }, [canvas]);
 
   /* ============================== Data loading ============================ */
   useEffect(() => {
@@ -450,7 +450,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     axios
       .get("https://canvaback.onrender.com/api/students")
       .then((res) => setStudents(res.data.data))
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   useEffect(() => {
@@ -482,7 +482,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     const fetchInstitute = async () => {
       try {
         const user = getStoredUser();
-               const institute_uuid = user?.institute_uuid || getStoredInstituteUUID();
+        const institute_uuid = user?.institute_uuid || getStoredInstituteUUID();
         if (institute_uuid) {
           const res = await axios.get(
             `https://canvaback.onrender.com/api/institute/${institute_uuid}`
@@ -494,7 +494,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
             signature: institute.signature || null,
           });
         }
-      } catch {}
+      } catch { }
     };
     fetchInstitute();
   }, []);
@@ -840,7 +840,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     return () => window.removeEventListener("keydown", onKey);
   }, [canvas, undo, redo, saveHistory, setActiveObj]);
 
-  
+
   // Update design canvas to match selected page size (only when print sizing is enabled)
   useEffect(() => {
     if (!usePrintSizing) return;
@@ -862,21 +862,21 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
       const trimW = W - bleedPx.left - bleedPx.right;
       const trimH = H - bleedPx.top - bleedPx.bottom;
       // bleed border
-      ctx.save(); ctx.strokeStyle = 'rgba(255,0,0,0.6)'; ctx.lineWidth = 1; ctx.strokeRect(0.5,0.5,W-1,H-1); ctx.restore();
+      ctx.save(); ctx.strokeStyle = 'rgba(255,0,0,0.6)'; ctx.lineWidth = 1; ctx.strokeRect(0.5, 0.5, W - 1, H - 1); ctx.restore();
       // trim box
-      ctx.save(); ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.setLineDash([6,4]); ctx.strokeRect(trimX+0.5,trimY+0.5,trimW-1,trimH-1); ctx.restore();
+      ctx.save(); ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.setLineDash([6, 4]); ctx.strokeRect(trimX + 0.5, trimY + 0.5, trimW - 1, trimH - 1); ctx.restore();
       // safe area
       const safeX = trimX + safePx.left; const safeY = trimY + safePx.top;
       const safeW = trimW - safePx.left - safePx.right; const safeH = trimH - safePx.top - safePx.bottom;
-      ctx.save(); ctx.strokeStyle = 'rgba(34,197,94,0.8)'; ctx.setLineDash([2,2]); ctx.strokeRect(safeX+0.5,safeY+0.5,safeW-1,safeH-1); ctx.restore();
+      ctx.save(); ctx.strokeStyle = 'rgba(34,197,94,0.8)'; ctx.setLineDash([2, 2]); ctx.strokeRect(safeX + 0.5, safeY + 0.5, safeW - 1, safeH - 1); ctx.restore();
       if (showMarks) { const markLen = mmToPx(4, dpi); const off = mmToPx(1.5, dpi); drawCropMarks(ctx, W, H, markLen, off, '#000', 1); }
-      if (showReg) { drawRegistrationMark(ctx, W/2, H/2, 8, 1); }
+      if (showReg) { drawRegistrationMark(ctx, W / 2, H / 2, 8, 1); }
     };
     canvas.requestRenderAll();
     return () => { if (!canvas) return; canvas._renderOverlay = null; canvas.requestRenderAll(); };
   }, [canvas, bleedPx, safePx, showMarks, showReg, dpi, usePrintSizing]);
 
-/* ============================ Replace / Extract ========================== */
+  /* ============================ Replace / Extract ========================== */
   const replaceActiveImage = () => {
     if (!canvas) return;
     const obj = canvas.getActiveObject();
@@ -1109,7 +1109,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     }
   };
 
-  
+
   /* ============================ PRINT EXPORTS (NEW) ============================ */
   const getTrimBoundsPx = useCallback(() => {
     const W = contentPx.W;
@@ -1143,7 +1143,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
       const toMM = (px) => pxToMm(px, dpi);
       const markLen = 4, off = 1.5;
       doc.setLineWidth(0.2);
-      const line = (x1,y1,x2,y2) => doc.line(x1,y1,x2,y2);
+      const line = (x1, y1, x2, y2) => doc.line(x1, y1, x2, y2);
       const tx = toMM(trim.x), ty = toMM(trim.y), tw = toMM(trim.w), th = toMM(trim.h);
       // TL
       line(tx - off, ty, tx - off, ty + markLen); line(tx, ty - off, tx + markLen, ty - off);
@@ -1161,7 +1161,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
       }
     }
 
-    const ts = new Date().toISOString().slice(0,19).replace(/[:T]/g,"-");
+    const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
     doc.save(`design_${pagePreset}_${pageOrientation}_${dpi}dpi_${ts}.pdf`);
   };
 
@@ -1191,7 +1191,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
         // Jump canvas to that student page
         const idx = bulkList.indexOf(baseList[i]);
         if (idx >= 0) gotoIndex(idx);
-        await new Promise(r=>setTimeout(r, 250));
+        await new Promise(r => setTimeout(r, 250));
         canvas.discardActiveObject();
         canvas.requestRenderAll();
       }
@@ -1217,12 +1217,12 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
       }
     }
 
-    const ts = new Date().toISOString().slice(0,19).replace(/[:T]/g,"-");
+    const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
     doc.save(`imposed_${rows}x${cols}_${sheetPreset}_${ts}.pdf`);
   };
   /* ============================================================================ */
 
-/* ================================= UI =================================== */
+  /* ================================= UI =================================== */
   return (
     <div className="h-screen w-screen overflow-hidden bg-gray-100">
       <Toaster position="top-right" />
@@ -1238,7 +1238,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
             >
               <MenuIcon size={20} />
             </button>
-             <div className="flex items-center gap-2 ml-2 overflow-x-auto scrollbar-thin">
+            <div className="flex items-center gap-2 ml-2 overflow-x-auto scrollbar-thin">
               <button
                 title="Add Text"
                 onClick={addText}
@@ -1346,17 +1346,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
               </button>
             )}
 
-            <button
-              title="Reset Canvas"
-              onClick={() => {
-                canvas?.clear();
-                resetHistory();
-                saveHistory();
-              }}
-              className="p-2 rounded-full bg-yellow-500 text-white shadow hover:bg-yellow-600"
-            >
-              <RefreshCw size={18} />
-            </button>
+            
 
             {/* Download current */}
             <button
@@ -1383,7 +1373,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
             >
               <BookOpen size={16} /> Imposed PDF
             </button>
-    
+
 
             {/* Bulk download PNGs */}
             <button
@@ -1406,13 +1396,13 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
             )}
 
             {/* Save template layout */}
-           <TemplateLayout
-  canvas={canvas}
-  activeTemplateId={activeTemplateId}
-  tplSize={tplSize}
-  setSavedPlaceholders={setSavedPlaceholders}
-  frameCorner={frameCorner}
-/>
+            <TemplateLayout
+              canvas={canvas}
+              activeTemplateId={activeTemplateId}
+              tplSize={tplSize}
+              setSavedPlaceholders={setSavedPlaceholders}
+              frameCorner={frameCorner}
+            />
 
             {/* Right sidebar toggle */}
             <button
@@ -1428,9 +1418,8 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
 
       {/* LEFT SIDEBAR */}
       <aside
-         className={`fixed top-14 bottom-14 md:bottom-16 left-0 md:w-80 w-72 bg-white border-r z-30 overflow-y-auto transform transition-transform duration-300 ease-in-out ${
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
-        }`}
+        className={`fixed top-14 bottom-14 md:bottom-16 left-0 md:w-80 w-72 bg-white border-r z-30 overflow-y-auto transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+          }`}
       >
         <PrintSettings
           usePrintSizing={usePrintSizing}
@@ -1660,8 +1649,8 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
             {showImageTools && (
               <div className="px-3 pb-3">
                 <div className="grid grid-cols-4 gap-2 mb-3">
-                  {["rect","rounded","circle","triangle","hexagon","star","heart"].map((shape) => {
-                    const Icon = {rect:Square, rounded:Square, circle:Circle, triangle:Triangle, hexagon:Hexagon, star:Star, heart:Heart}[shape];
+                  {["rect", "rounded", "circle", "triangle", "hexagon", "star", "heart"].map((shape) => {
+                    const Icon = { rect: Square, rounded: Square, circle: Circle, triangle: Triangle, hexagon: Hexagon, star: Star, heart: Heart }[shape];
                     return (
                       <IconButton key={shape} title={shape} onClick={() => {
                         setFrameShape(shape);
@@ -1792,9 +1781,8 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
       {/* CENTER / Canva-like viewport */}
       <main
         ref={viewportRef}
-        className={`absolute bg-gray-100 top-14 right-0 ${
-          isSidebarOpen ? "left-0 md:left-80" : "left-0 md:left-80"
-        } ${isRightbarOpen ? "md:right-80" : "right-0"} bottom-14 md:bottom-16 overflow-hidden flex items-center justify-center`}
+        className={`absolute bg-gray-100 top-14 right-0 ${isSidebarOpen ? "left-0 md:left-80" : "left-0 md:left-80"
+          } ${isRightbarOpen ? "md:right-80" : "right-0"} bottom-14 md:bottom-16 overflow-hidden flex items-center justify-center`}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
@@ -1844,9 +1832,8 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
 
       {/* RIGHT SIDEBAR – Template Switcher */}
       <aside
-        className={`fixed top-14 bottom-14 md:bottom-16 right-0 md:w-80 w-72 bg-white border-l z-30 overflow-y-auto transform transition-transform duration-200 ${
-          isRightbarOpen ? "translate-x-0" : "translate-x-full md:translate-x-0"
-        }`}
+        className={`fixed top-14 bottom-14 md:bottom-16 right-0 md:w-80 w-72 bg-white border-l z-30 overflow-y-auto transform transition-transform duration-200 ${isRightbarOpen ? "translate-x-0" : "translate-x-full md:translate-x-0"
+          }`}
       >
         <div className="p-3 border-b flex items-center justify-between">
           <div className="text-sm font-semibold">Templates</div>
@@ -1868,9 +1855,8 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
               <button
                 key={t._id || t.id}
                 onClick={() => loadTemplateById(t._id || t.id)}
-                className={`border rounded overflow-hidden text-left hover:shadow focus:ring-2 focus:ring-indigo-500 ${
-                  (t._id || t.id) === activeTemplateId ? "ring-2 ring-indigo-500" : ""
-                }`}
+                className={`border rounded overflow-hidden text-left hover:shadow focus:ring-2 focus:ring-indigo-500 ${(t._id || t.id) === activeTemplateId ? "ring-2 ring-indigo-500" : ""
+                  }`}
                 title={t.name || "Template"}
               >
                 <div className="aspect-[4/5] bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
@@ -1902,19 +1888,19 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
 
       {/* BOTTOM BAR */}
       {showToolbar && (
-  <div className="absolute bottom-2 left-0 right-0 flex justify-center">
-    <BottomToolbar
-      alignLeft={alignLeft}
-      alignCenter={alignCenter}
-      alignRight={alignRight}
-      alignTop={alignTop}
-      alignMiddle={alignMiddle}
-      alignBottom={alignBottom}
-      bringToFront={bringToFront}
-      sendToBack={sendToBack}
-    />
-  </div>
-)}
+        <div className="absolute bottom-2 left-0 right-0 flex justify-center">
+          <BottomToolbar
+            alignLeft={alignLeft}
+            alignCenter={alignCenter}
+            alignRight={alignRight}
+            alignTop={alignTop}
+            alignMiddle={alignMiddle}
+            alignBottom={alignBottom}
+            bringToFront={bringToFront}
+            sendToBack={sendToBack}
+          />
+        </div>
+      )}
 
     </div>
   );

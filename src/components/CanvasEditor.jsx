@@ -464,6 +464,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
   const [showSelectedSection, setShowSelectedSection] = useState(true);
   const [showImageTools, setShowImageTools] = useState(true);
   /* ========================= PRINT & IMPOSITION (NEW) ========================= */
+  const [usePrintSizing, setUsePrintSizing] = useState(false);
   const [pagePreset, setPagePreset] = useState("A4");
   const [pageOrientation, setPageOrientation] = useState("portrait"); // portrait|landscape
   const [dpi, setDpi] = useState(300); // 150–600
@@ -1167,70 +1168,40 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
   }, [canvas, undo, redo, saveHistory, setActiveObj]);
 
   
-  // Update design canvas to match selected page size (in pixels at selected DPI)
+  // Update design canvas to match selected page size (only when print sizing is enabled)
   useEffect(() => {
+    if (!usePrintSizing) return;
     if (!canvas) return;
     const W = contentPx.W, H = contentPx.H;
     setTplSize({ w: W, h: H });
     setCanvasSize?.(W, H);
-  }, [canvas, contentPx.W, contentPx.H, setCanvasSize]);
+  }, [canvas, contentPx.W, contentPx.H, setCanvasSize, usePrintSizing]);
 
-  // Draw bleed/safe/crop marks as Fabric overlay
+  // Draw bleed/safe/crop marks as Fabric overlay (only when print sizing is enabled)
   useEffect(() => {
+    if (!usePrintSizing) return;
     if (!canvas) return;
     canvas._renderOverlay = (ctx) => {
       const W = canvas.getWidth();
       const H = canvas.getHeight();
-
-      // page border (bleed edge)
-      ctx.save();
-      ctx.strokeStyle = "rgba(255,0,0,0.6)";
-      ctx.lineWidth = 1;
-      ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
-      ctx.restore();
-
-      // trim box (inside bleed)
       const trimX = bleedPx.left;
       const trimY = bleedPx.top;
       const trimW = W - bleedPx.left - bleedPx.right;
       const trimH = H - bleedPx.top - bleedPx.bottom;
-      ctx.save();
-      ctx.strokeStyle = "rgba(0,0,0,0.6)";
-      ctx.setLineDash([6, 4]);
-      ctx.strokeRect(trimX + 0.5, trimY + 0.5, trimW - 1, trimH - 1);
-      ctx.restore();
-
-      // safe area (inside trim)
-      const safeX = trimX + safePx.left;
-      const safeY = trimY + safePx.top;
-      const safeW = trimW - safePx.left - safePx.right;
-      const safeH = trimH - safePx.top - safePx.bottom;
-      ctx.save();
-      ctx.strokeStyle = "rgba(34,197,94,0.8)";
-      ctx.setLineDash([2, 2]);
-      ctx.strokeRect(safeX + 0.5, safeY + 0.5, safeW - 1, safeH - 1);
-      ctx.restore();
-
-      if (showMarks) {
-        const markLen = mmToPx(4, dpi);
-        const off = mmToPx(1.5, dpi);
-        drawCropMarks(ctx, W, H, markLen, off, "#000", 1);
-      }
-      if (showReg) {
-        drawRegistrationMark(ctx, W / 2, H / 2, 8, 1);
-        drawRegistrationMark(ctx, W / 2, mmToPx(10, dpi), 6, 1);
-        drawRegistrationMark(ctx, W / 2, H - mmToPx(10, dpi), 6, 1);
-        drawRegistrationMark(ctx, mmToPx(10, dpi), H / 2, 6, 1);
-        drawRegistrationMark(ctx, W - mmToPx(10, dpi), H / 2, 6, 1);
-      }
+      // bleed border
+      ctx.save(); ctx.strokeStyle = 'rgba(255,0,0,0.6)'; ctx.lineWidth = 1; ctx.strokeRect(0.5,0.5,W-1,H-1); ctx.restore();
+      // trim box
+      ctx.save(); ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.setLineDash([6,4]); ctx.strokeRect(trimX+0.5,trimY+0.5,trimW-1,trimH-1); ctx.restore();
+      // safe area
+      const safeX = trimX + safePx.left; const safeY = trimY + safePx.top;
+      const safeW = trimW - safePx.left - safePx.right; const safeH = trimH - safePx.top - safePx.bottom;
+      ctx.save(); ctx.strokeStyle = 'rgba(34,197,94,0.8)'; ctx.setLineDash([2,2]); ctx.strokeRect(safeX+0.5,safeY+0.5,safeW-1,safeH-1); ctx.restore();
+      if (showMarks) { const markLen = mmToPx(4, dpi); const off = mmToPx(1.5, dpi); drawCropMarks(ctx, W, H, markLen, off, '#000', 1); }
+      if (showReg) { drawRegistrationMark(ctx, W/2, H/2, 8, 1); }
     };
     canvas.requestRenderAll();
-    return () => {
-      if (!canvas) return;
-      canvas._renderOverlay = null;
-      canvas.requestRenderAll();
-    };
-  }, [canvas, bleedPx, safePx, showMarks, showReg, dpi]);
+    return () => { if (!canvas) return; canvas._renderOverlay = null; canvas.requestRenderAll(); };
+  }, [canvas, bleedPx, safePx, showMarks, showReg, dpi, usePrintSizing]);
 
 /* ============================ Replace / Extract ========================== */
   const replaceActiveImage = () => {
@@ -1851,6 +1822,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
             Page Size & DPI
           </button>
           <div className="px-3 pb-3 space-y-2 text-sm">
+            <label className="flex items-center gap-2 text-xs mb-2"><input type="checkbox" checked={usePrintSizing} onChange={(e)=>setUsePrintSizing(e.target.checked)} /> Enable print sizing</label>
             <div className="grid grid-cols-2 gap-2">
               {["ID-1/CR80","A4","Letter","Legal","Tabloid","Custom"].map(key => (
                 <button key={key} onClick={()=>setPagePreset(key)} className={`border rounded px-2 py-1 ${pagePreset===key?"bg-gray-900 text-white":""}`}>{key}</button>

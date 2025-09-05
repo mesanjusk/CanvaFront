@@ -435,6 +435,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
   const [savedPlaceholders, setSavedPlaceholders] = useState([]);
   const [activeStudentPhoto, setActiveStudentPhoto] = useState(null);
   const [selectedInstitute, setSelectedInstitute] = useState(null);
+  const [showToolbar, setShowToolbar] = useState(false);
 
   // templates (right sidebar)
   const [templates, setTemplates] = useState([]);
@@ -755,6 +756,23 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     canvas.requestRenderAll();
     saveHistory();
   };
+
+  useEffect(() => {
+  if (!canvas) return;
+
+  const handleSelect = () => setShowToolbar(true);
+  const handleClear = () => setShowToolbar(false);
+
+  canvas.on("selection:created", handleSelect);
+  canvas.on("selection:updated", handleSelect);
+  canvas.on("selection:cleared", handleClear);
+
+  return () => {
+    canvas.off("selection:created", handleSelect);
+    canvas.off("selection:updated", handleSelect);
+    canvas.off("selection:cleared", handleClear);
+  };
+}, [canvas]);
 
   /* ============================== Data loading ============================ */
   useEffect(() => {
@@ -2394,16 +2412,21 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
       </aside>
 
       {/* BOTTOM BAR */}
-      <BottomToolbar
-        alignLeft={alignLeft}
-        alignCenter={alignCenter}
-        alignRight={alignRight}
-        alignTop={alignTop}
-        alignMiddle={alignMiddle}
-        alignBottom={alignBottom}
-        bringToFront={bringToFront}
-        sendToBack={sendToBack}
-      />
+      {showToolbar && (
+  <div className="absolute bottom-2 left-0 right-0 flex justify-center">
+    <BottomToolbar
+      alignLeft={alignLeft}
+      alignCenter={alignCenter}
+      alignRight={alignRight}
+      alignTop={alignTop}
+      alignMiddle={alignMiddle}
+      alignBottom={alignBottom}
+      bringToFront={bringToFront}
+      sendToBack={sendToBack}
+    />
+  </div>
+)}
+
     </div>
   );
 };

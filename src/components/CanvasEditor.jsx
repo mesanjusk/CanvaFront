@@ -1,4 +1,4 @@
-// CanvasEditor.jsx final 
+// CanvasEditor.jsx
 import React, {
   useEffect,
   useLayoutEffect,
@@ -421,10 +421,11 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
       setScale(Number.isFinite(s) ? Math.max(0.05, Math.min(s, 3)) : 1);
     });
     ro.observe(viewportRef.current);
-    return () => ro.disconnect();
-  }, [tplSize.w, tplSize.h]);
     
   /* TEMPLATE CLICK DELEGATE (NEW) */
+return () => ro.disconnect();
+  }, [tplSize.w, tplSize.h]);
+
   useEffect(() => {
     const handler = (e) => {
       const el = e.target && e.target.closest ? e.target.closest('[data-template-id]') : null;
@@ -438,6 +439,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     document.addEventListener('click', handler);
     return () => document.removeEventListener('click', handler);
   }, [loadTemplateById]);
+
 
   // data
   const [students, setStudents] = useState([]);
@@ -1502,7 +1504,6 @@ if (!bulkList.length) return;
   const nextStudent = () => gotoIndex(bulkIndex + 1);
 
   const onTouchStart = (e) => { /* swipe disabled */ return; };
-  };
   const onTouchEnd = (e) => { /* swipe disabled */ return; };
 
   /* ============================== Downloads =============================== */
@@ -2505,6 +2506,6 @@ if (!bulkList.length) return;
       />
     </div>
   );
-};
+}
 
 export default CanvasEditor;

@@ -1576,7 +1576,6 @@ const applyOverridesFor = useCallback((studentUuid) => {
     }
     try {
       // dynamic import; same dep your single-page PDF likely uses
-      const { jsPDF } = /* top-level jsPDF import used */;
       const pdf = new jsPDF({
         orientation: "p",
         unit: "px",

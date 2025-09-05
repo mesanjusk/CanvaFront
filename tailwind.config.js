@@ -3,7 +3,7 @@ module.exports = {
   darkMode: "class",
   content: [
     "./src/**/*.{js,jsx,ts,tsx}", // Scan all JSX/TSX in src
-    "./public/index.html" // Optional: also scan HTML
+    "./index.html" // Optional: also scan HTML
   ],
   theme: {
     extend: {

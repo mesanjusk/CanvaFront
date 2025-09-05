@@ -1903,7 +1903,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
         </div>
       )}
 
-      {activeObj && ["rect", "circle", "triangle", "polygon", "path"].includes(activeObj.type) && (
+      {activeObj && ["rect", "circle"].includes(activeObj.type) && (
         <ShapeStylePanel activeObj={activeObj} canvas={canvas} />
       )}
 

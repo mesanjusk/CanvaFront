@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 
 /**
  * Panel for editing basic shape styles such as fill, opacity and border.
@@ -9,7 +9,9 @@ const ShapeStylePanel = ({ activeObj, canvas }) => {
   const [opacity, setOpacity] = useState(activeObj.opacity ?? 1);
   const [stroke, setStroke] = useState(activeObj.stroke || "#000000");
   const [strokeWidth, setStrokeWidth] = useState(activeObj.strokeWidth || 0);
-  const [corner, setCorner] = useState(activeObj.rx || 0);
+  const [cornerRadius, setCornerRadius] = useState(
+    activeObj.rx || activeObj.ry || 0
+  );
 
   // Sync local state when selection changes
   useEffect(() => {
@@ -17,14 +19,18 @@ const ShapeStylePanel = ({ activeObj, canvas }) => {
     setOpacity(activeObj.opacity ?? 1);
     setStroke(activeObj.stroke || "#000000");
     setStrokeWidth(activeObj.strokeWidth || 0);
-    setCorner(activeObj.rx || 0);
+    setCornerRadius(activeObj.rx || activeObj.ry || 0);
   }, [activeObj]);
 
-  const update = (props) => {
-    activeObj.set(props);
-    activeObj.setCoords();
-    canvas.requestRenderAll();
-  };
+  const update = useCallback(
+    (props) => {
+      if (!activeObj) return;
+      activeObj.set(props);
+      activeObj.setCoords();
+      canvas.requestRenderAll();
+    },
+    [activeObj, canvas]
+  );
 
   return (
     <div className="absolute top-4 right-4 w-60 bg-white shadow-lg rounded p-4 z-50 space-y-3 text-sm">
@@ -91,17 +97,17 @@ const ShapeStylePanel = ({ activeObj, canvas }) => {
       {activeObj.type === "rect" && (
         <div>
           <label className="block text-gray-600 mb-1">
-            Corner Radius ({corner})
+            Corner Radius ({cornerRadius})
           </label>
           <input
             type="range"
             min="0"
             max={Math.min(activeObj.width, activeObj.height) / 2 || 100}
             step="1"
-            value={corner}
+            value={cornerRadius}
             onChange={(e) => {
               const v = parseInt(e.target.value, 10);
-              setCorner(v);
+              setCornerRadius(v);
               update({ rx: v, ry: v });
             }}
             className="w-full"

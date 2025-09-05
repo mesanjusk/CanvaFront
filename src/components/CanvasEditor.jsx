@@ -1179,15 +1179,29 @@ return () => ro.disconnect();
     bulkIndex,
     filteredStudents,
 
+]);
+
 
   // Re-apply saved edits after template/student page render
-  useEffect(() => {
-    if (!canvas) return;
-    const __uuid = typeof getCurrentStudentUUID === 'function' ? getCurrentStudentUUID() : null;
-    if (__uuid) {
-      try { applyEditsForStudent(__uuid); } catch (e) {}
-    }
-  }, [canvas, bulkMode, bulkList, bulkIndex, selectedStudent, templateImage]);
+  const _persistDeps = [
+  canvas,
+  bulkMode,
+  bulkList,
+  bulkIndex,
+  selectedStudent,
+  templateImage,
+];
+
+useEffect(() => {
+  if (!canvas) return;
+  const __uuid =
+    typeof getCurrentStudentUUID === "function" ? getCurrentStudentUUID() : null;
+  if (__uuid) {
+    try {
+      applyEditsForStudent(__uuid);
+    } catch (e) {}
+  }
+}, _persistDeps);
   /* ============================= Canvas events ============================ */
   useEffect(() => {
     if (!canvas) return;

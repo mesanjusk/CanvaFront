@@ -1,4 +1,4 @@
-// CanvasEditor.jsx
+// CanvasEditor.jsx final 
 import React, {
   useEffect,
   useLayoutEffect,

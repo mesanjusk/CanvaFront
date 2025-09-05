@@ -37,7 +37,7 @@ const Courses = () => {
       setLoading(true);
       const res = await axios.get(`${BASE_URL}/api/courses`);
       setCourses(res.data || []);
-    } catch (err) {
+    } catch {
       toast.error('Failed to fetch courses');
     } finally {
       setLoading(false);
@@ -70,7 +70,7 @@ const Courses = () => {
       setEditingId(null);
       setShowModal(false);
       fetchCourses();
-    } catch (err) {
+    } catch {
       toast.error('Failed to submit');
     }
   };
@@ -118,16 +118,18 @@ const Courses = () => {
   };
 
   const exportExcel = () => {
-    const ws = XLSX.utils.json_to_sheet(filteredCourses.map(c => ({
-      'Course Name': c.name,
-      Description: c.description,
-      'Course Fees': c.courseFees,
-      'Exam Fees': c.examFees,
-      Duration: c.duration
-    })));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Courses');
-    XLSX.writeFile(wb, 'courses.xlsx');
+    const worksheet = XLSX.utils.json_to_sheet(
+      filteredCourses.map(c => ({
+        'Course Name': c.name,
+        Description: c.description,
+        'Course Fees': c.courseFees,
+        'Exam Fees': c.examFees,
+        Duration: c.duration,
+      }))
+    );
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Courses');
+    XLSX.writeFile(workbook, 'courses.xlsx');
   };
 
   return (

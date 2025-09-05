@@ -94,7 +94,7 @@ const BulkGenerator = () => {
         resolve();
       }));
       setSelected(tplId);
-    } catch (e) {
+    } catch {
       toast.error('Failed to load template');
     }
   };
@@ -156,8 +156,8 @@ const BulkGenerator = () => {
     const reader = new FileReader();
     reader.onload = (evt) => {
       const wb = XLSX.read(evt.target.result, { type: 'binary' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const json = XLSX.utils.sheet_to_json(ws);
+      const worksheet = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(worksheet);
       setRows(json);
       setIndex(0);
     };
@@ -312,7 +312,7 @@ const drawImageWithText = async (ctx, student, x, y, width, height, imageUrl) =>
     }
   };
 
- const downloadLayout = async (format) => {
+ const downloadLayout = async () => {
   if (!selected || rows.length === 0) return;
 
   const baseSize = size === 'A4' ? A4 : size === 'A3' ? A3 : custom;

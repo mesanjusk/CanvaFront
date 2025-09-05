@@ -42,7 +42,7 @@ const Students = () => {
       const res = await axios.get(`${BASE_URL}/api/students`);
 setStudents(Array.isArray(res.data?.data) ? res.data.data : []);
 
-    } catch (err) {
+    } catch {
       toast.error('Failed to fetch students');
     } finally {
       setLoading(false);
@@ -92,7 +92,7 @@ setStudents(Array.isArray(res.data?.data) ? res.data.data : []);
     setEditingId(null);
     setShowModal(false);
     fetchStudents();
-  } catch (err) {
+  } catch {
     toast.error('Failed to submit');
   }
 };
@@ -143,17 +143,19 @@ setStudents(Array.isArray(res.data?.data) ? res.data.data : []);
   };
 
   const exportExcel = () => {
-    const ws = XLSX.utils.json_to_sheet(filteredStudents.map(s => ({
-      'First Name': s.firstName,
-      'Middle Name': s.middleName,
-      'Last Name': s.lastName,
-      'DOB': s.dob,
-      'Gender': s.gender,
-      'Mobile': s.mobileSelf
-    })));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Students');
-    XLSX.writeFile(wb, 'students.xlsx');
+    const worksheet = XLSX.utils.json_to_sheet(
+      filteredStudents.map(s => ({
+        'First Name': s.firstName,
+        'Middle Name': s.middleName,
+        'Last Name': s.lastName,
+        'DOB': s.dob,
+        'Gender': s.gender,
+        'Mobile': s.mobileSelf,
+      }))
+    );
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Students');
+    XLSX.writeFile(workbook, 'students.xlsx');
   };
 
   return (

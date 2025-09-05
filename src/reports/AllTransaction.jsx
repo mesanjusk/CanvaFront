@@ -110,7 +110,7 @@ const AllTransaction = () => {
             const result = await res.json();
             if (result.error) alert("Failed to send: " + result.error);
             else alert("Message sent successfully.");
-        } catch (err) {
+        } catch {
             alert("Failed to send message.");
         }
     };
@@ -132,10 +132,10 @@ const AllTransaction = () => {
 
     // Export to Excel
     const exportToExcel = () => {
-        const ws = XLSX.utils.json_to_sheet(sortedReport);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Outstanding Report');
-        XLSX.writeFile(wb, 'outstanding_report.xlsx');
+        const worksheet = XLSX.utils.json_to_sheet(sortedReport);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Outstanding Report');
+        XLSX.writeFile(workbook, 'outstanding_report.xlsx');
     };
 
     // Export to PDF

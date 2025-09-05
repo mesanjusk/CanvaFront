@@ -14,7 +14,7 @@ const AllBalance = () => {
     const [outstandingReport, setOutstandingReport] = useState([]);
     const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
     const [searchQuery, setSearchQuery] = useState('');
-    const [filterType, setFilterType] = useState('all');
+    const [filterType] = useState('all');
 
     const navigate = useNavigate();
     const institute_uuid = localStorage.getItem('institute_uuid');
@@ -114,10 +114,10 @@ const AllBalance = () => {
 
     // Export to Excel
     const exportToExcel = () => {
-        const ws = XLSX.utils.json_to_sheet(sortedReport);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Outstanding Report');
-        XLSX.writeFile(wb, 'outstanding_report.xlsx');
+        const worksheet = XLSX.utils.json_to_sheet(sortedReport);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Outstanding Report');
+        XLSX.writeFile(workbook, 'outstanding_report.xlsx');
     };
 
     // Export to PDF

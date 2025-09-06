@@ -8,7 +8,7 @@ export function useCanvasEditor(canvasRef, canvasWidth, canvasHeight) {
   const [canvas, setCanvas] = useState(null);
   const [lockedObjects, setLockedObjects] = useState(new Set());
   const [history, setHistory] = useState([]);
-  const [redoStack, setRedoStack] = useState([]);
+ const [historyIndex, setHistoryIndex] = useState(-1);
 
   const isLocked = activeObj && lockedObjects.has(activeObj);
   const multipleSelected = canvas?.getActiveObjects().length > 1;
@@ -27,37 +27,48 @@ export function useCanvasEditor(canvasRef, canvasWidth, canvasHeight) {
 };
 
 
-  const saveHistory = () => {
-    if (!canvas) return;
-    sanitizeTextStyles();
-    try {
-      setHistory((prev) => [...prev, canvas.toJSON()]);
-      setRedoStack([]);
-    } catch (err) {
-      console.error("Error saving history:", err);
-    }
-  };
+  
+const saveHistory = () => {
+  if (!canvas) return;
+  sanitizeTextStyles();
+
+  const json = canvas.toJSON();
+
+  setHistory((prev) => {
+    // Trim forward history if we undo then add new changes
+    const updated = prev.slice(0, historyIndex + 1);
+    return [...updated, json];
+  });
+
+  setHistoryIndex((i) => i + 1);
+};
 
   const resetHistory = () => {
     setHistory([]);
     setRedoStack([]);
   };
 
-  const undo = () => {
-    if (!history.length || !canvas) return;
-    const prevState = history[history.length - 1];
-    setHistory((prev) => prev.slice(0, -1));
-    setRedoStack((r) => [...r, canvas.toJSON()]);
-    canvas.loadFromJSON(prevState, () => canvas.renderAll());
-  };
+const undo = () => {
+  if (historyIndex <= 0 || !canvas) return;
 
-  const redo = () => {
-    if (!redoStack.length || !canvas) return;
-    const nextState = redoStack[redoStack.length - 1];
-    setRedoStack((prev) => prev.slice(0, -1));
-    setHistory((h) => [...h, canvas.toJSON()]);
-    canvas.loadFromJSON(nextState, () => canvas.renderAll());
-  };
+  const prevState = history[historyIndex - 1];
+  setHistoryIndex((i) => i - 1);
+
+  canvas.loadFromJSON(prevState, () => {
+    canvas.renderAll();
+  });
+};
+
+const redo = () => {
+  if (historyIndex >= history.length - 1 || !canvas) return;
+
+  const nextState = history[historyIndex + 1];
+  setHistoryIndex((i) => i + 1);
+
+  canvas.loadFromJSON(nextState, () => {
+    canvas.renderAll();
+  });
+};
 
   const duplicateObject = () => {
     if (!canvas || !activeObj) return;

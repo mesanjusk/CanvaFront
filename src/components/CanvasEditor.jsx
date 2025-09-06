@@ -66,6 +66,9 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
   const viewportRef = useRef(null);
   const stageRef = useRef(null);
   const [scale, setScale] = useState(1);
+  
+const [showChooseButton, setShowChooseButton] = useState(true);
+
 
   useLayoutEffect(() => {
     if (!viewportRef.current) return;
@@ -504,10 +507,10 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
   useEffect(() => {
     const loadTemplates = async () => {
       try {
-        const res = await axios.get("https://canvaback.onrender.com/api/template/list");
+        const res = await axios.get("https://canvaback.onrender.com/api/template");
         setTemplates(res.data?.data || res.data || []);
       } catch {
-        // non-blocking
+        console.error("Error fetching categories:", err);
       }
     };
     loadTemplates();
@@ -697,27 +700,35 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
       }
 
       // institute logo/signature
-      if (selectedInstitute?.logo) {
-        const savedLogo = getSavedProps("logo");
-        safeLoadImage(selectedInstitute.logo, (img) => {
-          if (savedLogo?.scaleX && savedLogo?.scaleY) {
-            img.set({
-              left: savedLogo.left ?? 20,
-              top: savedLogo.top ?? 20,
-              scaleX: savedLogo.scaleX,
-              scaleY: savedLogo.scaleY,
-              angle: savedLogo?.angle ?? 0,
-            });
-          } else {
-            img.scaleToWidth(Math.round(canvas.width * 0.2));
-            img.set({ left: savedLogo?.left ?? 20, top: savedLogo?.top ?? 20 });
-          }
-          img.customId = "logo";
-          img.field = "logo";
-          logoRef.current = img;
-          canvas.add(img);
-        });
-      }
+     if (selectedInstitute?.logo) {
+  const savedLogo = getSavedProps("logo");
+  safeLoadImage(selectedInstitute.logo, (img) => {
+    if (
+      savedLogo &&
+      savedLogo.scaleX !== undefined &&
+      savedLogo.scaleY !== undefined
+    ) {
+      img.set({
+        left: savedLogo.left ?? 20,
+        top: savedLogo.top ?? 20,
+        scaleX: savedLogo.scaleX,  
+        scaleY: savedLogo.scaleY,
+        angle: savedLogo.angle ?? 0,
+      });
+    } else {
+      img.scaleToWidth(Math.round(canvas.width * 0.2));
+      img.set({
+        left: savedLogo?.left ?? 20,
+        top: savedLogo?.top ?? 20,
+      });
+    }
+
+    img.customId = "logo";
+    img.field = "logo";
+    logoRef.current = img;
+    canvas.add(img);
+  });
+}
 
       if (selectedInstitute?.signature) {
         const savedSign = getSavedProps("signature");
@@ -1296,6 +1307,74 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
               />
             </div>
           </div>
+{/* Fill Color (only for text/shape) */}
+{activeObj && (activeObj.type === "text" || activeObj.type === "i-text" || activeObj.type === "rect" || activeObj.type === "circle") && (
+  <div className="flex items-center gap-2">
+    {/* Fill Color */}
+    <input
+      type="color"
+      value={activeObj.fill || "#000000"}
+      onChange={(e) => {
+        activeObj.set({ fill: e.target.value });
+        canvasRef.current.requestRenderAll();
+      }}
+      className="w-8 h-8 p-0 border rounded cursor-pointer"
+      title="Change Fill Color"
+    />
+
+  {/* Font Size (only for text) */}
+{(activeObj?.type === "text" || activeObj?.type === "i-text") && (
+  <input
+    type="number"
+    min={8}
+    max={200}
+    value={activeObj.fontSize || 20}
+    onChange={(e) => {
+      const size = parseInt(e.target.value);
+      if (!isNaN(size)) {
+        const canvas = canvasRef.current;
+        const obj = canvas.getActiveObject();
+        if (obj && (obj.type === "text" || obj.type === "i-text")) {
+          obj.set({ fontSize: size });
+          obj.setCoords();
+          canvas.fire("object:modified"); // force update
+          canvas.requestRenderAll();
+        }
+      }
+    }}
+    className="w-16 p-1 border rounded"
+    title="Change Font Size"
+  />
+)}
+
+{/* Font Family (only for text) */}
+{(activeObj?.type === "text" || activeObj?.type === "i-text") && (
+  <select
+    value={activeObj.fontFamily || "Arial"}
+    onChange={(e) => {
+      const canvas = canvasRef.current;
+      const obj = canvas.getActiveObject();
+      if (obj && (obj.type === "text" || obj.type === "i-text")) {
+        obj.set({ fontFamily: e.target.value });
+        obj.setCoords();
+        canvas.fire("object:modified"); // force update
+        canvas.requestRenderAll();
+      }
+    }}
+    className="p-1 border rounded"
+    title="Change Font Family"
+  >
+    <option value="Arial">Arial</option>
+    <option value="Helvetica">Helvetica</option>
+    <option value="Times New Roman">Times New Roman</option>
+    <option value="Courier New">Courier New</option>
+    <option value="Georgia">Georgia</option>
+    <option value="Verdana">Verdana</option>
+  </select>
+)}
+
+  </div>
+)}
 
           <div className="flex items-center gap-2">
             {/* Bulk toggle */}
@@ -1377,6 +1456,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
 
 
             {/* Bulk download PNGs */}
+            {bulkMode && (
             <button
               title="Download All (PNGs)"
               onClick={downloadBulkPNGs}
@@ -1384,6 +1464,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
             >
               <Images size={16} /> Download All
             </button>
+            )}
 
             {/* NEW: Bulk multi-page PDF */}
             {bulkMode && (
@@ -1457,6 +1538,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
           setOuter={setOuter}
         />
         {/* Filters (collapsible) */}
+         {bulkMode && (
         <div className="border-b">
           <button
             className="w-full text-left p-3 text-sm font-semibold"
@@ -1515,6 +1597,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
             </div>
           )}
         </div>
+         )}
 
         <FrameSection
           showFrames={showFrames}
@@ -1832,60 +1915,84 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
       </main>
 
       {/* RIGHT SIDEBAR – Template Switcher */}
-      <aside
-        className={`fixed top-14 bottom-14 md:bottom-16 right-0 md:w-80 w-72 bg-white border-l z-30 overflow-y-auto transform transition-transform duration-200 ${isRightbarOpen ? "translate-x-0" : "translate-x-full md:translate-x-0"
-          }`}
+<aside
+  className={`fixed top-14 bottom-14 md:bottom-16 right-0 md:w-80 w-72 bg-white border-l z-30 overflow-y-auto transform transition-transform duration-200 ${
+    isRightbarOpen ? "translate-x-0" : "translate-x-full"
+  }`}
+>
+  <div className="p-3 border-b flex items-center justify-between">
+    {showChooseButton ? (
+      <button
+        className="px-3 py-2 rounded bg-indigo-600 text-white shadow hover:bg-indigo-700 text-sm"
+        onClick={() => {
+          setIsRightbarOpen(true);
+          setShowChooseButton(false); // switch to header mode
+        }}
       >
-        <div className="p-3 border-b flex items-center justify-between">
-          <div className="text-sm font-semibold">Templates</div>
-          <button
-            className="md:hidden p-2 rounded hover:bg-gray-100"
-            onClick={() => setIsRightbarOpen((s) => !s)}
-            title="Close"
-          >
-            <MenuIcon size={18} />
-          </button>
-        </div>
+        Choose Template
+      </button>
+    ) : (
+      <>
+        <div className="text-sm font-semibold">Templates</div>
+        <button
+          className="md:hidden p-2 rounded hover:bg-gray-100"
+          onClick={() => setIsRightbarOpen((s) => !s)}
+          title="Close"
+        >
+          <MenuIcon size={18} />
+        </button>
+      </>
+    )}
+  </div>
 
-        <div className="p-3">
-          {loadingTemplate && (
-            <div className="text-xs text-gray-500 mb-2">Loading template…</div>
-          )}
-          <div className="grid grid-cols-2 gap-3">
-            {templates.map((t) => (
-              <button
-                key={t._id || t.id}
-                onClick={() => loadTemplateById(t._id || t.id)}
-                className={`border rounded overflow-hidden text-left hover:shadow focus:ring-2 focus:ring-indigo-500 ${(t._id || t.id) === activeTemplateId ? "ring-2 ring-indigo-500" : ""
-                  }`}
-                title={t.name || "Template"}
-              >
-                <div className="aspect-[4/5] bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
-                  {t.thumbnail ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={t.thumbnail}
-                      alt={t.name || "template thumbnail"}
-                      className="w-full h-full object-cover"
-                      crossOrigin="anonymous"
-                    />
-                  ) : (
-                    <span>Preview</span>
-                  )}
-                </div>
-                <div className="px-2 py-1">
-                  <div className="text-xs font-medium truncate">
-                    {t.name || "Untitled"}
-                  </div>
-                  <div className="text-[10px] text-gray-500">
-                    {t.width || t.w || 400}×{t.height || t.h || 550}
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      </aside>
+  {/* Show template grid only when Templates header is active */}
+  {!showChooseButton && (
+    <div className="p-3">
+      {loadingTemplate && (
+        <div className="text-xs text-gray-500 mb-2">Loading template…</div>
+      )}
+      <div className="grid grid-cols-2 gap-3">
+        {templates.map((t) => (
+          <button
+            key={t._id || t.id}
+            onClick={() => {
+              loadTemplateById(t._id || t.id);
+              // keep sidebar open → removed setIsRightbarOpen(false)
+            }}
+            className={`border rounded overflow-hidden text-left hover:shadow focus:ring-2 focus:ring-indigo-500 ${
+              (t._id || t.id) === activeTemplateId
+                ? "ring-2 ring-indigo-500"
+                : ""
+            }`}
+            title={t.title || "Template"}
+          >
+            <div className="aspect-[4/5] bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
+              {t.image ? (
+                <img
+                  src={t.image}
+                  alt={t.title || "template thumbnail"}
+                  className="w-full h-full object-cover"
+                  crossOrigin="anonymous"
+                />
+              ) : (
+                <span>Preview</span>
+              )}
+            </div>
+            <div className="px-2 py-1">
+              <div className="text-xs font-medium truncate">
+                {t.title || "Untitled"}
+              </div>
+              <div className="text-[10px] text-gray-500">
+                {t.width || t.w || 400}×{t.height || t.h || 550}
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  )}
+</aside>
+
 
       {/* BOTTOM BAR */}
       {showToolbar && (

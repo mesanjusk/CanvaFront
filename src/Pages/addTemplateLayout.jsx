@@ -29,11 +29,11 @@ const TemplateLayout = ({
           top: obj.top,
            originX: obj.originX || "left",   
          originY: obj.originY || "top", 
-           scaleX: obj.scaleX || 1,  
-        scaleY: obj.scaleY || 1,
+           scaleX: obj.scaleX ?? 1,   
+          scaleY: obj.scaleY ?? 1,
           angle: obj.angle || 0,
-          width: obj.width || 0,    
-        height: obj.height || 0,
+          width: (obj.width || 0) * (obj.scaleX ?? 1),  
+          height: (obj.height || 0) * (obj.scaleY ?? 1),
           text: obj.text || null,
           fontSize: obj.fontSize || null,
           fill: obj.fill || null,
@@ -53,7 +53,7 @@ const TemplateLayout = ({
               : null,
         };
       });
-
+ console.log("Saving placeholders:", placeholders);
     try {
       await axios.put(
         `https://canvaback.onrender.com/api/template/update-canvas/${activeTemplateId}`,

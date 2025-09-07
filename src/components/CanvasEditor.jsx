@@ -699,61 +699,78 @@ const [showChooseButton, setShowChooseButton] = useState(true);
         });
       }
 
-      // institute logo/signature
-     if (selectedInstitute?.logo) {
+  // 🔹 Restore Logo
+if (selectedInstitute?.logo) {
   const savedLogo = getSavedProps("logo");
   safeLoadImage(selectedInstitute.logo, (img) => {
-    if (
-      savedLogo &&
-      savedLogo.scaleX !== undefined &&
-      savedLogo.scaleY !== undefined
-    ) {
+    if (savedLogo) {
+      // Compute scale from saved width/height
+      const scaleX = savedLogo.width && img.width
+        ? savedLogo.width / img.width
+        : savedLogo.scaleX ?? 1;
+      const scaleY = savedLogo.height && img.height
+        ? savedLogo.height / img.height
+        : savedLogo.scaleY ?? 1;
+
       img.set({
         left: savedLogo.left ?? 20,
         top: savedLogo.top ?? 20,
-        scaleX: savedLogo.scaleX,  
-        scaleY: savedLogo.scaleY,
+        scaleX,
+        scaleY,
         angle: savedLogo.angle ?? 0,
       });
     } else {
+      // First time placement → default
       img.scaleToWidth(Math.round(canvas.width * 0.2));
-      img.set({
-        left: savedLogo?.left ?? 20,
-        top: savedLogo?.top ?? 20,
-      });
+      img.set({ left: 20, top: 20 });
     }
 
     img.customId = "logo";
     img.field = "logo";
     logoRef.current = img;
     canvas.add(img);
+
+    img.setCoords();
+    canvas.renderAll();
   });
 }
 
-      if (selectedInstitute?.signature) {
-        const savedSign = getSavedProps("signature");
-        safeLoadImage(selectedInstitute.signature, (img) => {
-          if (savedSign?.scaleX && savedSign?.scaleY) {
-            img.set({
-              left: savedSign.left ?? canvas.width - 150,
-              top: savedSign.top ?? canvas.height - 80,
-              scaleX: savedSign.scaleX,
-              scaleY: savedSign.scaleY,
-              angle: savedSign?.angle ?? 0,
-            });
-          } else {
-            img.scaleToWidth(Math.round(canvas.width * 0.3));
-            img.set({
-              left: savedSign?.left ?? canvas.width - 150,
-              top: savedSign?.top ?? canvas.height - 80,
-            });
-          }
-          img.customId = "signature";
-          img.field = "signature";
-          signatureRef.current = img;
-          canvas.add(img);
-        });
-      }
+// 🔹 Restore Signature
+if (selectedInstitute?.signature) {
+  const savedSign = getSavedProps("signature");
+  safeLoadImage(selectedInstitute.signature, (img) => {
+    if (savedSign) {
+      const scaleX = savedSign.width && img.width
+        ? savedSign.width / img.width
+        : savedSign.scaleX ?? 1;
+      const scaleY = savedSign.height && img.height
+        ? savedSign.height / img.height
+        : savedSign.scaleY ?? 1;
+
+      img.set({
+        left: savedSign.left ?? canvas.width - 150,
+        top: savedSign.top ?? canvas.height - 80,
+        scaleX,
+        scaleY,
+        angle: savedSign.angle ?? 0,
+      });
+    } else {
+      img.scaleToWidth(Math.round(canvas.width * 0.3));
+      img.set({
+        left: canvas.width - 150,
+        top: canvas.height - 80,
+      });
+    }
+
+    img.customId = "signature";
+    img.field = "signature";
+    signatureRef.current = img;
+    canvas.add(img);
+
+    img.setCoords();
+    canvas.renderAll();
+  });
+}
 
       canvas.renderAll();
       return () => (cancelled = true);
@@ -1306,6 +1323,7 @@ const [showChooseButton, setShowChooseButton] = useState(true);
                 downloadPDF={downloadPDF}
               />
             </div>
+
           </div>
 {/* Fill Color (only for text/shape) */}
 {activeObj && (activeObj.type === "text" || activeObj.type === "i-text" || activeObj.type === "rect" || activeObj.type === "circle") && (
@@ -1857,7 +1875,7 @@ const [showChooseButton, setShowChooseButton] = useState(true);
                   </div>
                 </div>
               </div>
-            )}
+            )} 
           </div>
         )}
       </aside>

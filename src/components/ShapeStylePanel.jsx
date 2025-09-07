@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-
+import { X } from "lucide-react"; 
 /**
  * Panel for editing basic shape styles such as fill, opacity and border.
  * Only shown when a shape object (e.g. rect or circle) is selected.
@@ -32,8 +32,28 @@ const ShapeStylePanel = ({ activeObj, canvas }) => {
     [activeObj, canvas]
   );
 
+   // Handle close
+  const handleClose = () => {
+    if (canvas) {
+      canvas.discardActiveObject(); // deselect
+      canvas.requestRenderAll();
+    }
+  };
+
   return (
-    <div className="absolute top-4 right-4 w-60 bg-white shadow-lg rounded p-4 z-50 space-y-3 text-sm">
+    <div  className="
+        bg-white shadow-lg z-50 space-y-3 text-sm
+        md:absolute md:top-4 md:right-4 md:w-60 md:rounded md:p-4
+        fixed bottom-0 left-0 right-0 w-full p-3 rounded-t-2xl
+      ">
+           {/* Close button */}
+      <button
+        onClick={handleClose}
+        className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+        title="Close"
+      >
+        <X size={18} />
+      </button>
       <div>
         <label className="block text-gray-600 mb-1">Fill</label>
         <input

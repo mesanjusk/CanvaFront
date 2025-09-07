@@ -71,16 +71,17 @@ const redo = () => {
 };
 
   const duplicateObject = () => {
-    if (!canvas || !activeObj) return;
-    sanitizeTextStyles();
-    activeObj.clone((cloned) => {
-      cloned.set({ left: cloned.left  +20, top: cloned.top  +20 });
-      canvas.add(cloned);
-      canvas.setActiveObject(cloned);
-      canvas.requestRenderAll();
-      saveHistory();
-    });
-  };
+  if (!canvas || !activeObj) return;
+  sanitizeTextStyles();
+  activeObj.clone((cloned) => {
+    cloned.set({ left: cloned.left + 20, top: cloned.top + 20 });
+    canvas.add(cloned);
+    canvas.setActiveObject(cloned);
+    canvas.requestRenderAll();
+    saveHistory(); 
+  });
+};
+
 
   const downloadPDF = () => {
     if (!canvas) return;
@@ -96,42 +97,48 @@ const redo = () => {
 
 
   useEffect(() => {
-    if (canvasRef.current) {
-      const canvasInstance = canvasRef.current;
-      setCanvas(canvasInstance);
+  if (canvasRef.current) {
+    const canvasInstance = canvasRef.current;
+    setCanvas(canvasInstance);
 
-      const handleSelection = () => setActiveObj(canvasInstance.getActiveObject());
-      canvasInstance.on("selection:created", handleSelection);
-      canvasInstance.on("selection:updated", handleSelection);
-      canvasInstance.on("selection:cleared", () => setActiveObj(null));
+    const handleSelection = () =>
+      setActiveObj(canvasInstance.getActiveObject());
+    canvasInstance.on("selection:created", handleSelection);
+    canvasInstance.on("selection:updated", handleSelection);
+    canvasInstance.on("selection:cleared", () => setActiveObj(null));
 
-      const gridSize = 10;
-      canvasInstance.on("object:moving", (e) => {
-        e.target.set({
-          left: Math.round(e.target.left / gridSize) * gridSize,
-          top: Math.round(e.target.top / gridSize) * gridSize,
-        });
+    const gridSize = 10;
+    canvasInstance.on("object:moving", (e) => {
+      e.target.set({
+        left: Math.round(e.target.left / gridSize) * gridSize,
+        top: Math.round(e.target.top / gridSize) * gridSize,
       });
+    });
 
-      canvasInstance.on("object:modified", saveHistory);
+    // 🔹 Track changes for undo/redo
+    canvasInstance.on("object:added", saveHistory);
+    canvasInstance.on("object:modified", saveHistory);
+    canvasInstance.on("object:removed", saveHistory);
 
-      const mockData = { version: "5.2.4", objects: [] };
+    // Initialize with empty state
+    const mockData = { version: "5.2.4", objects: [] };
+    canvasInstance.loadFromJSON(mockData, () => {
+      canvasInstance.renderAll();
+      saveHistory(); // 🔹 First state
+    });
 
-      canvasInstance.loadFromJSON(mockData, () => {
-        canvasInstance.renderAll();
-        saveHistory();
-      });
+    return () => {
+      canvasInstance.off("selection:created", handleSelection);
+      canvasInstance.off("selection:updated", handleSelection);
+      canvasInstance.off("selection:cleared");
+      canvasInstance.off("object:moving");
+      canvasInstance.off("object:added", saveHistory);
+      canvasInstance.off("object:modified", saveHistory);
+      canvasInstance.off("object:removed", saveHistory);
+    };
+  }
+}, [canvasRef]);
 
-      return () => {
-        canvasInstance.off("selection:created", handleSelection);
-        canvasInstance.off("selection:updated", handleSelection);
-        canvasInstance.off("selection:cleared");
-        canvasInstance.off("object:moving");
-        canvasInstance.off("object:modified", saveHistory);
-       
-      };
-    }
-  }, [canvasRef]);
 
   return {
     showSettings,

@@ -390,7 +390,8 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     try {
       const res = await fetch(activeObj.getSrc());
       const blob = await res.blob();
-      const url = await removeBackground(blob);
+      const bgRemoved = await removeBackground(blob);
+      const url = URL.createObjectURL(bgRemoved);
       fabric.Image.fromURL(
         url,
         (img) => {
@@ -406,6 +407,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
           canvas.remove(activeObj);
           canvas.add(img);
           canvas.setActiveObject(img);
+          URL.revokeObjectURL(url);
           saveHistory();
         },
         { crossOrigin: "anonymous" }

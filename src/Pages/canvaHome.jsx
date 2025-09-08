@@ -1,4 +1,4 @@
-import Footer from "../components/Footer.jsx";
+
 import Banner from "./Banner";
 import AllCategory from "../reports/allCategory.jsx";
 import Navbar from "../components/Navbar.jsx";

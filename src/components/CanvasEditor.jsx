@@ -48,7 +48,7 @@ import {
   Sparkles,
   Contrast as ContrastIcon
 } from "lucide-react";
-import { Layout as LayoutIcon, Ruler, BookOpen, Scissors } from "lucide-react";
+import { Layout as LayoutIcon, BookOpen, Scissors } from "lucide-react";
 import IconButton from "./IconButton";
 import CanvasArea from "./CanvasArea";
 import ImageCropModal from "./ImageCropModal";

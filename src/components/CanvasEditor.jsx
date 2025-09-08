@@ -52,7 +52,6 @@ import { Layout as LayoutIcon, BookOpen, Scissors } from "lucide-react";
 import IconButton from "./IconButton";
 import CanvasArea from "./CanvasArea";
 import ImageCropModal from "./ImageCropModal";
-import BottomToolbar from "./BottomToolbar";
 import UndoRedoControls from "./UndoRedoControls";
 import { jsPDF } from "jspdf";
 import TemplateLayout from "../Pages/addTemplateLayout";
@@ -62,6 +61,8 @@ import ShapeStylePanel from "./ShapeStylePanel";
 import { buildClipShape, buildOverlayShape, moveOverlayAboveImage, applyMaskAndFrame, removeMaskAndFrame } from "../utils/shapeUtils";
 import { PRESET_SIZES, mmToPx, pxToMm, drawCropMarks, drawRegistrationMark } from "../utils/printUtils";
 import { removeBackground } from "../utils/backgroundUtils";
+import SelectionToolbar from "./SelectionToolbar";
+import BottomNavBar from "./BottomNavBar";
 
 /* ===================== Helpers added for Canva-like behavior ===================== */
 const isText = (o) => o && (o.type === "text" || o.type === "i-text");
@@ -1066,44 +1067,8 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   };
 
   /* ============================ Align & Z-index ============================ */
-  const withActive = (fn) => () => {
-    if (!canvas) return;
-    const obj = canvas.getActiveObject();
-    if (!obj) return;
-    fn(obj);
-    canvas.requestRenderAll();
-    saveHistory();
-  };
-  const alignLeft = withActive((obj) => {
-    obj.set({ left: obj.width ? (obj.width * obj.scaleX) / 2 : 0, originX: "center" });
-  });
-  const alignCenter = withActive((obj) => {
-    obj.set({ left: canvas.getWidth() / 2, originX: "center" });
-  });
-  const alignRight = withActive((obj) => {
-    const w = canvas.getWidth();
-    const ow = (obj.width || 0) * (obj.scaleX || 1);
-    obj.set({ left: w - ow / 2, originX: "center" });
-  });
-  const alignTop = withActive((obj) => {
-    obj.set({ top: obj.height ? (obj.height * obj.scaleY) / 2 : 0, originY: "center" });
-  });
-  const alignMiddle = withActive((obj) => {
-    obj.set({ top: canvas.getHeight() / 2, originY: "center" });
-  });
-  const alignBottom = withActive((obj) => {
-    const h = canvas.getHeight();
-    const oh = (obj.height || 0) * (obj.scaleY || 1);
-    obj.set({ top: h - oh / 2, originY: "center" });
-  });
-  const bringToFront = withActive((obj) => {
-    obj.bringToFront();
-    if (obj.type === "image" && obj.frameOverlay) moveOverlayAboveImage(canvas, obj, obj.frameOverlay);
-  });
-  const sendToBack = withActive((obj) => {
-    obj.sendToBack();
-    if (obj.type === "image" && obj.frameOverlay) moveOverlayAboveImage(canvas, obj, obj.frameOverlay);
-  });
+  // Alignment and z-index tools were previously exposed via a bottom toolbar.
+  // They have been removed in favor of a compact selection toolbar.
 
   // Distribute tools
   const distributeH = () => {
@@ -1672,6 +1637,9 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
           className="shadow-lg border bg-white relative"
         >
           <CanvasArea ref={canvasRef} width={tplSize.w} height={tplSize.h} />
+          {showToolbar && activeObj && (
+            <SelectionToolbar activeObj={activeObj} canvas={canvas} />
+          )}
         </div>
 
         {bulkMode && (
@@ -1992,21 +1960,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
         </div>
       </aside>
 
-      {/* BOTTOM BAR */}
-      {showToolbar && (
-        <div className="absolute bottom-2 left-0 right-0 flex justify-center md:static md:mt-4">
-          <BottomToolbar
-            alignLeft={alignLeft}
-            alignCenter={alignCenter}
-            alignRight={alignRight}
-            alignTop={alignTop}
-            alignMiddle={alignMiddle}
-            alignBottom={alignBottom}
-            bringToFront={bringToFront}
-            sendToBack={sendToBack}
-          />
-        </div>
-      )}
+      <BottomNavBar />
 
     </div>
   );

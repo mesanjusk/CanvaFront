@@ -2,6 +2,7 @@ import Footer from "../components/Footer.jsx";
 import Banner from "./Banner";
 import AllCategory from "../reports/allCategory.jsx";
 import Navbar from "../components/Navbar.jsx";
+import BottomNavBar from "../components/BottomNavBar.jsx";
 
 export default function CanvaHome() {
   return (
@@ -14,6 +15,7 @@ export default function CanvaHome() {
       </section>
       <AllCategory />
       <Footer />
+      <BottomNavBar />
     </div>
   );
 }

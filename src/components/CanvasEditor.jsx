@@ -56,7 +56,7 @@ import { PRESET_SIZES, mmToPx, pxToMm, drawCropMarks, drawRegistrationMark } fro
 /* =============================================================================
    Main Editor
 ============================================================================= */
-const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false }) => {
+const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   const { templateId: routeId } = useParams();
   const templateId = propTemplateId || routeId;
   const navigate = useNavigate();
@@ -85,7 +85,7 @@ const [showChooseButton, setShowChooseButton] = useState(true);
   }, [tplSize.w, tplSize.h]);
 
   // data
-  const [students, setStudents] = useState([]);
+  const [, setStudents] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [courses, setCourses] = useState([]);
   const [batches, setBatches] = useState([]);
@@ -201,7 +201,6 @@ const [showChooseButton, setShowChooseButton] = useState(true);
     duplicateObject,
     downloadPDF,       // existing single-page exporter
     downloadHighRes,
-    multipleSelected,
     saveHistory,
     resetHistory,
   } = useCanvasEditor(canvasRef, tplSize.w, tplSize.h);
@@ -499,7 +498,9 @@ const [showChooseButton, setShowChooseButton] = useState(true);
             signature: institute.signature || null,
           });
         }
-      } catch { }
+      } catch (err) {
+        console.error("Error fetching institute:", err);
+      }
     };
     fetchInstitute();
   }, []);
@@ -510,7 +511,7 @@ const [showChooseButton, setShowChooseButton] = useState(true);
       try {
         const res = await axios.get("https://canvaback.onrender.com/api/template");
         setTemplates(res.data?.data || res.data || []);
-      } catch {
+      } catch (err) {
         console.error("Error fetching categories:", err);
       }
     };
@@ -575,8 +576,7 @@ const [showChooseButton, setShowChooseButton] = useState(true);
   useEffect(() => {
     if (!templateId) return;
     loadTemplateById(templateId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [templateId]);
+  }, [templateId, loadTemplateById]);
 
   /* ==================== Render template + student objects ================== */
   useEffect(() => {
@@ -1012,21 +1012,16 @@ if (selectedInstitute?.signature) {
   });
 
   /* ============================= Carousel (bulk) =========================== */
-  const rebuildBulkFromFiltered = () => {
+  const rebuildBulkFromFiltered = useCallback(() => {
     const ids = filteredStudents.map((s) => s.uuid);
     setBulkList(ids);
     setBulkIndex(0);
-    if (ids.length) {
-      setSelectedStudent(filteredStudents[0]);
-    } else {
-      setSelectedStudent(null);
-    }
-  };
+    setSelectedStudent(ids.length ? filteredStudents[0] : null);
+  }, [filteredStudents]);
 
   useEffect(() => {
     if (bulkMode) rebuildBulkFromFiltered();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bulkMode, filteredStudents]);
+  }, [bulkMode, rebuildBulkFromFiltered]);
 
   const gotoIndex = (idx) => {
     if (!bulkList.length) return;
@@ -1151,14 +1146,6 @@ if (selectedInstitute?.signature) {
       h: H - bleedPx.top - bleedPx.bottom,
     };
   }, [contentPx, bleedPx]);
-
-  const exportSinglePNG = () => {
-    const dataUrl = canvas.toDataURL({ format: "png", quality: 1 });
-    const a = document.createElement("a");
-    a.href = dataUrl;
-    a.download = `design_${pagePreset}_${pageOrientation}_${dpi}dpi.png`;
-    a.click();
-  };
 
   const exportSinglePDF = () => {
     const { w_mm, h_mm } = pageMM;

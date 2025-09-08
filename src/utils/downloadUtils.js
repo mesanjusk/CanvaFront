@@ -10,7 +10,7 @@ export async function downloadPDF(canvas, canvasWidth, canvasHeight) {
   canvas.setViewportTransform(prevVpt);
 }
 
-export function downloadHighRes(canvas) {
+export function downloadHighRes(canvas, width, height, filename = 'canvas-image.png') { 
   if (!canvas) return;
   canvas.discardActiveObject();
   canvas.renderAll();
@@ -21,12 +21,16 @@ export function downloadHighRes(canvas) {
       format: 'png',
       multiplier: 2,
       enableRetinaScaling: false,
+       width,
+      height,
     });
     const link = document.createElement('a');
-    link.download = 'canvas-image.png';
+    link.download = filename;
     link.href = dataUrl;
+    document.body.appendChild(link);
     link.click();
-    canvas.setViewportTransform(prevVpt);
+    document.body.removeChild(link);
+        canvas.setViewportTransform(prevVpt);
     canvas.requestRenderAll();
   });
 }

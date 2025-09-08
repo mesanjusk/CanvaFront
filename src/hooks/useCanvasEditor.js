@@ -89,10 +89,10 @@ const redo = () => {
     pdfExporter(canvas, canvasWidth, canvasHeight);
   };
 
-  const downloadHighRes = () => {
+  const downloadHighRes = (width, height, filename) => {
     if (!canvas) return;
     sanitizeTextStyles();
-    highResExporter(canvas);
+    highResExporter(canvas,width, height, filename);
   };
 
 

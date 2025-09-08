@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { ChevronLeft } from "lucide-react";
 import Navbar from "../components/Navbar";
-import Footer from "../components/BottomNavBar";
+import BottomNavBar from "../components/BottomNavBar.jsx";
 
 export default function Subcategory() {
   const { categoryId } = useParams();

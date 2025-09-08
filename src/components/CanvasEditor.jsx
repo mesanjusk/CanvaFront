@@ -66,13 +66,13 @@ import { PRESET_SIZES, mmToPx, pxToMm, drawCropMarks, drawRegistrationMark } fro
 const isText = (o) => o && (o.type === "text" || o.type === "i-text");
 const isShape = (o) => o && (o.type === "rect" || o.type === "circle" || o.type === "triangle" || o.type === "polygon" || o.type === "path");
 
-const setGradientFill = (obj, colors=["#ff6b6b","#845ef7"]) => {
+const setGradientFill = (obj, colors = ["#ff6b6b", "#845ef7"]) => {
   if (!obj) return;
   const w = (obj.width || 100) * (obj.scaleX || 1);
   const grad = new fabric.Gradient({
     type: "linear",
     gradientUnits: "pixels",
-    coords: { x1: -w/2, y1: 0, x2: w/2, y2: 0 },
+    coords: { x1: -w / 2, y1: 0, x2: w / 2, y2: 0 },
     colorStops: [{ offset: 0, color: colors[0] }, { offset: 1, color: colors[1] }],
   });
   obj.set("fill", grad);
@@ -94,7 +94,7 @@ const applyImageFilter = (img, type, value) => {
   img.applyFilters();
 };
 
-const useSmartGuides = (canvasRef, enable=true, tolerance=8) => {
+const useSmartGuides = (canvasRef, enable = true, tolerance = 8) => {
   const showV = useRef(false);
   const showH = useRef(false);
   useEffect(() => {
@@ -102,26 +102,26 @@ const useSmartGuides = (canvasRef, enable=true, tolerance=8) => {
     if (!canvas || !enable) return;
 
     const prevOverlay = canvas._renderOverlay;
-    canvas._renderOverlay = (ctx) => {
-      if (typeof prevOverlay === "function") prevOverlay(ctx);
+    canvas._renderOverlay = function (ctx) {
+      if (typeof prevOverlay === "function") prevOverlay.call(this, ctx);
       const w = canvas.getWidth();
       const h = canvas.getHeight();
       ctx.save();
       ctx.strokeStyle = "rgba(99,102,241,0.85)";
       ctx.lineWidth = 1;
-      if (showV.current) { ctx.beginPath(); ctx.moveTo(w/2+0.5, 0); ctx.lineTo(w/2+0.5, h); ctx.stroke(); }
-      if (showH.current) { ctx.beginPath(); ctx.moveTo(0, h/2+0.5); ctx.lineTo(w, h/2+0.5); ctx.stroke(); }
+      if (showV.current) { ctx.beginPath(); ctx.moveTo(w / 2 + 0.5, 0); ctx.lineTo(w / 2 + 0.5, h); ctx.stroke(); }
+      if (showH.current) { ctx.beginPath(); ctx.moveTo(0, h / 2 + 0.5); ctx.lineTo(w, h / 2 + 0.5); ctx.stroke(); }
       ctx.restore();
     };
 
     const onMove = (e) => {
       const obj = e.target; if (!obj) return;
       const w = canvas.getWidth(), h = canvas.getHeight();
-      const nearV = Math.abs(obj.left - w/2) <= tolerance;
-      const nearH = Math.abs(obj.top - h/2) <= tolerance;
+      const nearV = Math.abs(obj.left - w / 2) <= tolerance;
+      const nearH = Math.abs(obj.top - h / 2) <= tolerance;
       showV.current = nearV; showH.current = nearH;
-      if (nearV) obj.set({ left: Math.round(w/2) });
-      if (nearH) obj.set({ top: Math.round(h/2) });
+      if (nearV) obj.set({ left: Math.round(w / 2) });
+      if (nearH) obj.set({ top: Math.round(h / 2) });
     };
     const clear = () => { showV.current = false; showH.current = false; canvas.requestRenderAll(); };
 
@@ -139,7 +139,7 @@ const useSmartGuides = (canvasRef, enable=true, tolerance=8) => {
 /** Layers panel */
 const LayersPanel = ({ canvas, onSelect }) => {
   const [, force] = useState(0);
-  const refresh = useCallback(()=>force(x=>x+1),[]);
+  const refresh = useCallback(() => force(x => x + 1), []);
   useEffect(() => {
     if (!canvas) return;
     const rerender = () => refresh();
@@ -162,7 +162,7 @@ const LayersPanel = ({ canvas, onSelect }) => {
   const objects = useMemo(() => canvas ? canvas.getObjects() : [], [canvas, refresh]);
   const setVisible = (obj, v) => { obj.visible = v; obj.dirty = true; canvas.requestRenderAll(); };
   const setLocked = (obj, v) => {
-    obj.set({ lockMovementX:v, lockMovementY:v, lockScalingX:v, lockScalingY:v, lockRotation:v, hasControls:!v });
+    obj.set({ lockMovementX: v, lockMovementY: v, lockScalingX: v, lockScalingY: v, lockRotation: v, hasControls: !v });
     canvas.requestRenderAll();
   };
   const bringFwd = (obj) => { obj.bringForward(); canvas.requestRenderAll(); };
@@ -177,20 +177,20 @@ const LayersPanel = ({ canvas, onSelect }) => {
         {[...objects].map((o, idx) => (
           <div key={idx} className="flex items-center justify-between gap-2 border rounded px-2 py-1">
             <div className="flex items-center gap-2 min-w-0">
-              <button className="p-1 rounded hover:bg-gray-100" onClick={() => setVisible(o, !o.visible)} title={o.visible?"Hide":"Show"}>
-                {o.visible ? <Eye size={16}/> : <EyeOff size={16}/>}
+              <button className="p-1 rounded hover:bg-gray-100" onClick={() => setVisible(o, !o.visible)} title={o.visible ? "Hide" : "Show"}>
+                {o.visible ? <Eye size={16} /> : <EyeOff size={16} />}
               </button>
-              <button className="p-1 rounded hover:bg-gray-100" onClick={() => setLocked(o, !o.lockMovementX)} title={o.lockMovementX?"Unlock":"Lock"}>
-                {o.lockMovementX ? <Unlock size={16}/> : <Lock size={16}/>}
+              <button className="p-1 rounded hover:bg-gray-100" onClick={() => setLocked(o, !o.lockMovementX)} title={o.lockMovementX ? "Unlock" : "Lock"}>
+                {o.lockMovementX ? <Unlock size={16} /> : <Lock size={16} />}
               </button>
-              <div className="truncate cursor-pointer text-xs" title={o.customId||o.field||o.type}
-                onClick={()=>{ canvas.setActiveObject(o); canvas.requestRenderAll(); onSelect?.(o); }}>
+              <div className="truncate cursor-pointer text-xs" title={o.customId || o.field || o.type}
+                onClick={() => { canvas.setActiveObject(o); canvas.requestRenderAll(); onSelect?.(o); }}>
                 {o.customId || o.field || o.type}
               </div>
             </div>
             <div className="flex items-center gap-1">
-              <button className="p-1 rounded hover:bg-gray-100" title="Bring forward" onClick={()=>bringFwd(o)}>▲</button>
-              <button className="p-1 rounded hover:bg-gray-100" title="Send backward" onClick={()=>sendBack(o)}>▼</button>
+              <button className="p-1 rounded hover:bg-gray-100" title="Bring forward" onClick={() => bringFwd(o)}>▲</button>
+              <button className="p-1 rounded hover:bg-gray-100" title="Send backward" onClick={() => sendBack(o)}>▼</button>
             </div>
           </div>
         ))}
@@ -1136,19 +1136,19 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   const distributeH = () => {
     const sel = canvas?.getActiveObject();
     if (!sel || sel.type !== "activeSelection") { toast.error("Select multiple objects"); return; }
-    const objs = sel._objects.slice().sort((a,b)=>a.left-b.left);
-    const left = objs[0].left; const right = objs[objs.length-1].left;
+    const objs = sel._objects.slice().sort((a, b) => a.left - b.left);
+    const left = objs[0].left; const right = objs[objs.length - 1].left;
     const step = (right - left) / (objs.length - 1 || 1);
-    objs.forEach((o,i)=>{ o.set({ left: left + i*step }); o.setCoords(); });
+    objs.forEach((o, i) => { o.set({ left: left + i * step }); o.setCoords(); });
     canvas.discardActiveObject(); const as = new fabric.ActiveSelection(objs, { canvas }); canvas.setActiveObject(as); canvas.requestRenderAll(); saveHistory();
   };
   const distributeV = () => {
     const sel = canvas?.getActiveObject();
     if (!sel || sel.type !== "activeSelection") { toast.error("Select multiple objects"); return; }
-    const objs = sel._objects.slice().sort((a,b)=>a.top-b.top);
-    const top = objs[0].top; const bottom = objs[objs.length-1].top;
+    const objs = sel._objects.slice().sort((a, b) => a.top - b.top);
+    const top = objs[0].top; const bottom = objs[objs.length - 1].top;
     const step = (bottom - top) / (objs.length - 1 || 1);
-    objs.forEach((o,i)=>{ o.set({ top: top + i*step }); o.setCoords(); });
+    objs.forEach((o, i) => { o.set({ top: top + i * step }); o.setCoords(); });
     canvas.discardActiveObject(); const as = new fabric.ActiveSelection(objs, { canvas }); canvas.setActiveObject(as); canvas.requestRenderAll(); saveHistory();
   };
 
@@ -1584,7 +1584,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
               </button>
             )}
 
-            
+
           </div>
         </header>
       )}
@@ -1710,66 +1710,66 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
           setOuter={setOuter}
         />
         {/* Filters (collapsible) */}
-         {bulkMode && (
-        <div className="border-b">
-          <button
-            className="w-full text-left p-3 text-sm font-semibold"
-            onClick={() => setShowFilters((v) => !v)}
-          >
-            Filters
-          </button>
-          {showFilters && (
-            <div className="px-3 pb-3">
-              <label className="block text-xs mb-1">Course</label>
-              <select
-                className="w-full border rounded px-2 py-1 mb-2"
-                value={selectedCourse}
-                onChange={(e) => setSelectedCourse(e.target.value)}
-              >
-                <option value="">Select course</option>
-                {courses.map((c) => (
-                  <option key={c._id} value={c.Course_uuid}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+        {bulkMode && (
+          <div className="border-b">
+            <button
+              className="w-full text-left p-3 text-sm font-semibold"
+              onClick={() => setShowFilters((v) => !v)}
+            >
+              Filters
+            </button>
+            {showFilters && (
+              <div className="px-3 pb-3">
+                <label className="block text-xs mb-1">Course</label>
+                <select
+                  className="w-full border rounded px-2 py-1 mb-2"
+                  value={selectedCourse}
+                  onChange={(e) => setSelectedCourse(e.target.value)}
+                >
+                  <option value="">Select course</option>
+                  {courses.map((c) => (
+                    <option key={c._id} value={c.Course_uuid}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
 
-              <label className="block text-xs mb-1">Batch</label>
-              <select
-                className="w-full border rounded px-2 py-1 mb-2"
-                value={selectedBatch}
-                onChange={(e) => setSelectedBatch(e.target.value)}
-              >
-                <option value="">Select batch</option>
-                {batches.map((b) => (
-                  <option key={b._id} value={b.name}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
+                <label className="block text-xs mb-1">Batch</label>
+                <select
+                  className="w-full border rounded px-2 py-1 mb-2"
+                  value={selectedBatch}
+                  onChange={(e) => setSelectedBatch(e.target.value)}
+                >
+                  <option value="">Select batch</option>
+                  {batches.map((b) => (
+                    <option key={b._id} value={b.name}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
 
-              <label className="block text-xs mb-1">Student</label>
-              <select
-                className="w-full border rounded px-2 py-1"
-                onChange={(e) => handleStudentSelect(e.target.value)}
-                value={selectedStudent?.uuid || ""}
-                disabled={bulkMode}
-              >
-                <option value="">Select a student</option>
-                {filteredStudents.map((s) => (
-                  <option key={s.uuid} value={s.uuid}>
-                    {s.firstName} {s.lastName}
-                  </option>
-                ))}
-              </select>
+                <label className="block text-xs mb-1">Student</label>
+                <select
+                  className="w-full border rounded px-2 py-1"
+                  onChange={(e) => handleStudentSelect(e.target.value)}
+                  value={selectedStudent?.uuid || ""}
+                  disabled={bulkMode}
+                >
+                  <option value="">Select a student</option>
+                  {filteredStudents.map((s) => (
+                    <option key={s.uuid} value={s.uuid}>
+                      {s.firstName} {s.lastName}
+                    </option>
+                  ))}
+                </select>
 
-              <div className="text-[11px] text-gray-500 mt-2">
-                Bulk mode uses the filtered list above. Use the Prev/Next buttons to navigate.
+                <div className="text-[11px] text-gray-500 mt-2">
+                  Bulk mode uses the filtered list above. Use the Prev/Next buttons to navigate.
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-         )}
+            )}
+          </div>
+        )}
 
         <FrameSection
           showFrames={showFrames}
@@ -1896,23 +1896,23 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
                     <div className="flex items-center gap-2">
                       <label className="text-xs w-20">Brightness</label>
                       <Slider min={-1} max={1} step={0.01} defaultValue={0}
-                        onChangeCommitted={(_,v)=>{ applyImageFilter(activeObj, "brightness", Array.isArray(v)?v[0]:v); canvas.requestRenderAll(); saveHistory(); }}/>
+                        onChangeCommitted={(_, v) => { applyImageFilter(activeObj, "brightness", Array.isArray(v) ? v[0] : v); canvas.requestRenderAll(); saveHistory(); }} />
                     </div>
                     <div className="flex items-center gap-2">
                       <label className="text-xs w-20">Contrast</label>
                       <Slider min={-1} max={1} step={0.01} defaultValue={0}
-                        onChangeCommitted={(_,v)=>{ applyImageFilter(activeObj, "contrast", Array.isArray(v)?v[0]:v); canvas.requestRenderAll(); saveHistory(); }}/>
+                        onChangeCommitted={(_, v) => { applyImageFilter(activeObj, "contrast", Array.isArray(v) ? v[0] : v); canvas.requestRenderAll(); saveHistory(); }} />
                     </div>
                     <div className="flex items-center gap-2">
                       <label className="text-xs w-20">Blur</label>
                       <Slider min={0} max={1} step={0.01} defaultValue={0}
-                        onChangeCommitted={(_,v)=>{ applyImageFilter(activeObj, "blur", Array.isArray(v)?v[0]:v); canvas.requestRenderAll(); saveHistory(); }}/>
+                        onChangeCommitted={(_, v) => { applyImageFilter(activeObj, "blur", Array.isArray(v) ? v[0] : v); canvas.requestRenderAll(); saveHistory(); }} />
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button size="small" variant="outlined" onClick={()=>{ applyImageFilter(activeObj, "grayscale"); canvas.requestRenderAll(); saveHistory(); }}>
+                      <Button size="small" variant="outlined" onClick={() => { applyImageFilter(activeObj, "grayscale"); canvas.requestRenderAll(); saveHistory(); }}>
                         Grayscale
                       </Button>
-                      <Button size="small" variant="text" onClick={()=>{ activeObj.filters = []; activeObj.applyFilters(); canvas.requestRenderAll(); saveHistory(); }}>
+                      <Button size="small" variant="text" onClick={() => { activeObj.filters = []; activeObj.applyFilters(); canvas.requestRenderAll(); saveHistory(); }}>
                         Clear Filters
                       </Button>
                     </div>
@@ -2059,7 +2059,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
                   </div>
                 </div>
               </div>
-            )} 
+            )}
           </div>
         )}
       </aside>
@@ -2067,9 +2067,8 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
       {/* CENTER / Canva-like viewport */}
       <main
         ref={viewportRef}
-        className={`absolute bg-gray-100 top-14 left-0 right-0 ${isSidebarOpen ? "md:left-80" : "md:left-0"} ${
-          isRightbarOpen ? "md:right-80" : "right-0"
-        } bottom-14 md:bottom-16 overflow-hidden flex items-center justify-center`}
+        className={`absolute bg-gray-100 top-14 left-0 right-0 ${isSidebarOpen ? "md:left-80" : "md:left-0"} ${isRightbarOpen ? "md:right-80" : "right-0"
+          } bottom-14 md:bottom-16 overflow-hidden flex items-center justify-center`}
       >
         <div
           ref={stageRef}
@@ -2120,9 +2119,8 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
 
       {/* RIGHT SIDEBAR – Template Switcher + Layers */}
       <aside
-        className={`fixed top-14 bottom-14 md:bottom-16 right-0 md:w-80 w-72 bg-white border-l z-30 overflow-y-auto transform transition-transform duration-200 ${
-          isRightbarOpen ? "translate-x-0" : "translate-x-full"
-        }`}
+        className={`fixed top-14 bottom-14 md:bottom-16 right-0 md:w-80 w-72 bg-white border-l z-30 overflow-y-auto transform transition-transform duration-200 ${isRightbarOpen ? "translate-x-0" : "translate-x-full"
+          }`}
       >
         <div className="p-3 border-b flex items-center justify-between">
           <div className="text-sm font-semibold">Templates</div>
@@ -2146,11 +2144,10 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
                 onClick={() => {
                   loadTemplateById(t._id || t.id);
                 }}
-                className={`border rounded overflow-hidden text-left hover:shadow focus:ring-2 focus:ring-indigo-500 ${
-                  (t._id || t.id) === activeTemplateId
+                className={`border rounded overflow-hidden text-left hover:shadow focus:ring-2 focus:ring-indigo-500 ${(t._id || t.id) === activeTemplateId
                     ? "ring-2 ring-indigo-500"
                     : ""
-                }`}
+                  }`}
                 title={t.title || "Template"}
               >
                 <div className="aspect-[4/5] bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
@@ -2178,7 +2175,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
           </div>
           {/* Layers Panel (below templates) */}
           <div className="mt-4 border-t pt-3">
-            <LayersPanel canvas={canvas} onSelect={(o)=> setActiveObj(o)} />
+            <LayersPanel canvas={canvas} onSelect={(o) => setActiveObj(o)} />
           </div>
         </div>
       </aside>

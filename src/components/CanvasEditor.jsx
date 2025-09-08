@@ -62,6 +62,7 @@ import { buildClipShape, buildOverlayShape, moveOverlayAboveImage, applyMaskAndF
 import { PRESET_SIZES, mmToPx, pxToMm, drawCropMarks, drawRegistrationMark } from "../utils/printUtils";
 import { removeBackground } from "../utils/backgroundUtils";
 import SelectionToolbar from "./SelectionToolbar";
+import BottomToolbar from "./BottomToolbar";
 import BottomNavBar from "./BottomNavBar";
 
 /* ===================== Helpers added for Canva-like behavior ===================== */
@@ -84,6 +85,7 @@ const setGradientFill = (obj, colors = ["#ff6b6b", "#845ef7"]) => {
 const useSmartGuides = (canvasRef, enable = true, tolerance = 8) => {
   const showV = useRef(false);
   const showH = useRef(false);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !enable) return;
@@ -203,6 +205,36 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   const viewportRef = useRef(null);
   const stageRef = useRef(null);
   const [zoom, setZoom] = useState(1);
+  // hooks
+  const {
+    canvasRef,
+    cropSrc,
+    setCropSrc,
+    cropCallbackRef,
+    addText,
+    addRect,
+    addCircle,
+    addImage,
+    cropImage,
+    setCanvasSize,
+  } = useCanvasTools({ width: tplSize.w, height: tplSize.h });
+
+  const {
+    activeObj,
+    setActiveObj,
+    canvas,
+    undo,
+    redo,
+    duplicateObject,
+    downloadPDF,       // existing single-page exporter
+    downloadHighRes,
+    saveHistory,
+    resetHistory,
+  } = useCanvasEditor(canvasRef, tplSize.w, tplSize.h);
+
+  // enable smart guides now that canvasRef exists
+  useSmartGuides(canvasRef, true, 8);
+
 
   const handleZoomChange = (val) => {
     const z = val / 100;
@@ -234,9 +266,10 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     return () => window.removeEventListener("resize", onResize);
   }, [fitToViewport]);
 
+
   useEffect(() => {
     if (canvasRef.current) fitToViewport();
-  }, [canvasRef.current, fitToViewport]);
+  }, [fitToViewport]);
 
   const handleSizeChange = (dim, value) => {
     const num = parseInt(value, 10) || 0;
@@ -247,10 +280,10 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     });
   };
 
-  useSmartGuides(/* canvasRef provided by hook below */ { current: null }, false); // placeholder until canvasRef is ready
+// (placeholder smart guides call removed; real one runs after hooks)
 
   // data
-  const [_, setStudents] = useState([]);
+  const [allStudents, setStudents] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [courses, setCourses] = useState([]);
   const [batches, setBatches] = useState([]);
@@ -277,6 +310,13 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   // UI
   const [isRightbarOpen, setIsRightbarOpen] = useState(false); // right
   const [rightPanel, setRightPanel] = useState(null);
+
+  // Open templates panel by default so users can pick one
+  useEffect(() => {
+    setRightPanel('templates');
+    setIsRightbarOpen(true);
+  }, []);
+
   const [frameShape] = useState("rounded");
   const [frameBorder] = useState("#ffffff");
   const [frameWidth] = useState(6);
@@ -339,35 +379,6 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   const logoRef = useRef(null);
   const signatureRef = useRef(null);
 
-  // hooks
-  const {
-    canvasRef,
-    cropSrc,
-    setCropSrc,
-    cropCallbackRef,
-    addText,
-    addRect,
-    addCircle,
-    addImage,
-    cropImage,
-    setCanvasSize,
-  } = useCanvasTools({ width: tplSize.w, height: tplSize.h });
-
-  const {
-    activeObj,
-    setActiveObj,
-    canvas,
-    undo,
-    redo,
-    duplicateObject,
-    downloadPDF,       // existing single-page exporter
-    downloadHighRes,
-    saveHistory,
-    resetHistory,
-  } = useCanvasEditor(canvasRef, tplSize.w, tplSize.h);
-
-  // enable smart guides now that canvasRef exists
-  useSmartGuides(canvasRef, true, 8);
 
   const getSavedProps = useCallback(
     (field) => savedPlaceholders.find((p) => p.field === field) || null,
@@ -763,6 +774,8 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
         const res = await axios.get(`https://canvaback.onrender.com/api/template/${id}`);
         await applyTemplateResponse(res.data || {});
         setActiveTemplateId(id);
+        setRightPanel('templates');
+        setIsRightbarOpen(true);
         resetHistory();
         saveHistory();
       } catch {
@@ -780,176 +793,164 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     loadTemplateById(templateId);
   }, [templateId]);
 
+  
   /* ==================== Render template + student objects ================== */
   useEffect(() => {
     if (!canvas) return;
 
-    // clear
-    if (bgRef.current) canvas.remove(bgRef.current);
-    if (logoRef.current) canvas.remove(logoRef.current);
-    if (signatureRef.current) canvas.remove(signatureRef.current);
+    // Clear previous scene
+    if (bgRef.current) { canvas.remove(bgRef.current); bgRef.current = null; }
+    if (logoRef.current) { canvas.remove(logoRef.current); logoRef.current = null; }
+    if (signatureRef.current) { canvas.remove(signatureRef.current); signatureRef.current = null; }
     studentObjectsRef.current.forEach((o) => canvas.remove(o));
     studentObjectsRef.current = [];
-    bgRef.current = null;
-    logoRef.current = null;
-    signatureRef.current = null;
 
-    const load = async () => {
-      if (templateImage) {
-        const bg = fabric.util.object.clone(templateImage);
-        bg.scaleX = canvas.width / bg.width;
-        bg.scaleY = canvas.height / bg.height;
-        bg.set({ selectable: false, evented: false });
-        canvas.add(bg);
-        bg.sendToBack();
-        bgRef.current = bg;
-      }
-
-      let cancelled = false;
-      const safeLoadImage = (url, cb) => {
-        fabric.Image.fromURL(
-          url,
-          (img) => !cancelled && cb(img),
-          { crossOrigin: "anonymous" }
-        );
-      };
-
-      // pick current student (single or bulk)
-      const currentStudent = bulkMode
-        ? filteredStudents.find((s) => s?.uuid === bulkList[bulkIndex]) || null
-        : selectedStudent;
-
-      if (currentStudent) {
-        const savedName = getSavedProps("studentName");
-        const nameText = new fabric.IText(
-          `${currentStudent.firstName || ""} ${currentStudent.lastName || ""}`.trim(),
-          {
-            left: savedName?.left ?? Math.round(canvas.width * 0.33),
-            top: savedName?.top ?? Math.round(canvas.height * 0.55),
-            fontSize: savedName?.fontSize ?? 22,
-            fill: "#000",
-          }
-        );
-        nameText.customId = "studentName";
-        nameText.field = "studentName";
-        canvas.add(nameText);
-        studentObjectsRef.current.push(nameText);
-      }
-
-      // student photo
-      const current = bulkMode
-        ? filteredStudents.find((s) => s?.uuid === bulkList[bulkIndex]) || null
-        : selectedStudent;
-
-      const photoUrl = Array.isArray(current?.photo)
-        ? current?.photo[0]
-        : current?.photo;
-      const savedPhoto = getSavedProps("studentPhoto");
-      const photoLeft = savedPhoto?.left ?? Math.round(canvas.width * 0.5);
-      const photoTop = savedPhoto?.top ?? Math.round(canvas.height * 0.33);
-      const savedShape = savedPhoto?.shape || "circle";
-
-      if (photoUrl) {
-        safeLoadImage(photoUrl, (img) => {
-          const phWidth = Math.min(400, canvas.width * 0.6);
-          const phHeight = Math.min(400, canvas.height * 0.6);
-          const autoScale = Math.min(phWidth / img.width, phHeight / img.height, 1);
-          img.set({
-            originX: "center",
-            originY: "center",
-            left: photoLeft,
-            top: photoTop,
-            scaleX: savedPhoto?.scaleX ?? autoScale,
-            scaleY: savedPhoto?.scaleY ?? autoScale,
+    const addTemplateBg = () => {
+      if (!templateImage) return;
+      try {
+        if (typeof templateImage.clone === "function") {
+          templateImage.clone((bg) => {
+            if (!bg) return;
+            bg.scaleX = canvas.width / bg.width;
+            bg.scaleY = canvas.height / bg.height;
+            bg.set({ selectable: false, evented: false });
+            canvas.add(bg);
+            bg.sendToBack();
+            bgRef.current = bg;
+            canvas.requestRenderAll();
           });
-          img.customId = "studentPhoto";
-          img.field = "studentPhoto";
-
-          // Normal mode: overlay follows the image (move/scale unit)
-          applyMaskAndFrame(canvas, img, savedShape, {
-            stroke: frameBorder,
-            strokeWidth: frameWidth,
-            rx: frameCorner,
-            absolute: false,
-            followImage: true,
-          });
-
-          // default selection allows moving/scaling entire unit
-          img.set({
-            lockMovementX: false,
-            lockMovementY: false,
-            lockScalingX: false,
-            lockScalingY: false,
-            lockRotation: false,
-            hasControls: true,
-            selectable: true,
-            evented: true,
-          });
-
-          img.on("selected", () => {
-            setActiveStudentPhoto(img);
-          });
-          img.on("deselected", () => setActiveStudentPhoto(null));
-
-          // Double-click to enter Adjust (move image inside mask)
-          img.on("mousedblclick", () => {
-            enterAdjustMode(img);
-            fitImageToFrame(img, "cover");
-          });
-
-          canvas.add(img);
-          studentObjectsRef.current.push(img);
-        });
+        } else {
+          // Fallback: draw directly (may mutate original)
+          const bg = templateImage;
+          bg.scaleX = canvas.width / bg.width;
+          bg.scaleY = canvas.height / bg.height;
+          bg.set({ selectable: false, evented: false });
+          canvas.add(bg);
+          bg.sendToBack();
+          bgRef.current = bg;
+        }
+      } catch (e) {
+        console.warn("Template BG add failed:", e);
       }
-
-      // Restore Logo
-      if (selectedInstitute?.logo) {
-        const savedLogo = getSavedProps("logo");
-        safeLoadImage(selectedInstitute.logo, (img) => {
-          if (savedLogo) {
-            const scaleX = savedLogo.width && img.width ? savedLogo.width / img.width : savedLogo.scaleX ?? 1;
-            const scaleY = savedLogo.height && img.height ? savedLogo.height / img.height : savedLogo.scaleY ?? 1;
-            img.set({ left: savedLogo.left ?? 20, top: savedLogo.top ?? 20, scaleX, scaleY, angle: savedLogo.angle ?? 0 });
-          } else {
-            img.scaleToWidth(Math.round(canvas.width * 0.2));
-            img.set({ left: 20, top: 20 });
-          }
-          img.customId = "logo";
-          img.field = "logo";
-          logoRef.current = img;
-          canvas.add(img);
-          img.setCoords();
-          canvas.renderAll();
-        });
-      }
-
-      // Restore Signature
-      if (selectedInstitute?.signature) {
-        const savedSign = getSavedProps("signature");
-        safeLoadImage(selectedInstitute.signature, (img) => {
-          if (savedSign) {
-            const scaleX = savedSign.width && img.width ? savedSign.width / img.width : savedSign.scaleX ?? 1;
-            const scaleY = savedSign.height && img.height ? savedSign.height / img.height : savedSign.scaleY ?? 1;
-            img.set({ left: savedSign.left ?? canvas.width - 150, top: savedSign.top ?? canvas.height - 80, scaleX, scaleY, angle: savedSign.angle ?? 0 });
-          } else {
-            img.scaleToWidth(Math.round(canvas.width * 0.3));
-            img.set({ left: canvas.width - 150, top: canvas.height - 80 });
-          }
-          img.customId = "signature";
-          img.field = "signature";
-          signatureRef.current = img;
-          canvas.add(img);
-          img.setCoords();
-          canvas.renderAll();
-        });
-      }
-
-      canvas.renderAll();
-      return () => (cancelled = true);
     };
 
-    const t = setTimeout(load, 60);
-    return () => clearTimeout(t);
+    // Helper for loading external images safely with CORS
+    const safeLoadImage = (url, cb) => {
+      if (!url) return;
+      fabric.Image.fromURL(
+        url,
+        (img) => { try { cb && cb(img); } catch(e) { console.error(e); } },
+        { crossOrigin: "anonymous" }
+      );
+    };
+
+    // 1) Background
+    addTemplateBg();
+
+    // 2) Current student (bulk-aware)
+    const currentStudent = bulkMode
+      ? filteredStudents.find((s) => s?.uuid === bulkList[bulkIndex]) || null
+      : selectedStudent;
+
+    if (currentStudent) {
+      const savedName = getSavedProps("studentName");
+      const nameText = new fabric.IText(
+        `${currentStudent.firstName || ""} ${currentStudent.lastName || ""}`.trim(),
+        {
+          left: savedName?.left ?? Math.round(canvas.width * 0.33),
+          top: savedName?.top ?? Math.round(canvas.height * 0.55),
+          fontSize: savedName?.fontSize ?? 22,
+          fill: "#000",
+        }
+      );
+      nameText.customId = "studentName";
+      nameText.field = "studentName";
+      canvas.add(nameText);
+      studentObjectsRef.current.push(nameText);
+    }
+
+    // 3) Student photo
+    const current = currentStudent;
+    const photoUrl = Array.isArray(current?.photo) ? current?.photo[0] : current?.photo;
+    const savedPhoto = getSavedProps("studentPhoto");
+    const photoLeft = savedPhoto?.left ?? Math.round(canvas.width * 0.5);
+    const photoTop = savedPhoto?.top ?? Math.round(canvas.height * 0.33);
+    const savedShape = savedPhoto?.shape || "circle";
+
+    if (photoUrl) {
+      safeLoadImage(photoUrl, (img) => {
+        const phWidth = Math.min(400, canvas.width * 0.6);
+        const phHeight = Math.min(400, canvas.height * 0.6);
+        const autoScale = Math.min(phWidth / img.width, phHeight / img.height, 1);
+        img.set({
+          originX: "center",
+          originY: "center",
+          left: photoLeft,
+          top: photoTop,
+          scaleX: savedPhoto?.scaleX ?? autoScale,
+          scaleY: savedPhoto?.scaleY ?? autoScale,
+        });
+        img.customId = "studentPhoto";
+        img.field = "studentPhoto";
+        applyMaskAndFrame(canvas, img, savedShape, {
+          stroke: frameBorder,
+          strokeWidth: frameWidth,
+          rx: frameCorner,
+          absolute: false,
+          followImage: true,
+        });
+        img.set({ lockMovementX: false, lockMovementY: false, lockScalingX: false, lockScalingY: false, lockRotation: false, hasControls: true, selectable: true, evented: true, });
+        img.on("selected", () => setActiveStudentPhoto(img));
+        img.on("deselected", () => setActiveStudentPhoto(null));
+        img.on("mousedblclick", () => { enterAdjustMode(img); fitImageToFrame(img, "cover"); });
+        canvas.add(img);
+        studentObjectsRef.current.push(img);
+        canvas.requestRenderAll();
+      });
+    }
+
+    // 4) Institute logo & signature
+    if (selectedInstitute?.logo) {
+      const savedLogo = getSavedProps("logo");
+      safeLoadImage(selectedInstitute.logo, (img) => {
+        if (savedLogo) {
+          const scaleX = savedLogo.width && img.width ? savedLogo.width / img.width : savedLogo.scaleX ?? 1;
+          const scaleY = savedLogo.height && img.height ? savedLogo.height / img.height : savedLogo.scaleY ?? 1;
+          img.set({ left: savedLogo.left ?? 20, top: savedLogo.top ?? 20, scaleX, scaleY, angle: savedLogo.angle ?? 0 });
+        } else {
+          img.scaleToWidth(Math.round(canvas.width * 0.2));
+          img.set({ left: 20, top: 20 });
+        }
+        img.customId = "logo";
+        img.field = "logo";
+        logoRef.current = img;
+        canvas.add(img);
+        img.setCoords();
+        canvas.requestRenderAll();
+      });
+    }
+
+    if (selectedInstitute?.signature) {
+      const savedSign = getSavedProps("signature");
+      safeLoadImage(selectedInstitute.signature, (img) => {
+        if (savedSign) {
+          const scaleX = savedSign.width && img.width ? savedSign.width / img.width : savedSign.scaleX ?? 1;
+          const scaleY = savedSign.height && img.height ? savedSign.height / img.height : savedSign.scaleY ?? 1;
+          img.set({ left: savedSign.left ?? canvas.width - 150, top: savedSign.top ?? canvas.height - 80, scaleX, scaleY, angle: savedSign.angle ?? 0 });
+        } else {
+          img.scaleToWidth(Math.round(canvas.width * 0.3));
+          img.set({ left: canvas.width - 150, top: canvas.height - 80 });
+        }
+        img.customId = "signature";
+        img.field = "signature";
+        signatureRef.current = img;
+        canvas.add(img);
+        img.setCoords();
+        canvas.requestRenderAll();
+      });
+    }
+
+    canvas.requestRenderAll();
   }, [
     canvas,
     selectedInstitute,
@@ -964,8 +965,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     bulkIndex,
     filteredStudents,
   ]);
-
-  /* ============================= Canvas events ============================ */
+/* ============================= Canvas events ============================ */
   useEffect(() => {
     if (!canvas) return;
     const onDbl = (e) => {
@@ -1146,7 +1146,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
 
   /* ============================= Carousel (bulk) =========================== */
   const rebuildBulkFromFiltered = () => {
-    const ids = filteredStudents.map((s) => s.uuid);
+    const ids = (filteredStudents.length ? filteredStudents : allStudents).map((s) => s.uuid);
     setBulkList(ids);
     setBulkIndex(0);
     if (ids.length) {
@@ -1168,7 +1168,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     const n = ((idx % bulkList.length) + bulkList.length) % bulkList.length;
     setBulkIndex(n);
     const uuid = bulkList[n];
-    const st = filteredStudents.find((s) => s.uuid === uuid) || null;
+    const st = (filteredStudents.length ? filteredStudents : allStudents).find((s) => s.uuid === uuid) || null;
     setSelectedStudent(st);
     if (canvasRef.current) {
       const saved = studentLayoutsRef.current[uuid];
@@ -1615,6 +1615,8 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
 
 
       <div className={`fixed top-16 left-2 z-40 flex-col gap-2 ${showMobileTools ? "flex" : "hidden"} md:flex`}>
+
+
         <button
           title="Choose Template"
           onClick={() => { setRightPanel('templates'); setIsRightbarOpen(true); }}
@@ -1896,7 +1898,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
                         disabled={bulkMode}
                       >
                         <option value="">Select a student</option>
-                        {filteredStudents.map((s) => (
+                        {(filteredStudents.length ? filteredStudents : allStudents).map((s) => (
                           <option key={s.uuid} value={s.uuid}>
                             {s.firstName} {s.lastName}
                           </option>

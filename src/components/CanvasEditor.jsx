@@ -1359,6 +1359,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
               onClick={() => navigate(-1)}
               className="p-2 rounded hover:bg-gray-100"
               title="Back"
+              aria-label="Back"
             >
               <ChevronLeft size={20} />
             </button>

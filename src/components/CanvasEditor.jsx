@@ -13,7 +13,7 @@ import { useCanvasTools } from "../hooks/useCanvasTools";
 import { getStoredUser, getStoredInstituteUUID } from "../utils/storageUtils";
 import { Button, Stack, Slider, Switch, FormControlLabel } from "@mui/material";
 import axios from "axios";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { fabric } from "fabric";
 import {
   Menu as MenuIcon,
@@ -59,6 +59,7 @@ import { PRESET_SIZES, mmToPx, pxToMm, drawCropMarks, drawRegistrationMark } fro
 const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false }) => {
   const { templateId: routeId } = useParams();
   const templateId = propTemplateId || routeId;
+  const navigate = useNavigate();
 
   // template-driven size + responsive fit
   const [tplSize, setTplSize] = useState({ w: 400, h: 550 });
@@ -1260,6 +1261,13 @@ if (selectedInstitute?.signature) {
       {!hideHeader && (
         <header className="fixed top-0 left-0 right-0 h-14 bg-white border-b z-40 flex items-center justify-between px-3 md:px-4 gap-3">
           <div className="flex items-center gap-2 overflow-x-auto">
+            <button
+              onClick={() => navigate(-1)}
+              className="p-2 rounded hover:bg-gray-100"
+              title="Back to templates"
+            >
+              <ChevronLeft size={20} />
+            </button>
             <button
               className="md:hidden p-2 rounded hover:bg-gray-100"
               onClick={() => setIsSidebarOpen((s) => !s)}

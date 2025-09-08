@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react"; 
+import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
+import { ChevronLeft } from "lucide-react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 
@@ -12,10 +13,7 @@ const id = categoryId;
 
   const [subcategories, setSubcategories] = useState([]);
   const [allTemplates, setAllTemplates] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  const [subItems, setSubItems] = useState([]);
   const [selectedCategoryName, setSelectedCategoryName] = useState('');
-  const [selectedSubcategoryName, setSelectedSubcategoryName] = useState('');
   const [originalTemplates, setOriginalTemplates] = useState([]);
 
   useEffect(() => {
@@ -77,7 +75,6 @@ useEffect(() => {
 
 const handleClick = async (item) => {
     const subcategoryId = item._id;
-    setSelectedCategory(item);
     navigate(`/editor/${subcategoryId}`);
   };
 
@@ -85,6 +82,15 @@ const handleClick = async (item) => {
     <>
       <Navbar />
       <div className="font-sans bg-white text-gray-900">
+        <div className="flex items-center gap-2 px-4 pt-4">
+          <button
+            onClick={() => navigate(-1)}
+            className="text-sm text-indigo-600 flex items-center hover:underline"
+          >
+            <ChevronLeft className="w-4 h-4 mr-1" /> Back
+          </button>
+          <h2 className="text-lg font-semibold">{selectedCategoryName}</h2>
+        </div>
         {/* Subcategory Carousel */}
         <section className="py-4">
           <div className="container mx-auto px-4">
@@ -94,7 +100,6 @@ const handleClick = async (item) => {
                   <button
                     key={item._id}
                     onClick={() => {
-                      setSelectedSubcategoryName(item.name?.trim());
                       const filteredBySub = originalTemplates.filter(
                         (temp) =>
                           temp.subcategory?.trim().toLowerCase() ===
@@ -135,8 +140,8 @@ const handleClick = async (item) => {
             {allTemplates.map((temp) => (
               <div
                 key={temp._id}
-                className="border rounded-lg p-3 shadow hover:shadow-md transition cursor-pointer"
-                 onClick={() => handleClick(temp)}
+                className="border rounded-lg p-3 shadow hover:shadow-md hover:scale-105 transform transition cursor-pointer"
+                onClick={() => handleClick(temp)}
               >
                 <div className="w-full aspect-square overflow-hidden rounded mb-2">
                   <img

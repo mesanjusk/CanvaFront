@@ -195,11 +195,57 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   const navigate = useNavigate();
 
   // template-driven size + responsive fit
-  const [tplSize, setTplSize] = useState({ w: 400, h: 550 });
+  const [tplSize, setTplSize] = useState(() => {
+    const h = Math.round(window.innerHeight * 0.75);
+    return { w: Math.round(h * 0.75), h };
+  });
   const [templateImage, setTemplateImage] = useState(null);
   const viewportRef = useRef(null);
   const stageRef = useRef(null);
-  const [scale] = useState(1);
+  const [zoom, setZoom] = useState(1);
+
+  const handleZoomChange = (val) => {
+    const z = val / 100;
+    setZoom(z);
+    const c = canvasRef.current;
+    if (c) {
+      c.setZoom(z);
+      const el = c.getElement();
+      el.style.width = `${tplSize.w * z}px`;
+      el.style.height = `${tplSize.h * z}px`;
+      c.renderAll();
+    }
+  };
+
+  const fitToViewport = useCallback(() => {
+    const vp = viewportRef.current;
+    if (!vp) return;
+    const s = Math.min(vp.clientWidth / tplSize.w, vp.clientHeight / tplSize.h, 1);
+    handleZoomChange(s * 100);
+  }, [tplSize]);
+
+  useEffect(() => {
+    fitToViewport();
+  }, [tplSize, fitToViewport]);
+
+  useEffect(() => {
+    const onResize = () => fitToViewport();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [fitToViewport]);
+
+  useEffect(() => {
+    if (canvasRef.current) fitToViewport();
+  }, [canvasRef.current, fitToViewport]);
+
+  const handleSizeChange = (dim, value) => {
+    const num = parseInt(value, 10) || 0;
+    setTplSize((prev) => {
+      const newSize = { ...prev, [dim]: num };
+      setCanvasSize?.(newSize.w, newSize.h);
+      return newSize;
+    });
+  };
 
   useSmartGuides(/* canvasRef provided by hook below */ { current: null }, false); // placeholder until canvasRef is ready
 
@@ -670,10 +716,18 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   const applyTemplateResponse = useCallback(
     async (data) => {
       setSavedPlaceholders(data?.placeholders || []);
-      const w = Number(data?.width) || 400;
-      const h = Number(data?.height) || 550;
-      setTplSize({ w, h });
-      setCanvasSize?.(w, h);
+      const w = Number(data?.width);
+      const h = Number(data?.height);
+      let newW = w;
+      let newH = h;
+      if (!w || !h) {
+        const defH = Math.round(window.innerHeight * 0.75);
+        const aspect = w && h ? w / h : 0.75;
+        newH = defH;
+        newW = Math.round(defH * aspect);
+      }
+      setTplSize({ w: newW, h: newH });
+      setCanvasSize?.(newW, newH);
 
       if (data?.image) {
         return new Promise((resolve) => {
@@ -1422,6 +1476,37 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
           )}
 
           <div className="flex items-center gap-2">
+            <label className="text-xs">W</label>
+            <input
+              type="number"
+              value={tplSize.w}
+              onChange={(e) => handleSizeChange("w", e.target.value)}
+              className="w-16 p-1 border rounded"
+            />
+            <label className="text-xs">H</label>
+            <input
+              type="number"
+              value={tplSize.h}
+              onChange={(e) => handleSizeChange("h", e.target.value)}
+              className="w-16 p-1 border rounded"
+            />
+            <label className="text-xs">Zoom</label>
+            <input
+              type="range"
+              min={25}
+              max={200}
+              value={Math.round(zoom * 100)}
+              onChange={(e) => handleZoomChange(e.target.value)}
+              className="w-24"
+            />
+            <span className="text-xs w-12 text-center">{Math.round(zoom * 100)}%</span>
+            <button
+              className="px-2 py-1 rounded border text-xs hover:bg-gray-100"
+              onClick={fitToViewport}
+              title="Fit to Viewport"
+            >
+              Fit
+            </button>
             {/* Group / Ungroup */}
             <button
               className="hidden sm:flex items-center gap-1 px-3 py-2 rounded-full bg-white border hover:bg-gray-50 text-sm"
@@ -1624,15 +1709,13 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
       {/* CENTER / Canva-like viewport */}
       <main
         ref={viewportRef}
-        className={`absolute bg-gray-100 top-14 left-0 right-0 ${isRightbarOpen ? "md:right-80" : "right-0"} bottom-14 md:bottom-16 overflow-hidden flex items-center justify-center`}
+        className={`absolute bg-gray-100 top-14 left-0 right-0 ${isRightbarOpen ? "md:right-80" : "right-0"} bottom-14 md:bottom-16 overflow-auto flex items-center justify-center`}
       >
         <div
           ref={stageRef}
           style={{
-            width: `${tplSize.w}px`,
-            height: `${tplSize.h}px`,
-            transform: `scale(${scale})`,
-            transformOrigin: "center center",
+            width: `${tplSize.w * zoom}px`,
+            height: `${tplSize.h * zoom}px`,
           }}
           className="shadow-lg border bg-white relative"
         >

@@ -1,20 +1,32 @@
-import React, { useEffect, useImperativeHandle, forwardRef } from "react";
+import React, { useEffect, useImperativeHandle, useRef, forwardRef } from "react";
 import { fabric } from "fabric";
 
 const CanvasArea = forwardRef(({ width, height }, ref) => {
+  const localRef = useRef(null);
+
   useEffect(() => {
-    const canvas = new fabric.Canvas("main-canvas", {
+    localRef.current = new fabric.Canvas("main-canvas", {
       width,
       height,
       backgroundColor: "#fff",
       preserveObjectStacking: true,
     });
-    if (ref) ref.current = canvas;
-
+    if (ref) ref.current = localRef.current;
     return () => {
-      canvas.dispose();
+      localRef.current?.dispose();
     };
-  }, [width, height, ref]);
+  }, [ref]);
+
+  useEffect(() => {
+    const canvas = localRef.current;
+    if (canvas) {
+      canvas.setWidth(width);
+      canvas.setHeight(height);
+      canvas.renderAll();
+    }
+  }, [width, height]);
+
+  useImperativeHandle(ref, () => localRef.current, []);
 
   return (
     <div className="bg-white shadow border w-full h-full">

@@ -197,6 +197,17 @@ export function useCanvasTools({ width, height }) {
     canvas.requestRenderAll();
   };
 
+  const setCanvasSize = (w, h) => {
+    setCanvasWidth(w);
+    setCanvasHeight(h);
+    const canvas = canvasRef.current;
+    if (canvas) {
+      canvas.setWidth(w);
+      canvas.setHeight(h);
+      canvas.renderAll();
+    }
+  };
+
   return {
     canvasRef,
     fillColor, setFillColor,
@@ -222,5 +233,6 @@ export function useCanvasTools({ width, height }) {
     alignTop,
     alignMiddle,
     alignBottom,
+    setCanvasSize,
   };
 }

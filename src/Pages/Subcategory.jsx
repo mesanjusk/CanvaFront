@@ -6,8 +6,7 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 
 export default function Subcategory() {
-  const { categoryId } = useParams();
-const id = categoryId;
+  const { categoryId: id } = useParams();
 
   const navigate = useNavigate();
 
@@ -73,10 +72,10 @@ useEffect(() => {
   fetchSubcategories();
 }, [id]);
 
-const handleClick = async (item) => {
-    const subcategoryId = item._id;
-    navigate(`/editor/${subcategoryId}`);
-  };
+const handleClick = (item) => {
+  const subcategoryId = item._id;
+  navigate(`/editor/${subcategoryId}`);
+};
 
   return (
     <>

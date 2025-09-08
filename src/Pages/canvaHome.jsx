@@ -2,7 +2,7 @@ import Footer from "../components/Footer.jsx";
 import Banner from "./Banner";
 import AllCategory from "../reports/allCategory.jsx";
 import Navbar from "../components/Navbar.jsx";
-import BottomNavBar from "../components/BottomNavBar.jsx";
+import BottomNavBar from "./BottomNavBar";
 
 export default function CanvaHome() {
   return (
@@ -14,7 +14,7 @@ export default function CanvaHome() {
         <p className="mt-2 text-gray-600">Select a category to start designing like a pro.</p>
       </section>
       <AllCategory />
-      <Footer />
+      
       <BottomNavBar />
     </div>
   );

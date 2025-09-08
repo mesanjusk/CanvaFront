@@ -1953,7 +1953,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
                   )}
                 </Fragment>
               ) : (
-                <div className="text-sm text-gray-500">No object selected.</div>
+                <div className="text-sm text-gray-600">No object selected.</div>
               )}
             </Fragment>
           )}

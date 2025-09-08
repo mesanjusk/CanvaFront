@@ -79,21 +79,6 @@ const setGradientFill = (obj, colors = ["#ff6b6b", "#845ef7"]) => {
   obj.set("fill", grad);
 };
 
-const applyImageFilter = (img, type, value) => {
-  if (!img || img.type !== "image") return;
-  const f = fabric.Image.filters;
-  let filter;
-  switch (type) {
-    case "grayscale": filter = new f.Grayscale(); break;
-    case "brightness": filter = new f.Brightness({ brightness: value }); break; // -1..1
-    case "contrast": filter = new f.Contrast({ contrast: value }); break; // -1..1
-    case "blur": filter = new f.Blur({ blur: Math.max(0, value) }); break; // 0..1
-    default: return;
-  }
-  const idx = (img.filters || []).findIndex(fl => fl && fl.type === filter.type);
-  if (idx >= 0) img.filters[idx] = filter; else img.filters.push(filter);
-  img.applyFilters();
-};
 
 const useSmartGuides = (canvasRef, enable = true, tolerance = 8) => {
   const showV = useRef(false);
@@ -241,18 +226,16 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   const studentLayoutsRef = useRef({});
 
   // UI
-  const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth >= 768); // left
   const [isRightbarOpen, setIsRightbarOpen] = useState(false); // right
-  const [frameShape, setFrameShape] = useState("rounded");
-  const [frameBorder, setFrameBorder] = useState("#ffffff");
-  const [frameWidth, setFrameWidth] = useState(6);
-  const [frameCorner, setFrameCorner] = useState(24);
+  const [rightPanel, setRightPanel] = useState(null);
+  const [frameShape] = useState("rounded");
+  const [frameBorder] = useState("#ffffff");
+  const [frameWidth] = useState(6);
+  const [frameCorner] = useState(24);
   const [adjustMode, setAdjustMode] = useState(false);
 
   // Collapsible sections
   const [showFilters, setShowFilters] = useState(true);
-  const [showSelectedSection, setShowSelectedSection] = useState(true);
-  const [showImageTools, setShowImageTools] = useState(true);
 
   /* ========================= PRINT & IMPOSITION (NEW) ========================= */
   const [usePrintSizing, setUsePrintSizing] = useState(false);
@@ -371,13 +354,6 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
       originX: "center",
       originY: "center",
     });
-    img.setCoords();
-    canvas.requestRenderAll();
-  };
-  const centerImageInFrame = (img) => {
-    const box = getOverlayBox(img);
-    if (!img || !box) return;
-    img.set({ left: box.cx, top: box.cy, originX: "center", originY: "center" });
     img.setCoords();
     canvas.requestRenderAll();
   };
@@ -1065,47 +1041,6 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   }, [canvas, bleedPx, safePx, showMarks, showReg, dpi, usePrintSizing]);
 
   /* ============================ Replace / Extract ========================== */
-  const replaceActiveImage = () => {
-    if (!canvas) return;
-    const obj = canvas.getActiveObject();
-    if (!obj || obj.type !== "image") {
-      toast.error("Select an image to replace");
-      return;
-    }
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*";
-    input.onchange = (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const prevShape = obj.shape || frameShape;
-        const stroke = obj.frameOverlay?.stroke ?? frameBorder;
-        const strokeWidth = obj.frameOverlay?.strokeWidth ?? frameWidth;
-
-        obj.setSrc(
-          ev.target.result,
-          () => {
-            // normal mode after replace
-            applyMaskAndFrame(canvas, obj, prevShape, {
-              stroke,
-              strokeWidth,
-              rx: frameCorner,
-              absolute: false,
-              followImage: true,
-            });
-            setAdjustMode(false);
-            canvas.requestRenderAll();
-            saveHistory();
-          },
-          { crossOrigin: "anonymous" }
-        );
-      };
-      reader.readAsDataURL(file);
-    };
-    input.click();
-  };
 
   const extractActiveImage = () => {
     if (!canvas) return;
@@ -1417,15 +1352,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
       {/* TOP BAR */}
       {!hideHeader && (
         <header className="fixed top-0 left-0 right-0 h-14 bg-white border-b z-40 flex items-center justify-between px-3 md:px-4 gap-3">
-          <div className="flex items-center gap-2 overflow-x-auto">
-            <button
-              className="md:hidden p-2 rounded hover:bg-gray-100"
-              onClick={() => setIsSidebarOpen((s) => !s)}
-              title="Toggle left sidebar"
-            >
-              <MenuIcon size={20} />
-            </button>
-          </div>
+          <div className="flex items-center gap-2 overflow-x-auto"></div>
 
           {/* Contextual mini-toolbar (fill/gradient + text effects) */}
           {activeObj && (isText(activeObj) || isShape(activeObj)) && (
@@ -1625,8 +1552,36 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
         </header>
       )}
 
-      {/* VERTICAL TOOLBAR */}
+
       <div className="fixed top-16 left-2 z-40 flex flex-col gap-2">
+        <button
+          title="Choose Template"
+          onClick={() => { setRightPanel('templates'); setIsRightbarOpen(true); }}
+          className="p-2 rounded bg-white shadow hover:bg-blue-100"
+        >
+          <Images size={20} />
+        </button>
+        <button
+          title="Bulk Settings"
+          onClick={() => { setRightPanel('bulk'); setIsRightbarOpen(true); }}
+          className="p-2 rounded bg-white shadow hover:bg-blue-100"
+        >
+          <LayersIcon size={20} />
+        </button>
+        <button
+          title="Add Frame"
+          onClick={() => { setRightPanel('frames'); setIsRightbarOpen(true); }}
+          className="p-2 rounded bg-white shadow hover:bg-blue-100"
+        >
+          <LayoutIcon size={20} />
+        </button>
+        <button
+          title="Selected Object"
+          onClick={() => { setRightPanel('object'); setIsRightbarOpen(true); }}
+          className="p-2 rounded bg-white shadow hover:bg-blue-100"
+        >
+          <Move size={20} />
+        </button>
         <button
           title="Add Text"
           onClick={addText}
@@ -1679,470 +1634,12 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
           downloadPDF={downloadPDF}
           vertical
         />
-
-        {/* FRAME MASK BUTTONS */}
-        <button
-          title="Add Circle Frame"
-          onClick={() => addFrameSlot("circle")}
-          className="p-2 rounded bg-white shadow hover:bg-blue-100"
-        >
-          <Circle size={20} />
-        </button>
-        <button
-          title="Add Triangle Frame"
-          onClick={() => addFrameSlot("triangle")}
-          className="p-2 rounded bg-white shadow hover:bg-blue-100"
-        >
-          <Triangle size={20} />
-        </button>
-        <button
-          title="Add Hexagon Frame"
-          onClick={() => addFrameSlot("hexagon")}
-          className="p-2 rounded bg-white shadow hover:bg-blue-100"
-        >
-          <Hexagon size={20} />
-        </button>
-        <button
-          title="Add Star Frame"
-          onClick={() => addFrameSlot("star")}
-          className="p-2 rounded bg-white shadow hover:bg-blue-100"
-        >
-          <Star size={20} />
-        </button>
-        <button
-          title="Add Heart Frame"
-          onClick={() => addFrameSlot("heart")}
-          className="p-2 rounded bg-white shadow hover:bg-blue-100"
-        >
-          <Heart size={20} />
-        </button>
-
       </div>
-
-      {/* LEFT SIDEBAR */}
-      <aside
-        className={`fixed top-14 bottom-14 md:bottom-16 md:left-0 right-0 md:w-80 w-72 bg-white md:border-r border-l z-30 overflow-y-auto transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? "translate-x-0" : "translate-x-full md:translate-x-0"}`}
-      >
-        <div className="p-3 border-b flex flex-col gap-3">
-          <button
-            className="px-3 py-2 rounded bg-indigo-600 text-white shadow hover:bg-indigo-700 text-sm"
-            onClick={() => setIsRightbarOpen(true)}
-          >
-            Choose Template
-          </button>
-          <FormControlLabel
-            sx={{ mr: 1 }}
-            control={
-              <Switch
-                checked={bulkMode}
-                onChange={(e) => setBulkMode(e.target.checked)}
-                size="small"
-              />
-            }
-            label={<span className="text-sm">Bulk</span>}
-          />
-          {/* Filters (collapsible) */}
-        {bulkMode && (
-          <div className="border-b">
-            <button
-              className="w-full text-left p-3 text-sm font-semibold"
-              onClick={() => setShowFilters((v) => !v)}
-            >
-              Filters
-            </button>
-            {showFilters && (
-              <div className="px-3 pb-3">
-                <label className="block text-xs mb-1">Course</label>
-                <select
-                  className="w-full border rounded px-2 py-1 mb-2"
-                  value={selectedCourse}
-                  onChange={(e) => setSelectedCourse(e.target.value)}
-                >
-                  <option value="">Select course</option>
-                  {courses.map((c) => (
-                    <option key={c._id} value={c.Course_uuid}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-
-                <label className="block text-xs mb-1">Batch</label>
-                <select
-                  className="w-full border rounded px-2 py-1 mb-2"
-                  value={selectedBatch}
-                  onChange={(e) => setSelectedBatch(e.target.value)}
-                >
-                  <option value="">Select batch</option>
-                  {batches.map((b) => (
-                    <option key={b._id} value={b.name}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
-
-                <label className="block text-xs mb-1">Student</label>
-                <select
-                  className="w-full border rounded px-2 py-1"
-                  onChange={(e) => handleStudentSelect(e.target.value)}
-                  value={selectedStudent?.uuid || ""}
-                  disabled={bulkMode}
-                >
-                  <option value="">Select a student</option>
-                  {filteredStudents.map((s) => (
-                    <option key={s.uuid} value={s.uuid}>
-                      {s.firstName} {s.lastName}
-                    </option>
-                  ))}
-                </select>
-
-                
-              </div>
-            )}
-          </div>
-        )}
-          <TemplateLayout
-            canvas={canvas}
-            activeTemplateId={activeTemplateId}
-            tplSize={tplSize}
-            setSavedPlaceholders={setSavedPlaceholders}
-            frameCorner={frameCorner}
-          />
-        </div>
-        <PrintSettings
-          usePrintSizing={usePrintSizing}
-          setUsePrintSizing={setUsePrintSizing}
-          pagePreset={pagePreset}
-          setPagePreset={setPagePreset}
-          customPage={customPage}
-          setCustomPage={setCustomPage}
-          pageOrientation={pageOrientation}
-          setPageOrientation={setPageOrientation}
-          dpi={dpi}
-          setDpi={setDpi}
-          bleed={bleed}
-          setBleed={setBleed}
-          safe={safe}
-          setSafe={setSafe}
-          showMarks={showMarks}
-          setShowMarks={setShowMarks}
-          showReg={showReg}
-          setShowReg={setShowReg}
-          imposeOn={imposeOn}
-          setImposeOn={setImposeOn}
-          sheetPreset={sheetPreset}
-          setSheetPreset={setSheetPreset}
-          sheetCustom={sheetCustom}
-          setSheetCustom={setSheetCustom}
-          rows={rows}
-          setRows={setRows}
-          cols={cols}
-          setCols={setCols}
-          gap={gap}
-          setGap={setGap}
-          outer={outer}
-          setOuter={setOuter}
-        />
-        
-
-      
-        {/* Selected object (collapsible) */}
-        {activeObj && (
-          <div className="border-b">
-            <button
-              className="w-full text-left p-3 text-sm font-semibold"
-              onClick={() => setShowSelectedSection((v) => !v)}
-            >
-              Selected Object
-            </button>
-            {showSelectedSection && (
-              <div className="px-3 pb-3">
-                <div className="flex flex-wrap gap-2">
-                  <IconButton onClick={cropImage} title="Crop"><Crop size={18} /></IconButton>
-
-                  {activeObj?.type === "image" && (
-                    <IconButton onClick={removeSelectedImageBackground} title="Remove Background">
-                      <Scissors size={18} />
-                    </IconButton>
-                  )}
-
-                  <IconButton
-                    onClick={() => {
-                      const obj = activeObj;
-                      if (!obj) return;
-                      if (obj.type === "image" && obj.frameOverlay) {
-                        removeMaskAndFrame(canvas, obj, true);
-                        canvas.remove(obj);
-                      } else {
-                        canvas.remove(obj);
-                      }
-                      setActiveObj(null);
-                      setActiveStudentPhoto(null);
-                      saveHistory();
-                    }}
-                    title="Delete"
-                  >
-                    <Trash2 size={18} />
-                  </IconButton>
-
-                  <IconButton
-                    onClick={() => {
-                      const locked = !!activeObj.lockMovementX;
-                      activeObj.set({
-                        lockMovementX: !locked,
-                        lockMovementY: !locked,
-                        lockScalingX: !locked,
-                        lockScalingY: !locked,
-                        lockRotation: !locked,
-                        hasControls: locked,
-                      });
-                      canvas.renderAll();
-                    }}
-                    title="Lock/Unlock"
-                  >
-                    {activeObj?.lockMovementX ? <Unlock size={18} /> : <Lock size={18} />}
-                  </IconButton>
-
-                  {/* Extract image from frame */}
-                  {activeObj?.type === "image" && activeObj?.frameOverlay && (
-                    <IconButton onClick={extractActiveImage} title="Extract Image (remove frame)">
-                      <Move size={18} />
-                    </IconButton>
-                  )}
-                </div>
-
-                {/* Student photo quick zooms */}
-                {activeStudentPhoto && (
-                  <Stack direction="row" spacing={1} justifyContent="start" className="mt-3">
-                    <Button
-                      variant="contained"
-                      size="small"
-                      onClick={() =>
-                        setImageZoom(
-                          activeStudentPhoto,
-                          (activeStudentPhoto.scaleX || 1) * 1.1
-                        )
-                      }
-                    >
-                      Zoom In
-                    </Button>
-                    <Button
-                      variant="contained"
-                      size="small"
-                      onClick={() =>
-                        setImageZoom(
-                          activeStudentPhoto,
-                          (activeStudentPhoto.scaleX || 1) * 0.9
-                        )
-                      }
-                    >
-                      Zoom Out
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      onClick={() => {
-                        const box = getOverlayBox(activeStudentPhoto);
-                        if (!box) return;
-                        const scale = Math.min(
-                          box.w / activeStudentPhoto.width,
-                          box.h / activeStudentPhoto.height
-                        );
-                        activeStudentPhoto.set({
-                          scaleX: scale,
-                          scaleY: scale,
-                          left: box.cx,
-                          top: box.cy,
-                          originX: "center",
-                          originY: "center",
-                        });
-                        canvas.requestRenderAll();
-                      }}
-                    >
-                      Reset Fit
-                    </Button>
-                  </Stack>
-                )}
-
-                {/* Image filters */}
-                {activeObj?.type === "image" && (
-                  <div className="mt-4 space-y-2">
-                    <div className="text-xs font-semibold">Image Filters</div>
-                    <div className="flex items-center gap-2">
-                      <label className="text-xs w-20">Brightness</label>
-                      <Slider min={-1} max={1} step={0.01} defaultValue={0}
-                        onChangeCommitted={(_, v) => { applyImageFilter(activeObj, "brightness", Array.isArray(v) ? v[0] : v); canvas.requestRenderAll(); saveHistory(); }} />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <label className="text-xs w-20">Contrast</label>
-                      <Slider min={-1} max={1} step={0.01} defaultValue={0}
-                        onChangeCommitted={(_, v) => { applyImageFilter(activeObj, "contrast", Array.isArray(v) ? v[0] : v); canvas.requestRenderAll(); saveHistory(); }} />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <label className="text-xs w-20">Blur</label>
-                      <Slider min={0} max={1} step={0.01} defaultValue={0}
-                        onChangeCommitted={(_, v) => { applyImageFilter(activeObj, "blur", Array.isArray(v) ? v[0] : v); canvas.requestRenderAll(); saveHistory(); }} />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button size="small" variant="outlined" onClick={() => { applyImageFilter(activeObj, "grayscale"); canvas.requestRenderAll(); saveHistory(); }}>
-                        Grayscale
-                      </Button>
-                      <Button size="small" variant="text" onClick={() => { activeObj.filters = []; activeObj.applyFilters(); canvas.requestRenderAll(); saveHistory(); }}>
-                        Clear Filters
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Image tools (collapsible) */}
-        {activeObj && activeObj.type === "image" && (
-          <div className="border-b">
-            <button
-              className="w-full text-left p-3 text-sm font-semibold"
-              onClick={() => setShowImageTools((v) => !v)}
-            >
-              Mask & Frame / Adjust
-            </button>
-            {showImageTools && (
-              <div className="px-3 pb-3">
-                <div className="grid grid-cols-4 gap-2 mb-3">
-                  {["rect", "rounded", "circle", "triangle", "hexagon", "star", "heart"].map((shape) => {
-                    const Icon = { rect: Square, rounded: Square, circle: Circle, triangle: Triangle, hexagon: Hexagon, star: Star, heart: Heart }[shape];
-                    return (
-                      <IconButton key={shape} title={shape} onClick={() => {
-                        setFrameShape(shape);
-                        applyMaskAndFrame(canvas, activeObj, shape, {
-                          stroke: frameBorder, strokeWidth: frameWidth, rx: frameCorner,
-                          absolute: adjustMode, followImage: !adjustMode
-                        });
-                        if (adjustMode) fitImageToFrame(activeObj, "cover");
-                        saveHistory();
-                      }}>
-                        <Icon size={18} />
-                      </IconButton>
-                    );
-                  })}
-                  <IconButton title="Remove Frame (keep slot)" onClick={() => { removeMaskAndFrame(canvas, activeObj, true); saveHistory(); }}>
-                    <RefreshCw size={18} />
-                  </IconButton>
-                </div>
-
-                {frameShape === "rounded" && (
-                  <div className="mb-2">
-                    <label className="block text-xs mb-1">Corner Radius</label>
-                    <Slider
-                      min={0}
-                      max={Math.floor(Math.min(activeObj?.width || 100, activeObj?.height || 100) / 2)}
-                      value={frameCorner}
-                      onChange={(_, v) => {
-                        const val = Array.isArray(v) ? v[0] : v;
-                        setFrameCorner(val);
-                        if (activeObj) {
-                          applyMaskAndFrame(canvas, activeObj, "rounded", {
-                            stroke: frameBorder, strokeWidth: frameWidth, rx: val, absolute: adjustMode, followImage: !adjustMode
-                          });
-                          if (adjustMode) fitImageToFrame(activeObj, "cover");
-                        }
-                      }}
-                    />
-                  </div>
-                )}
-
-                <div className="mb-2">
-                  <label className="block text-xs mb-1">Border Width</label>
-                  <Slider
-                    min={0}
-                    max={30}
-                    value={frameWidth}
-                    onChange={(_, v) => {
-                      const val = Array.isArray(v) ? v[0] : v;
-                      setFrameWidth(val);
-                      if (activeObj?.frameOverlay) {
-                        activeObj.frameOverlay.set({ strokeWidth: val });
-                        canvas.requestRenderAll();
-                      }
-                    }}
-                  />
-                </div>
-
-                <div className="mb-2">
-                  <label className="block text-xs mb-1">Border Color</label>
-                  <input
-                    type="color"
-                    value={frameBorder}
-                    onChange={(e) => {
-                      const col = e.target.value;
-                      setFrameBorder(col);
-                      if (activeObj?.frameOverlay) {
-                        activeObj.frameOverlay.set({ stroke: col });
-                        canvas.requestRenderAll();
-                      }
-                    }}
-                  />
-                </div>
-
-                {/* Adjust Mode */}
-                <div className="mt-4 p-3 border rounded">
-                  <div className="text-sm font-semibold mb-2">Adjust Image in Frame</div>
-                  <div className="flex flex-wrap items-center gap-2 mb-2">
-                    {!adjustMode ? (
-                      <Button size="small" variant="contained" onClick={() => enterAdjustMode(activeObj)}>
-                        Enter Adjust
-                      </Button>
-                    ) : (
-                      <Button size="small" color="secondary" variant="outlined" onClick={() => exitAdjustMode(activeObj)}>
-                        Done
-                      </Button>
-                    )}
-                    <Button size="small" variant="outlined" onClick={() => fitImageToFrame(activeObj, "contain")} disabled={!adjustMode}>
-                      Fit
-                    </Button>
-                    <Button size="small" variant="outlined" onClick={() => fitImageToFrame(activeObj, "cover")} disabled={!adjustMode}>
-                      Fill
-                    </Button>
-                    <Button size="small" variant="outlined" onClick={() => centerImageInFrame(activeObj)} disabled={!adjustMode}>
-                      Center
-                    </Button>
-                  </div>
-                  <div className="mb-2">
-                    <label className="block text-xs mb-1">Zoom</label>
-                    <Slider
-                      min={0.1}
-                      max={5}
-                      step={0.01}
-                      value={Number((activeObj?.scaleX || 1).toFixed(2))}
-                      onChange={(_, v) => setImageZoom(activeObj, Array.isArray(v) ? v[0] : v)}
-                      disabled={!adjustMode}
-                    />
-                  </div>
-                  <div className="text-[11px] text-gray-500 mt-2">
-                    Double-click an image to enter Adjust. Drag to pan under the mask. Use Fit/Fill/Center/Zoom.
-                  </div>
-                  <div className="mt-3">
-                    <Button size="small" variant="outlined" onClick={replaceActiveImage}>
-                      Replace Image
-                    </Button>
-                    {activeObj?.frameOverlay && (
-                      <Button size="small" variant="text" className="ml-2" onClick={extractActiveImage}>
-                        Extract (remove frame)
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </aside>
 
       {/* CENTER / Canva-like viewport */}
       <main
         ref={viewportRef}
-        className={`absolute bg-gray-100 top-14 left-0 right-0 ${isSidebarOpen ? "md:left-80" : "md:left-0"} ${isRightbarOpen ? "md:right-80" : "right-0"
-          } bottom-14 md:bottom-16 overflow-hidden flex items-center justify-center`}
+        className={`absolute bg-gray-100 top-14 left-0 right-0 ${isRightbarOpen ? "md:right-80" : "right-0"} bottom-14 md:bottom-16 overflow-hidden flex items-center justify-center`}
       >
         <div
           ref={stageRef}
@@ -2191,66 +1688,287 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
         )}
       </main>
 
-      {/* RIGHT SIDEBAR – Template Switcher + Layers */}
+      {/* RIGHT SIDEBAR PANELS */}
       <aside
-        className={`fixed top-14 bottom-14 md:bottom-16 right-0 md:w-80 w-72 bg-white border-l z-30 overflow-y-auto transform transition-transform duration-200 ${isRightbarOpen ? "translate-x-0" : "translate-x-full"
-          }`}
+        className={`fixed top-14 bottom-14 md:bottom-16 right-0 md:w-80 w-72 bg-white border-l z-30 overflow-y-auto transform transition-transform duration-200 ${isRightbarOpen ? "translate-x-0" : "translate-x-full"}`}
       >
         <div className="p-3 border-b flex items-center justify-between">
-          <div className="text-sm font-semibold">Templates</div>
+          <div className="text-sm font-semibold">
+            {rightPanel === "templates"
+              ? "Templates"
+              : rightPanel === "bulk"
+              ? "Bulk Settings"
+              : rightPanel === "frames"
+              ? "Frames"
+              : rightPanel === "object"
+              ? "Object Settings"
+              : ""}
+          </div>
           <button
-            className="md:hidden p-2 rounded hover:bg-gray-100"
-            onClick={() => setIsRightbarOpen(false)}
+            className="p-2 rounded hover:bg-gray-100"
+            onClick={() => {
+              setIsRightbarOpen(false);
+              setRightPanel(null);
+            }}
             title="Close"
           >
             <MenuIcon size={18} />
           </button>
         </div>
-
         <div className="p-3">
-          {loadingTemplate && (
-            <div className="text-xs text-gray-500 mb-2">Loading template…</div>
+          {rightPanel === "templates" && (
+            <Fragment>
+              {loadingTemplate && (
+                <div className="text-xs text-gray-500 mb-2">Loading template…</div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                {templates.map((t) => (
+                  <button
+                    key={t._id || t.id}
+                    onClick={() => {
+                      loadTemplateById(t._id || t.id);
+                    }}
+                    className={`border rounded overflow-hidden text-left hover:shadow focus:ring-2 focus:ring-indigo-500 ${(t._id || t.id) === activeTemplateId ? "ring-2 ring-indigo-500" : ""}`}
+                    title={t.title || "Template"}
+                  >
+                    <div className="aspect-[4/5] bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
+                      {t.image ? (
+                        <img
+                          src={t.image}
+                          alt={t.title || "template thumbnail"}
+                          className="w-full h-full object-cover"
+                          crossOrigin="anonymous"
+                        />
+                      ) : (
+                        <span>Preview</span>
+                      )}
+                    </div>
+                    <div className="px-2 py-1">
+                      <div className="text-xs font-medium truncate">
+                        {t.title || "Untitled"}
+                      </div>
+                      <div className="text-[10px] text-gray-500">
+                        {t.width || t.w || 400}×{t.height || t.h || 550}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <TemplateLayout
+                canvas={canvas}
+                activeTemplateId={activeTemplateId}
+                tplSize={tplSize}
+                setSavedPlaceholders={setSavedPlaceholders}
+                frameCorner={frameCorner}
+              />
+              <div className="mt-4 border-t pt-3">
+                <LayersPanel canvas={canvas} onSelect={(o) => setActiveObj(o)} />
+              </div>
+            </Fragment>
           )}
-          <div className="grid grid-cols-2 gap-3">
-            {templates.map((t) => (
-              <button
-                key={t._id || t.id}
-                onClick={() => {
-                  loadTemplateById(t._id || t.id);
-                }}
-                className={`border rounded overflow-hidden text-left hover:shadow focus:ring-2 focus:ring-indigo-500 ${(t._id || t.id) === activeTemplateId
-                  ? "ring-2 ring-indigo-500"
-                  : ""
-                  }`}
-                title={t.title || "Template"}
-              >
-                <div className="aspect-[4/5] bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
-                  {t.image ? (
-                    <img
-                      src={t.image}
-                      alt={t.title || "template thumbnail"}
-                      className="w-full h-full object-cover"
-                      crossOrigin="anonymous"
-                    />
-                  ) : (
-                    <span>Preview</span>
+          {rightPanel === "bulk" && (
+            <Fragment>
+              <FormControlLabel
+                sx={{ mr: 1 }}
+                control={
+                  <Switch
+                    checked={bulkMode}
+                    onChange={(e) => setBulkMode(e.target.checked)}
+                    size="small"
+                  />
+                }
+                label={<span className="text-sm">Bulk</span>}
+              />
+              {bulkMode && (
+                <div className="border-b">
+                  <button
+                    className="w-full text-left p-3 text-sm font-semibold"
+                    onClick={() => setShowFilters((v) => !v)}
+                  >
+                    Filters
+                  </button>
+                  {showFilters && (
+                    <div className="px-3 pb-3">
+                      <label className="block text-xs mb-1">Course</label>
+                      <select
+                        className="w-full border rounded px-2 py-1 mb-2"
+                        value={selectedCourse}
+                        onChange={(e) => setSelectedCourse(e.target.value)}
+                      >
+                        <option value="">Select course</option>
+                        {courses.map((c) => (
+                          <option key={c._id} value={c.Course_uuid}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+
+                      <label className="block text-xs mb-1">Batch</label>
+                      <select
+                        className="w-full border rounded px-2 py-1 mb-2"
+                        value={selectedBatch}
+                        onChange={(e) => setSelectedBatch(e.target.value)}
+                      >
+                        <option value="">Select batch</option>
+                        {batches.map((b) => (
+                          <option key={b._id} value={b.name}>
+                            {b.name}
+                          </option>
+                        ))}
+                      </select>
+
+                      <label className="block text-xs mb-1">Student</label>
+                      <select
+                        className="w-full border rounded px-2 py-1"
+                        onChange={(e) => handleStudentSelect(e.target.value)}
+                        value={selectedStudent?.uuid || ""}
+                        disabled={bulkMode}
+                      >
+                        <option value="">Select a student</option>
+                        {filteredStudents.map((s) => (
+                          <option key={s.uuid} value={s.uuid}>
+                            {s.firstName} {s.lastName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   )}
                 </div>
-                <div className="px-2 py-1">
-                  <div className="text-xs font-medium truncate">
-                    {t.title || "Untitled"}
+              )}
+              <PrintSettings
+                usePrintSizing={usePrintSizing}
+                setUsePrintSizing={setUsePrintSizing}
+                pagePreset={pagePreset}
+                setPagePreset={setPagePreset}
+                customPage={customPage}
+                setCustomPage={setCustomPage}
+                pageOrientation={pageOrientation}
+                setPageOrientation={setPageOrientation}
+                dpi={dpi}
+                setDpi={setDpi}
+                bleed={bleed}
+                setBleed={setBleed}
+                safe={safe}
+                setSafe={setSafe}
+                showMarks={showMarks}
+                setShowMarks={setShowMarks}
+                showReg={showReg}
+                setShowReg={setShowReg}
+                imposeOn={imposeOn}
+                setImposeOn={setImposeOn}
+                sheetPreset={sheetPreset}
+                setSheetPreset={setSheetPreset}
+                sheetCustom={sheetCustom}
+                setSheetCustom={setSheetCustom}
+                rows={rows}
+                setRows={setRows}
+                cols={cols}
+                setCols={setCols}
+                gap={gap}
+                setGap={setGap}
+                outer={outer}
+                setOuter={setOuter}
+              />
+            </Fragment>
+          )}
+          {rightPanel === "frames" && (
+            <FrameSection addFrameSlot={addFrameSlot} />
+          )}
+          {rightPanel === "object" && (
+            <Fragment>
+              {activeObj ? (
+                <Fragment>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    <IconButton onClick={cropImage} title="Crop"><Crop size={18} /></IconButton>
+
+                    {activeObj?.type === "image" && (
+                      <IconButton onClick={removeSelectedImageBackground} title="Remove Background">
+                        <Scissors size={18} />
+                      </IconButton>
+                    )}
+
+                    <IconButton
+                      onClick={() => {
+                        const obj = activeObj;
+                        if (!obj) return;
+                        if (obj.type === "image" && obj.frameOverlay) {
+                          removeMaskAndFrame(canvas, obj, true);
+                          canvas.remove(obj);
+                        } else {
+                          canvas.remove(obj);
+                        }
+                        setActiveObj(null);
+                        setActiveStudentPhoto(null);
+                        saveHistory();
+                      }}
+                      title="Delete"
+                    >
+                      <Trash2 size={18} />
+                    </IconButton>
+
+                    <IconButton
+                      onClick={() => {
+                        const locked = !!activeObj.lockMovementX;
+                        activeObj.set({
+                          lockMovementX: !locked,
+                          lockMovementY: !locked,
+                          lockScalingX: !locked,
+                          lockScalingY: !locked,
+                          lockRotation: !locked,
+                          hasControls: locked,
+                        });
+                        canvas.renderAll();
+                      }}
+                      title="Lock/Unlock"
+                    >
+                      {activeObj?.lockMovementX ? <Unlock size={18} /> : <Lock size={18} />}
+                    </IconButton>
+
+                    {activeObj?.type === "image" && activeObj?.frameOverlay && (
+                      <IconButton onClick={extractActiveImage} title="Extract Image (remove frame)">
+                        <Move size={18} />
+                      </IconButton>
+                    )}
                   </div>
-                  <div className="text-[10px] text-gray-500">
-                    {t.width || t.w || 400}×{t.height || t.h || 550}
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-          {/* Layers Panel (below templates) */}
-          <div className="mt-4 border-t pt-3">
-            <LayersPanel canvas={canvas} onSelect={(o) => setActiveObj(o)} />
-          </div>
+
+                  {activeStudentPhoto && (
+                    <Stack direction="row" spacing={1} justifyContent="start" className="mt-3">
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={() =>
+                          setImageZoom(
+                            activeStudentPhoto,
+                            (activeStudentPhoto.zoom || 1) * 1.2
+                          )
+                        }
+                      >
+                        Zoom +
+                      </Button>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={() =>
+                          setImageZoom(
+                            activeStudentPhoto,
+                            (activeStudentPhoto.zoom || 1) / 1.2
+                          )
+                        }
+                      >
+                        Zoom -
+                      </Button>
+                    </Stack>
+                  )}
+
+                  {activeObj && ["rect", "circle"].includes(activeObj.type) && (
+                    <ShapeStylePanel activeObj={activeObj} canvas={canvas} />
+                  )}
+                </Fragment>
+              ) : (
+                <div className="text-sm text-gray-500">No object selected.</div>
+              )}
+            </Fragment>
+          )}
         </div>
       </aside>
 
@@ -2268,10 +1986,6 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
             sendToBack={sendToBack}
           />
         </div>
-      )}
-
-      {activeObj && ["rect", "circle"].includes(activeObj.type) && (
-        <ShapeStylePanel activeObj={activeObj} canvas={canvas} />
       )}
 
     </div>

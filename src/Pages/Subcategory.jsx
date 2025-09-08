@@ -80,7 +80,7 @@ const handleClick = async (item) => {
 
   return (
     <>
-      <Navbar />
+      
       <div className="font-sans bg-white text-gray-900">
         <div className="flex items-center gap-2 px-4 pt-4">
           <button

@@ -12,8 +12,9 @@ export default function AllCategory() {
     const fetchCategories = async () => {
       try {
         const response = await axios.get("https://canvaback.onrender.com/api/category");
-        setCategories(response.data);
-        console.log(response.data);
+        console.log("API response:", response.data);
+setCategories(response.data.categories || response.data || []);
+
       } catch (err) {
         console.error("Error fetching categories:", err);
         setError("Failed to load categories.");

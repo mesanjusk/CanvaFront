@@ -5,7 +5,10 @@ import { useNavigate } from "react-router-dom";
 const BottomNavBar = () => {
   const navigate = useNavigate();
   return (
-    <nav className="fixed bottom-0 left-0 right-0 h-14 bg-white border-t shadow-md z-40 flex justify-around items-center">
+    <nav
+      aria-label="Primary"
+      className="fixed bottom-0 left-0 right-0 h-14 bg-white border-t shadow-md z-40 flex justify-around items-center"
+    >
       <button className="flex flex-col items-center text-gray-600 text-xs">
         <Home size={24} />
         <span>Home</span>

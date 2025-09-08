@@ -70,8 +70,8 @@ import { buildClipShape, buildOverlayShape, moveOverlayAboveImage, applyMaskAndF
 import { PRESET_SIZES, mmToPx, pxToMm, drawCropMarks, drawRegistrationMark } from "../utils/printUtils";
 import { removeBackground } from "../utils/backgroundUtils";
 import SelectionToolbar from "./SelectionToolbar";
-import BottomToolbar from "./BottomToolbar";
 import BottomNavBar from "./BottomNavBar";
+import useMediaQuery from "../hooks/useMediaQuery";
 
 /* ===================== Helpers ===================== */
 const isText = (o) => o && (o.type === "text" || o.type === "i-text");
@@ -244,6 +244,8 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   const { templateId: routeId } = useParams();
   const templateId = propTemplateId || routeId;
   const navigate = useNavigate();
+
+  const isMobile = useMediaQuery("(max-width: 768px)");
 
   // template-driven size + responsive fit
   const [tplSize, setTplSize] = useState(() => {
@@ -2342,7 +2344,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
         }}
       />
 
-      <BottomNavBar />
+      {isMobile && <BottomNavBar />}
 
     </div>
   );

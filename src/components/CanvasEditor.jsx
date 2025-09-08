@@ -1,4 +1,4 @@
-// CanvasEditor.jsx
+// CanvasEditor.jsx (Merged with Canva-like features)
 import React, {
   useEffect,
   useLayoutEffect,
@@ -6,6 +6,7 @@ import React, {
   useRef,
   useState,
   useCallback,
+  Fragment,
 } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import { useCanvasEditor } from "../hooks/useCanvasEditor";
@@ -13,7 +14,7 @@ import { useCanvasTools } from "../hooks/useCanvasTools";
 import { getStoredUser, getStoredInstituteUUID } from "../utils/storageUtils";
 import { Button, Stack, Slider, Switch, FormControlLabel } from "@mui/material";
 import axios from "axios";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { fabric } from "fabric";
 import {
   Menu as MenuIcon,
@@ -37,6 +38,16 @@ import {
   ChevronRight,
   Images,
   FileDown,
+  Layers as LayersIcon,
+  Eye,
+  EyeOff,
+  Group as GroupIcon,
+  Ungroup,
+  AlignHorizontalJustifyCenter,
+  AlignVerticalJustifyCenter,
+  PaintBucket,
+  Sparkles,
+  Contrast as ContrastIcon
 } from "lucide-react";
 import { Layout as LayoutIcon, Ruler, BookOpen, Scissors } from "lucide-react";
 import IconButton from "./IconButton";
@@ -52,14 +63,149 @@ import ShapeStylePanel from "./ShapeStylePanel";
 import { buildClipShape, buildOverlayShape, moveOverlayAboveImage, applyMaskAndFrame, removeMaskAndFrame } from "../utils/shapeUtils";
 import { PRESET_SIZES, mmToPx, pxToMm, drawCropMarks, drawRegistrationMark } from "../utils/printUtils";
 
+/* ===================== Helpers added for Canva-like behavior ===================== */
+const isText = (o) => o && (o.type === "text" || o.type === "i-text");
+const isShape = (o) => o && (o.type === "rect" || o.type === "circle" || o.type === "triangle" || o.type === "polygon" || o.type === "path");
+
+const setGradientFill = (obj, colors=["#ff6b6b","#845ef7"]) => {
+  if (!obj) return;
+  const w = (obj.width || 100) * (obj.scaleX || 1);
+  const grad = new fabric.Gradient({
+    type: "linear",
+    gradientUnits: "pixels",
+    coords: { x1: -w/2, y1: 0, x2: w/2, y2: 0 },
+    colorStops: [{ offset: 0, color: colors[0] }, { offset: 1, color: colors[1] }],
+  });
+  obj.set("fill", grad);
+};
+
+const applyImageFilter = (img, type, value) => {
+  if (!img || img.type !== "image") return;
+  const f = fabric.Image.filters;
+  let filter;
+  switch (type) {
+    case "grayscale": filter = new f.Grayscale(); break;
+    case "brightness": filter = new f.Brightness({ brightness: value }); break; // -1..1
+    case "contrast": filter = new f.Contrast({ contrast: value }); break; // -1..1
+    case "blur": filter = new f.Blur({ blur: Math.max(0, value) }); break; // 0..1
+    default: return;
+  }
+  const idx = (img.filters || []).findIndex(fl => fl && fl.type === filter.type);
+  if (idx >= 0) img.filters[idx] = filter; else img.filters.push(filter);
+  img.applyFilters();
+};
+
+const useSmartGuides = (canvasRef, enable=true, tolerance=8) => {
+  const showV = useRef(false);
+  const showH = useRef(false);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !enable) return;
+
+    const prevOverlay = canvas._renderOverlay;
+    canvas._renderOverlay = (ctx) => {
+      if (typeof prevOverlay === "function") prevOverlay(ctx);
+      const w = canvas.getWidth();
+      const h = canvas.getHeight();
+      ctx.save();
+      ctx.strokeStyle = "rgba(99,102,241,0.85)";
+      ctx.lineWidth = 1;
+      if (showV.current) { ctx.beginPath(); ctx.moveTo(w/2+0.5, 0); ctx.lineTo(w/2+0.5, h); ctx.stroke(); }
+      if (showH.current) { ctx.beginPath(); ctx.moveTo(0, h/2+0.5); ctx.lineTo(w, h/2+0.5); ctx.stroke(); }
+      ctx.restore();
+    };
+
+    const onMove = (e) => {
+      const obj = e.target; if (!obj) return;
+      const w = canvas.getWidth(), h = canvas.getHeight();
+      const nearV = Math.abs(obj.left - w/2) <= tolerance;
+      const nearH = Math.abs(obj.top - h/2) <= tolerance;
+      showV.current = nearV; showH.current = nearH;
+      if (nearV) obj.set({ left: Math.round(w/2) });
+      if (nearH) obj.set({ top: Math.round(h/2) });
+    };
+    const clear = () => { showV.current = false; showH.current = false; canvas.requestRenderAll(); };
+
+    canvas.on("object:moving", onMove);
+    canvas.on("mouse:up", clear);
+    return () => {
+      canvas.off("object:moving", onMove);
+      canvas.off("mouse:up", clear);
+      canvas._renderOverlay = prevOverlay;
+      canvas.requestRenderAll();
+    };
+  }, [canvasRef, enable, tolerance]);
+};
+
+/** Layers panel */
+const LayersPanel = ({ canvas, onSelect }) => {
+  const [, force] = useState(0);
+  const refresh = useCallback(()=>force(x=>x+1),[]);
+  useEffect(() => {
+    if (!canvas) return;
+    const rerender = () => refresh();
+    canvas.on("object:added", rerender);
+    canvas.on("object:removed", rerender);
+    canvas.on("object:modified", rerender);
+    canvas.on("selection:created", rerender);
+    canvas.on("selection:updated", rerender);
+    canvas.on("selection:cleared", rerender);
+    return () => {
+      canvas.off("object:added", rerender);
+      canvas.off("object:removed", rerender);
+      canvas.off("object:modified", rerender);
+      canvas.off("selection:created", rerender);
+      canvas.off("selection:updated", rerender);
+      canvas.off("selection:cleared", rerender);
+    };
+  }, [canvas, refresh]);
+
+  const objects = useMemo(() => canvas ? canvas.getObjects() : [], [canvas, refresh]);
+  const setVisible = (obj, v) => { obj.visible = v; obj.dirty = true; canvas.requestRenderAll(); };
+  const setLocked = (obj, v) => {
+    obj.set({ lockMovementX:v, lockMovementY:v, lockScalingX:v, lockScalingY:v, lockRotation:v, hasControls:!v });
+    canvas.requestRenderAll();
+  };
+  const bringFwd = (obj) => { obj.bringForward(); canvas.requestRenderAll(); };
+  const sendBack = (obj) => { obj.sendBackwards(); canvas.requestRenderAll(); };
+
+  return (
+    <div className="p-3">
+      <div className="flex items-center gap-2 mb-2">
+        <LayersIcon size={16} /> <div className="text-sm font-semibold">Layers</div>
+      </div>
+      <div className="space-y-2">
+        {[...objects].map((o, idx) => (
+          <div key={idx} className="flex items-center justify-between gap-2 border rounded px-2 py-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <button className="p-1 rounded hover:bg-gray-100" onClick={() => setVisible(o, !o.visible)} title={o.visible?"Hide":"Show"}>
+                {o.visible ? <Eye size={16}/> : <EyeOff size={16}/>}
+              </button>
+              <button className="p-1 rounded hover:bg-gray-100" onClick={() => setLocked(o, !o.lockMovementX)} title={o.lockMovementX?"Unlock":"Lock"}>
+                {o.lockMovementX ? <Unlock size={16}/> : <Lock size={16}/>}
+              </button>
+              <div className="truncate cursor-pointer text-xs" title={o.customId||o.field||o.type}
+                onClick={()=>{ canvas.setActiveObject(o); canvas.requestRenderAll(); onSelect?.(o); }}>
+                {o.customId || o.field || o.type}
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              <button className="p-1 rounded hover:bg-gray-100" title="Bring forward" onClick={()=>bringFwd(o)}>▲</button>
+              <button className="p-1 rounded hover:bg-gray-100" title="Send backward" onClick={()=>sendBack(o)}>▼</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 /* =============================================================================
-   Main Editor
+   Main Editor (your original component, extended)
 ============================================================================= */
 const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false }) => {
   const { templateId: routeId } = useParams();
   const templateId = propTemplateId || routeId;
-  const navigate = useNavigate();
 
   // template-driven size + responsive fit
   const [tplSize, setTplSize] = useState({ w: 400, h: 550 });
@@ -67,22 +213,9 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
   const viewportRef = useRef(null);
   const stageRef = useRef(null);
   const [scale, setScale] = useState(1);
-  
-const [showChooseButton, setShowChooseButton] = useState(true);
+  const [showChooseButton, setShowChooseButton] = useState(true);
 
-
-  useLayoutEffect(() => {
-    if (!viewportRef.current) return;
-    const ro = new ResizeObserver(() => {
-      const vp = viewportRef.current;
-      const availableW = vp.clientWidth;
-      const availableH = vp.clientHeight;
-      const s = Math.min(availableW / tplSize.w, availableH / tplSize.h);
-      setScale(Number.isFinite(s) ? Math.max(0.05, Math.min(s, 3)) : 1);
-    });
-    ro.observe(viewportRef.current);
-    return () => ro.disconnect();
-  }, [tplSize.w, tplSize.h]);
+  useSmartGuides(/* canvasRef provided by hook below */ { current: null }, false); // placeholder until canvasRef is ready
 
   // data
   const [students, setStudents] = useState([]);
@@ -124,6 +257,7 @@ const [showChooseButton, setShowChooseButton] = useState(true);
   const [showFrames, setShowFrames] = useState(true);
   const [showSelectedSection, setShowSelectedSection] = useState(true);
   const [showImageTools, setShowImageTools] = useState(true);
+
   /* ========================= PRINT & IMPOSITION (NEW) ========================= */
   const [usePrintSizing, setUsePrintSizing] = useState(false);
   const [pagePreset, setPagePreset] = useState("A4");
@@ -172,7 +306,6 @@ const [showChooseButton, setShowChooseButton] = useState(true);
   }), [safe, dpi]);
   /* ========================================================================== */
 
-
   const studentObjectsRef = useRef([]);
   const bgRef = useRef(null);
   const logoRef = useRef(null);
@@ -205,6 +338,9 @@ const [showChooseButton, setShowChooseButton] = useState(true);
     saveHistory,
     resetHistory,
   } = useCanvasEditor(canvasRef, tplSize.w, tplSize.h);
+
+  // enable smart guides now that canvasRef exists
+  useSmartGuides(canvasRef, true, 8);
 
   const getSavedProps = useCallback(
     (field) => savedPlaceholders.find((p) => p.field === field) || null,
@@ -353,6 +489,7 @@ const [showChooseButton, setShowChooseButton] = useState(true);
       hoverCursor: "move",
     });
     overlay.shapeType = shapeType;
+    overlay.isFrameSlot = true;
     canvas.add(overlay);
     canvas.setActiveObject(overlay);
     canvas.requestRenderAll();
@@ -510,7 +647,7 @@ const [showChooseButton, setShowChooseButton] = useState(true);
       try {
         const res = await axios.get("https://canvaback.onrender.com/api/template");
         setTemplates(res.data?.data || res.data || []);
-      } catch {
+      } catch (err) {
         console.error("Error fetching categories:", err);
       }
     };
@@ -575,8 +712,7 @@ const [showChooseButton, setShowChooseButton] = useState(true);
   useEffect(() => {
     if (!templateId) return;
     loadTemplateById(templateId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [templateId]);
+  }, [templateId]); // eslint-disable-line
 
   /* ==================== Render template + student objects ================== */
   useEffect(() => {
@@ -700,78 +836,47 @@ const [showChooseButton, setShowChooseButton] = useState(true);
         });
       }
 
-  // 🔹 Restore Logo
-if (selectedInstitute?.logo) {
-  const savedLogo = getSavedProps("logo");
-  safeLoadImage(selectedInstitute.logo, (img) => {
-    if (savedLogo) {
-      // Compute scale from saved width/height
-      const scaleX = savedLogo.width && img.width
-        ? savedLogo.width / img.width
-        : savedLogo.scaleX ?? 1;
-      const scaleY = savedLogo.height && img.height
-        ? savedLogo.height / img.height
-        : savedLogo.scaleY ?? 1;
+      // Restore Logo
+      if (selectedInstitute?.logo) {
+        const savedLogo = getSavedProps("logo");
+        safeLoadImage(selectedInstitute.logo, (img) => {
+          if (savedLogo) {
+            const scaleX = savedLogo.width && img.width ? savedLogo.width / img.width : savedLogo.scaleX ?? 1;
+            const scaleY = savedLogo.height && img.height ? savedLogo.height / img.height : savedLogo.scaleY ?? 1;
+            img.set({ left: savedLogo.left ?? 20, top: savedLogo.top ?? 20, scaleX, scaleY, angle: savedLogo.angle ?? 0 });
+          } else {
+            img.scaleToWidth(Math.round(canvas.width * 0.2));
+            img.set({ left: 20, top: 20 });
+          }
+          img.customId = "logo";
+          img.field = "logo";
+          logoRef.current = img;
+          canvas.add(img);
+          img.setCoords();
+          canvas.renderAll();
+        });
+      }
 
-      img.set({
-        left: savedLogo.left ?? 20,
-        top: savedLogo.top ?? 20,
-        scaleX,
-        scaleY,
-        angle: savedLogo.angle ?? 0,
-      });
-    } else {
-      // First time placement → default
-      img.scaleToWidth(Math.round(canvas.width * 0.2));
-      img.set({ left: 20, top: 20 });
-    }
-
-    img.customId = "logo";
-    img.field = "logo";
-    logoRef.current = img;
-    canvas.add(img);
-
-    img.setCoords();
-    canvas.renderAll();
-  });
-}
-
-// 🔹 Restore Signature
-if (selectedInstitute?.signature) {
-  const savedSign = getSavedProps("signature");
-  safeLoadImage(selectedInstitute.signature, (img) => {
-    if (savedSign) {
-      const scaleX = savedSign.width && img.width
-        ? savedSign.width / img.width
-        : savedSign.scaleX ?? 1;
-      const scaleY = savedSign.height && img.height
-        ? savedSign.height / img.height
-        : savedSign.scaleY ?? 1;
-
-      img.set({
-        left: savedSign.left ?? canvas.width - 150,
-        top: savedSign.top ?? canvas.height - 80,
-        scaleX,
-        scaleY,
-        angle: savedSign.angle ?? 0,
-      });
-    } else {
-      img.scaleToWidth(Math.round(canvas.width * 0.3));
-      img.set({
-        left: canvas.width - 150,
-        top: canvas.height - 80,
-      });
-    }
-
-    img.customId = "signature";
-    img.field = "signature";
-    signatureRef.current = img;
-    canvas.add(img);
-
-    img.setCoords();
-    canvas.renderAll();
-  });
-}
+      // Restore Signature
+      if (selectedInstitute?.signature) {
+        const savedSign = getSavedProps("signature");
+        safeLoadImage(selectedInstitute.signature, (img) => {
+          if (savedSign) {
+            const scaleX = savedSign.width && img.width ? savedSign.width / img.width : savedSign.scaleX ?? 1;
+            const scaleY = savedSign.height && img.height ? savedSign.height / img.height : savedSign.scaleY ?? 1;
+            img.set({ left: savedSign.left ?? canvas.width - 150, top: savedSign.top ?? canvas.height - 80, scaleX, scaleY, angle: savedSign.angle ?? 0 });
+          } else {
+            img.scaleToWidth(Math.round(canvas.width * 0.3));
+            img.set({ left: canvas.width - 150, top: canvas.height - 80 });
+          }
+          img.customId = "signature";
+          img.field = "signature";
+          signatureRef.current = img;
+          canvas.add(img);
+          img.setCoords();
+          canvas.renderAll();
+        });
+      }
 
       canvas.renderAll();
       return () => (cancelled = true);
@@ -837,7 +942,7 @@ if (selectedInstitute?.signature) {
     };
   }, [canvas, saveHistory]);
 
-  // Keyboard shortcuts: delete/backspace, undo/redo
+  // Keyboard shortcuts: delete/backspace, undo/redo, group/ungroup
   useEffect(() => {
     const onKey = (e) => {
       const cmd = e.metaKey || e.ctrlKey;
@@ -846,6 +951,23 @@ if (selectedInstitute?.signature) {
         e.preventDefault();
         if (e.shiftKey) redo();
         else undo();
+        return;
+      }
+
+      if (cmd && (e.key === "g" || e.key === "G")) {
+        e.preventDefault();
+        const sel = canvas?.getActiveObject();
+        if (!sel) return;
+        if (sel.type === "activeSelection") {
+          const grp = sel.toGroup();
+          canvas.setActiveObject(grp);
+          canvas.requestRenderAll();
+          saveHistory();
+        } else if (sel.type === "group") {
+          sel.toActiveSelection();
+          canvas.requestRenderAll();
+          saveHistory();
+        }
         return;
       }
 
@@ -870,7 +992,6 @@ if (selectedInstitute?.signature) {
     return () => window.removeEventListener("keydown", onKey);
   }, [canvas, undo, redo, saveHistory, setActiveObj]);
 
-
   // Update design canvas to match selected page size (only when print sizing is enabled)
   useEffect(() => {
     if (!usePrintSizing) return;
@@ -884,7 +1005,9 @@ if (selectedInstitute?.signature) {
   useEffect(() => {
     if (!usePrintSizing) return;
     if (!canvas) return;
+    const prevOverlay = canvas._renderOverlay;
     canvas._renderOverlay = (ctx) => {
+      // existing print overlay
       const W = canvas.getWidth();
       const H = canvas.getHeight();
       const trimX = bleedPx.left;
@@ -901,9 +1024,11 @@ if (selectedInstitute?.signature) {
       ctx.save(); ctx.strokeStyle = 'rgba(34,197,94,0.8)'; ctx.setLineDash([2, 2]); ctx.strokeRect(safeX + 0.5, safeY + 0.5, safeW - 1, safeH - 1); ctx.restore();
       if (showMarks) { const markLen = mmToPx(4, dpi); const off = mmToPx(1.5, dpi); drawCropMarks(ctx, W, H, markLen, off, '#000', 1); }
       if (showReg) { drawRegistrationMark(ctx, W / 2, H / 2, 8, 1); }
+      // plus any previous overlays (e.g., smart guides) if they were set before
+      if (typeof prevOverlay === "function") prevOverlay(ctx);
     };
     canvas.requestRenderAll();
-    return () => { if (!canvas) return; canvas._renderOverlay = null; canvas.requestRenderAll(); };
+    return () => { if (!canvas) return; canvas._renderOverlay = prevOverlay; canvas.requestRenderAll(); };
   }, [canvas, bleedPx, safePx, showMarks, showReg, dpi, usePrintSizing]);
 
   /* ============================ Replace / Extract ========================== */
@@ -970,7 +1095,6 @@ if (selectedInstitute?.signature) {
     saveHistory();
   };
 
-
   /* ============================ Align & Z-index ============================ */
   const withActive = (fn) => () => {
     if (!canvas) return;
@@ -1011,6 +1135,26 @@ if (selectedInstitute?.signature) {
     if (obj.type === "image" && obj.frameOverlay) moveOverlayAboveImage(canvas, obj, obj.frameOverlay);
   });
 
+  // Distribute tools
+  const distributeH = () => {
+    const sel = canvas?.getActiveObject();
+    if (!sel || sel.type !== "activeSelection") { toast.error("Select multiple objects"); return; }
+    const objs = sel._objects.slice().sort((a,b)=>a.left-b.left);
+    const left = objs[0].left; const right = objs[objs.length-1].left;
+    const step = (right - left) / (objs.length - 1 || 1);
+    objs.forEach((o,i)=>{ o.set({ left: left + i*step }); o.setCoords(); });
+    canvas.discardActiveObject(); const as = new fabric.ActiveSelection(objs, { canvas }); canvas.setActiveObject(as); canvas.requestRenderAll(); saveHistory();
+  };
+  const distributeV = () => {
+    const sel = canvas?.getActiveObject();
+    if (!sel || sel.type !== "activeSelection") { toast.error("Select multiple objects"); return; }
+    const objs = sel._objects.slice().sort((a,b)=>a.top-b.top);
+    const top = objs[0].top; const bottom = objs[objs.length-1].top;
+    const step = (bottom - top) / (objs.length - 1 || 1);
+    objs.forEach((o,i)=>{ o.set({ top: top + i*step }); o.setCoords(); });
+    canvas.discardActiveObject(); const as = new fabric.ActiveSelection(objs, { canvas }); canvas.setActiveObject(as); canvas.requestRenderAll(); saveHistory();
+  };
+
   /* ============================= Carousel (bulk) =========================== */
   const rebuildBulkFromFiltered = () => {
     const ids = filteredStudents.map((s) => s.uuid);
@@ -1025,8 +1169,7 @@ if (selectedInstitute?.signature) {
 
   useEffect(() => {
     if (bulkMode) rebuildBulkFromFiltered();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bulkMode, filteredStudents]);
+  }, [bulkMode, filteredStudents]); // eslint-disable-line
 
   const gotoIndex = (idx) => {
     if (!bulkList.length) return;
@@ -1098,7 +1241,6 @@ if (selectedInstitute?.signature) {
       return;
     }
     try {
-      // dynamic import; same dep your single-page PDF likely uses
       const { jsPDF } = await import("jspdf");
       const pdf = new jsPDF({
         orientation: "p",
@@ -1108,18 +1250,15 @@ if (selectedInstitute?.signature) {
       });
 
       toast("Creating PDF…");
-      // ensure no active selection outlines
       canvas.discardActiveObject();
       canvas.requestRenderAll();
 
       for (let i = 0; i < bulkList.length; i++) {
         gotoIndex(i);
-        // Allow render settle
         await sleep(350);
         canvas.discardActiveObject();
         canvas.requestRenderAll();
 
-        // export current canvas page
         const dataUrl = canvas.toDataURL({
           format: "png",
           enableRetinaScaling: true,
@@ -1138,7 +1277,6 @@ if (selectedInstitute?.signature) {
       toast.error("PDF export failed.");
     }
   };
-
 
   /* ============================ PRINT EXPORTS (NEW) ============================ */
   const getTrimBoundsPx = useCallback(() => {
@@ -1262,13 +1400,6 @@ if (selectedInstitute?.signature) {
         <header className="fixed top-0 left-0 right-0 h-14 bg-white border-b z-40 flex items-center justify-between px-3 md:px-4 gap-3">
           <div className="flex items-center gap-2 overflow-x-auto">
             <button
-              onClick={() => navigate(-1)}
-              className="p-2 rounded hover:bg-gray-100"
-              title="Back to templates"
-            >
-              <ChevronLeft size={20} />
-            </button>
-            <button
               className="md:hidden p-2 rounded hover:bg-gray-100"
               onClick={() => setIsSidebarOpen((s) => !s)}
               title="Toggle left sidebar"
@@ -1331,78 +1462,140 @@ if (selectedInstitute?.signature) {
                 downloadPDF={downloadPDF}
               />
             </div>
-
           </div>
-{/* Fill Color (only for text/shape) */}
-{activeObj && (activeObj.type === "text" || activeObj.type === "i-text" || activeObj.type === "rect" || activeObj.type === "circle") && (
-  <div className="flex items-center gap-2">
-    {/* Fill Color */}
-    <input
-      type="color"
-      value={activeObj.fill || "#000000"}
-      onChange={(e) => {
-        activeObj.set({ fill: e.target.value });
-        canvasRef.current.requestRenderAll();
-      }}
-      className="w-8 h-8 p-0 border rounded cursor-pointer"
-      title="Change Fill Color"
-    />
 
-  {/* Font Size (only for text) */}
-{(activeObj?.type === "text" || activeObj?.type === "i-text") && (
-  <input
-    type="number"
-    min={8}
-    max={200}
-    value={activeObj.fontSize || 20}
-    onChange={(e) => {
-      const size = parseInt(e.target.value);
-      if (!isNaN(size)) {
-        const canvas = canvasRef.current;
-        const obj = canvas.getActiveObject();
-        if (obj && (obj.type === "text" || obj.type === "i-text")) {
-          obj.set({ fontSize: size });
-          obj.setCoords();
-          canvas.fire("object:modified"); // force update
-          canvas.requestRenderAll();
-        }
-      }
-    }}
-    className="w-16 p-1 border rounded"
-    title="Change Font Size"
-  />
-)}
+          {/* Contextual mini-toolbar (fill/gradient + text effects) */}
+          {activeObj && (isText(activeObj) || isShape(activeObj)) && (
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={typeof activeObj.fill === "string" ? activeObj.fill : "#000000"}
+                onChange={(e) => {
+                  activeObj.set({ fill: e.target.value });
+                  canvasRef.current.requestRenderAll();
+                }}
+                className="w-8 h-8 p-0 border rounded cursor-pointer"
+                title="Change Fill Color"
+              />
+              <button
+                className="px-2 py-1 rounded border text-xs hover:bg-gray-100"
+                onClick={() => { setGradientFill(activeObj); canvas.requestRenderAll(); }}
+                title="Apply Gradient Fill"
+              >
+                <PaintBucket size={14} />
+              </button>
 
-{/* Font Family (only for text) */}
-{(activeObj?.type === "text" || activeObj?.type === "i-text") && (
-  <select
-    value={activeObj.fontFamily || "Arial"}
-    onChange={(e) => {
-      const canvas = canvasRef.current;
-      const obj = canvas.getActiveObject();
-      if (obj && (obj.type === "text" || obj.type === "i-text")) {
-        obj.set({ fontFamily: e.target.value });
-        obj.setCoords();
-        canvas.fire("object:modified"); // force update
-        canvas.requestRenderAll();
-      }
-    }}
-    className="p-1 border rounded"
-    title="Change Font Family"
-  >
-    <option value="Arial">Arial</option>
-    <option value="Helvetica">Helvetica</option>
-    <option value="Times New Roman">Times New Roman</option>
-    <option value="Courier New">Courier New</option>
-    <option value="Georgia">Georgia</option>
-    <option value="Verdana">Verdana</option>
-  </select>
-)}
-
-  </div>
-)}
+              {(isText(activeObj)) && (
+                <Fragment>
+                  <input
+                    type="number"
+                    min={8}
+                    max={200}
+                    value={activeObj.fontSize || 20}
+                    onChange={(e) => {
+                      const size = parseInt(e.target.value);
+                      if (!isNaN(size)) {
+                        const canvas = canvasRef.current;
+                        const obj = canvas.getActiveObject();
+                        if (obj && isText(obj)) {
+                          obj.set({ fontSize: size });
+                          obj.setCoords();
+                          canvas.fire("object:modified");
+                          canvas.requestRenderAll();
+                        }
+                      }
+                    }}
+                    className="w-16 p-1 border rounded"
+                    title="Change Font Size"
+                  />
+                  <select
+                    value={activeObj.fontFamily || "Arial"}
+                    onChange={(e) => {
+                      const canvas = canvasRef.current;
+                      const obj = canvas.getActiveObject();
+                      if (obj && isText(obj)) {
+                        obj.set({ fontFamily: e.target.value });
+                        obj.setCoords();
+                        canvas.fire("object:modified");
+                        canvas.requestRenderAll();
+                      }
+                    }}
+                    className="p-1 border rounded"
+                    title="Change Font Family"
+                  >
+                    <option value="Arial">Arial</option>
+                    <option value="Helvetica">Helvetica</option>
+                    <option value="Times New Roman">Times New Roman</option>
+                    <option value="Courier New">Courier New</option>
+                    <option value="Georgia">Georgia</option>
+                    <option value="Verdana">Verdana</option>
+                  </select>
+                  <button
+                    className="px-2 py-1 rounded border text-xs hover:bg-gray-100"
+                    title="Text Shadow"
+                    onClick={() => {
+                      activeObj.set("shadow", { color: "rgba(0,0,0,0.35)", blur: 6, offsetX: 2, offsetY: 2 });
+                      canvas.requestRenderAll();
+                    }}
+                  >
+                    <Sparkles size={14} />
+                  </button>
+                  <button
+                    className="px-2 py-1 rounded border text-xs hover:bg-gray-100"
+                    title="Text Outline"
+                    onClick={() => {
+                      activeObj.set({ stroke: "#000000", strokeWidth: 1 });
+                      canvas.requestRenderAll();
+                    }}
+                  >
+                    <ContrastIcon size={14} />
+                  </button>
+                </Fragment>
+              )}
+            </div>
+          )}
 
           <div className="flex items-center gap-2">
+            {/* Group / Ungroup */}
+            <button
+              className="hidden sm:flex items-center gap-1 px-3 py-2 rounded-full bg-white border hover:bg-gray-50 text-sm"
+              onClick={() => {
+                const sel = canvas?.getActiveObject();
+                if (!sel) return;
+                if (sel.type === "activeSelection") {
+                  const grp = sel.toGroup();
+                  canvas.setActiveObject(grp);
+                  canvas.requestRenderAll();
+                  saveHistory();
+                } else if (sel.type === "group") {
+                  sel.toActiveSelection();
+                  canvas.requestRenderAll();
+                  saveHistory();
+                } else {
+                  toast("Select multiple objects to group");
+                }
+              }}
+              title="Group / Ungroup (Ctrl/Cmd+G)"
+            >
+              <GroupIcon size={16} /> / <Ungroup size={16} />
+            </button>
+
+            {/* Distribute */}
+            <button
+              className="hidden sm:flex items-center gap-1 px-3 py-2 rounded-full bg-white border hover:bg-gray-50 text-sm"
+              onClick={distributeH}
+              title="Distribute Horizontally"
+            >
+              <AlignHorizontalJustifyCenter size={16} /> H
+            </button>
+            <button
+              className="hidden sm:flex items-center gap-1 px-3 py-2 rounded-full bg-white border hover:bg-gray-50 text-sm"
+              onClick={distributeV}
+              title="Distribute Vertically"
+            >
+              <AlignVerticalJustifyCenter size={16} /> V
+            </button>
+
             {/* Bulk toggle */}
             <FormControlLabel
               sx={{ mr: 1 }}
@@ -1452,8 +1645,6 @@ if (selectedInstitute?.signature) {
               </button>
             )}
 
-            
-
             {/* Download current */}
             <button
               title="Download PNG"
@@ -1480,16 +1671,15 @@ if (selectedInstitute?.signature) {
               <BookOpen size={16} /> Imposed PDF
             </button>
 
-
             {/* Bulk download PNGs */}
             {bulkMode && (
-            <button
-              title="Download All (PNGs)"
-              onClick={downloadBulkPNGs}
-              className="hidden sm:flex items-center gap-1 px-3 py-2 rounded-full bg-indigo-600 text-white shadow hover:bg-indigo-700 text-sm"
-            >
-              <Images size={16} /> Download All
-            </button>
+              <button
+                title="Download All (PNGs)"
+                onClick={downloadBulkPNGs}
+                className="hidden sm:flex items-center gap-1 px-3 py-2 rounded-full bg-indigo-600 text-white shadow hover:bg-indigo-700 text-sm"
+              >
+                <Images size={16} /> Download All
+              </button>
             )}
 
             {/* NEW: Bulk multi-page PDF */}
@@ -1742,6 +1932,36 @@ if (selectedInstitute?.signature) {
                     </Button>
                   </Stack>
                 )}
+
+                {/* Image filters */}
+                {activeObj?.type === "image" && (
+                  <div className="mt-4 space-y-2">
+                    <div className="text-xs font-semibold">Image Filters</div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs w-20">Brightness</label>
+                      <Slider min={-1} max={1} step={0.01} defaultValue={0}
+                        onChangeCommitted={(_,v)=>{ applyImageFilter(activeObj, "brightness", Array.isArray(v)?v[0]:v); canvas.requestRenderAll(); saveHistory(); }}/>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs w-20">Contrast</label>
+                      <Slider min={-1} max={1} step={0.01} defaultValue={0}
+                        onChangeCommitted={(_,v)=>{ applyImageFilter(activeObj, "contrast", Array.isArray(v)?v[0]:v); canvas.requestRenderAll(); saveHistory(); }}/>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs w-20">Blur</label>
+                      <Slider min={0} max={1} step={0.01} defaultValue={0}
+                        onChangeCommitted={(_,v)=>{ applyImageFilter(activeObj, "blur", Array.isArray(v)?v[0]:v); canvas.requestRenderAll(); saveHistory(); }}/>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button size="small" variant="outlined" onClick={()=>{ applyImageFilter(activeObj, "grayscale"); canvas.requestRenderAll(); saveHistory(); }}>
+                        Grayscale
+                      </Button>
+                      <Button size="small" variant="text" onClick={()=>{ activeObj.filters = []; activeObj.applyFilters(); canvas.requestRenderAll(); saveHistory(); }}>
+                        Clear Filters
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1940,85 +2160,88 @@ if (selectedInstitute?.signature) {
         )}
       </main>
 
-      {/* RIGHT SIDEBAR – Template Switcher */}
-<aside
-  className={`fixed top-14 bottom-14 md:bottom-16 right-0 md:w-80 w-72 bg-white border-l z-30 overflow-y-auto transform transition-transform duration-200 ${
-    isRightbarOpen ? "translate-x-0" : "translate-x-full"
-  }`}
->
-  <div className="p-3 border-b flex items-center justify-between">
-    {showChooseButton ? (
-      <button
-        className="px-3 py-2 rounded bg-indigo-600 text-white shadow hover:bg-indigo-700 text-sm"
-        onClick={() => {
-          setIsRightbarOpen(true);
-          setShowChooseButton(false); // switch to header mode
-        }}
+      {/* RIGHT SIDEBAR – Template Switcher + Layers */}
+      <aside
+        className={`fixed top-14 bottom-14 md:bottom-16 right-0 md:w-80 w-72 bg-white border-l z-30 overflow-y-auto transform transition-transform duration-200 ${
+          isRightbarOpen ? "translate-x-0" : "translate-x-full"
+        }`}
       >
-        Choose Template
-      </button>
-    ) : (
-      <>
-        <div className="text-sm font-semibold">Templates</div>
-        <button
-          className="md:hidden p-2 rounded hover:bg-gray-100"
-          onClick={() => setIsRightbarOpen((s) => !s)}
-          title="Close"
-        >
-          <MenuIcon size={18} />
-        </button>
-      </>
-    )}
-  </div>
+        <div className="p-3 border-b flex items-center justify-between">
+          {showChooseButton ? (
+            <button
+              className="px-3 py-2 rounded bg-indigo-600 text-white shadow hover:bg-indigo-700 text-sm"
+              onClick={() => {
+                setIsRightbarOpen(true);
+                setShowChooseButton(false); // switch to header mode
+              }}
+            >
+              Choose Template
+            </button>
+          ) : (
+            <>
+              <div className="text-sm font-semibold">Templates</div>
+              <button
+                className="md:hidden p-2 rounded hover:bg-gray-100"
+                onClick={() => setIsRightbarOpen((s) => !s)}
+                title="Close"
+              >
+                <MenuIcon size={18} />
+              </button>
+            </>
+          )}
+        </div>
 
-  {/* Show template grid only when Templates header is active */}
-  {!showChooseButton && (
-    <div className="p-3">
-      {loadingTemplate && (
-        <div className="text-xs text-gray-500 mb-2">Loading template…</div>
-      )}
-      <div className="grid grid-cols-2 gap-3">
-        {templates.map((t) => (
-          <button
-            key={t._id || t.id}
-            onClick={() => {
-              loadTemplateById(t._id || t.id);
-              // keep sidebar open → removed setIsRightbarOpen(false)
-            }}
-            className={`border rounded overflow-hidden text-left hover:shadow focus:ring-2 focus:ring-indigo-500 ${
-              (t._id || t.id) === activeTemplateId
-                ? "ring-2 ring-indigo-500"
-                : ""
-            }`}
-            title={t.title || "Template"}
-          >
-            <div className="aspect-[4/5] bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
-              {t.image ? (
-                <img
-                  src={t.image}
-                  alt={t.title || "template thumbnail"}
-                  className="w-full h-full object-cover"
-                  crossOrigin="anonymous"
-                />
-              ) : (
-                <span>Preview</span>
-              )}
+        {/* Show template grid only when Templates header is active */}
+        {!showChooseButton && (
+          <div className="p-3">
+            {loadingTemplate && (
+              <div className="text-xs text-gray-500 mb-2">Loading template…</div>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              {templates.map((t) => (
+                <button
+                  key={t._id || t.id}
+                  onClick={() => {
+                    loadTemplateById(t._id || t.id);
+                  }}
+                  className={`border rounded overflow-hidden text-left hover:shadow focus:ring-2 focus:ring-indigo-500 ${
+                    (t._id || t.id) === activeTemplateId
+                      ? "ring-2 ring-indigo-500"
+                      : ""
+                  }`}
+                  title={t.title || "Template"}
+                >
+                  <div className="aspect-[4/5] bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
+                    {t.image ? (
+                      <img
+                        src={t.image}
+                        alt={t.title || "template thumbnail"}
+                        className="w-full h-full object-cover"
+                        crossOrigin="anonymous"
+                      />
+                    ) : (
+                      <span>Preview</span>
+                    )}
+                  </div>
+                  <div className="px-2 py-1">
+                    <div className="text-xs font-medium truncate">
+                      {t.title || "Untitled"}
+                    </div>
+                    <div className="text-[10px] text-gray-500">
+                      {t.width || t.w || 400}×{t.height || t.h || 550}
+                    </div>
+                  </div>
+                </button>
+              ))}
             </div>
-            <div className="px-2 py-1">
-              <div className="text-xs font-medium truncate">
-                {t.title || "Untitled"}
-              </div>
-              <div className="text-[10px] text-gray-500">
-                {t.width || t.w || 400}×{t.height || t.h || 550}
-              </div>
-            </div>
-          </button>
-        ))}
-      </div>
-    </div>
-  )}
-</aside>
 
+            {/* Layers Panel (below templates) */}
+            <div className="mt-4 border-t pt-3">
+              <LayersPanel canvas={canvas} onSelect={(o)=> setActiveObj(o)} />
+            </div>
+          </div>
+        )}
+      </aside>
 
       {/* BOTTOM BAR */}
       {showToolbar && (

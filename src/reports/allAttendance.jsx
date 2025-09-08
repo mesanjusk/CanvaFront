@@ -1,17 +1,12 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { format } from 'date-fns';
 import BASE_URL from '../config';
 
 export default function AllAttendance() {
   const [attendance, setAttendance] = useState([]);
-  const [loggedInUser, setLoggedInUser] = useState(null);
-  const [userMap, setUserMap] = useState({});
   const institute_uuid = localStorage.getItem("institute_uuid");
 
   useEffect(() => {
-    const user = JSON.parse(localStorage.getItem('user'));
-    if (user?.name) setLoggedInUser(user.name);
     fetchUsers();
   }, []);
 
@@ -23,7 +18,6 @@ export default function AllAttendance() {
         response.data.result.forEach(user => {
           map[user.user_uuid] = `${user.name}`.trim();
         });
-        setUserMap(map);
         fetchAttendanceData(map);
       }
     } catch (err) {

@@ -1,7 +1,6 @@
 // CanvasEditor.jsx (Merged with Canva-like features)
 import React, {
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -203,7 +202,7 @@ const LayersPanel = ({ canvas, onSelect }) => {
 /* =============================================================================
    Main Editor (your original component, extended)
 ============================================================================= */
-const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false }) => {
+const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   const { templateId: routeId } = useParams();
   const templateId = propTemplateId || routeId;
 
@@ -212,13 +211,12 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
   const [templateImage, setTemplateImage] = useState(null);
   const viewportRef = useRef(null);
   const stageRef = useRef(null);
-  const [scale, setScale] = useState(1);
-  const [showChooseButton, setShowChooseButton] = useState(true);
+  const [scale] = useState(1);
 
   useSmartGuides(/* canvasRef provided by hook below */ { current: null }, false); // placeholder until canvasRef is ready
 
   // data
-  const [students, setStudents] = useState([]);
+  const [_, setStudents] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [courses, setCourses] = useState([]);
   const [batches, setBatches] = useState([]);
@@ -239,13 +237,11 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
   const [bulkMode, setBulkMode] = useState(false);
   const [bulkList, setBulkList] = useState([]); // array of student uuids
   const [bulkIndex, setBulkIndex] = useState(0);
-
-  // swipe handlers
-  const touchRef = useRef({ x: 0, y: 0, active: false });
+  const studentLayoutsRef = useRef({});
 
   // UI
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // left
-  const [isRightbarOpen, setIsRightbarOpen] = useState(true); // right
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth >= 768); // left
+  const [isRightbarOpen, setIsRightbarOpen] = useState(false); // right
   const [frameShape, setFrameShape] = useState("rounded");
   const [frameBorder, setFrameBorder] = useState("#ffffff");
   const [frameWidth, setFrameWidth] = useState(6);
@@ -334,7 +330,6 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
     duplicateObject,
     downloadPDF,       // existing single-page exporter
     downloadHighRes,
-    multipleSelected,
     saveHistory,
     resetHistory,
   } = useCanvasEditor(canvasRef, tplSize.w, tplSize.h);
@@ -636,7 +631,9 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
             signature: institute.signature || null,
           });
         }
-      } catch { }
+      } catch (err) {
+        console.error(err);
+      }
     };
     fetchInstitute();
   }, []);
@@ -712,7 +709,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
   useEffect(() => {
     if (!templateId) return;
     loadTemplateById(templateId);
-  }, [templateId]); // eslint-disable-line
+  }, [templateId]);
 
   /* ==================== Render template + student objects ================== */
   useEffect(() => {
@@ -1169,36 +1166,30 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
 
   useEffect(() => {
     if (bulkMode) rebuildBulkFromFiltered();
-  }, [bulkMode, filteredStudents]); // eslint-disable-line
+  }, [bulkMode, filteredStudents]);
 
   const gotoIndex = (idx) => {
     if (!bulkList.length) return;
+    if (canvasRef.current && bulkList[bulkIndex]) {
+      studentLayoutsRef.current[bulkList[bulkIndex]] = canvasRef.current.toJSON();
+    }
     const n = ((idx % bulkList.length) + bulkList.length) % bulkList.length;
     setBulkIndex(n);
     const uuid = bulkList[n];
     const st = filteredStudents.find((s) => s.uuid === uuid) || null;
     setSelectedStudent(st);
+    if (canvasRef.current) {
+      const saved = studentLayoutsRef.current[uuid];
+      if (saved) {
+        canvasRef.current.loadFromJSON(saved, () => {
+          canvasRef.current.renderAll();
+        });
+      }
+    }
   };
 
   const prevStudent = () => gotoIndex(bulkIndex - 1);
   const nextStudent = () => gotoIndex(bulkIndex + 1);
-
-  const onTouchStart = (e) => {
-    if (!bulkMode) return;
-    const t = e.touches[0];
-    touchRef.current = { x: t.clientX, y: t.clientY, active: true };
-  };
-  const onTouchEnd = (e) => {
-    if (!bulkMode || !touchRef.current.active) return;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - touchRef.current.x;
-    const abs = Math.abs(dx);
-    touchRef.current.active = false;
-    if (abs > 40) {
-      if (dx > 0) prevStudent();
-      else nextStudent();
-    }
-  };
 
   /* ============================== Downloads =============================== */
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -1289,14 +1280,6 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
       h: H - bleedPx.top - bleedPx.bottom,
     };
   }, [contentPx, bleedPx]);
-
-  const exportSinglePNG = () => {
-    const dataUrl = canvas.toDataURL({ format: "png", quality: 1 });
-    const a = document.createElement("a");
-    a.href = dataUrl;
-    a.download = `design_${pagePreset}_${pageOrientation}_${dpi}dpi.png`;
-    a.click();
-  };
 
   const exportSinglePDF = () => {
     const { w_mm, h_mm } = pageMM;
@@ -1406,62 +1389,6 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
             >
               <MenuIcon size={20} />
             </button>
-            <div className="flex items-center gap-2 ml-2 overflow-x-auto scrollbar-thin">
-              <button
-                title="Add Text"
-                onClick={addText}
-                className="p-2 rounded bg-white shadow hover:bg-blue-100"
-              >
-                <Type size={20} />
-              </button>
-              <button
-                title="Add Rectangle"
-                onClick={addRect}
-                className="p-2 rounded bg-white shadow hover:bg-blue-100"
-              >
-                <Square size={20} />
-              </button>
-              <button
-                title="Add Circle"
-                onClick={addCircle}
-                className="p-2 rounded bg-white shadow hover:bg-blue-100"
-              >
-                <Circle size={20} />
-              </button>
-
-              {/* Upload new image */}
-              <input
-                type="file"
-                accept="image/*"
-                id="upload-image"
-                style={{ display: "none" }}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                      setCropSrc(reader.result);
-                      cropCallbackRef.current = (croppedUrl) => addImage(croppedUrl);
-                    };
-                    reader.readAsDataURL(file);
-                  }
-                }}
-              />
-              <label
-                htmlFor="upload-image"
-                className="p-2 rounded bg-white shadow hover:bg-blue-100 cursor-pointer"
-                title="Upload Image"
-              >
-                <ImageIcon size={20} />
-              </label>
-
-              <UndoRedoControls
-                undo={undo}
-                redo={redo}
-                duplicateObject={duplicateObject}
-                downloadPDF={downloadPDF}
-              />
-            </div>
           </div>
 
           {/* Contextual mini-toolbar (fill/gradient + text effects) */}
@@ -1596,42 +1523,6 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
               <AlignVerticalJustifyCenter size={16} /> V
             </button>
 
-            {/* Bulk toggle */}
-            <FormControlLabel
-              sx={{ mr: 1 }}
-              control={
-                <Switch
-                  checked={bulkMode}
-                  onChange={(e) => setBulkMode(e.target.checked)}
-                  size="small"
-                />
-              }
-              label={<span className="text-sm">Bulk</span>}
-            />
-
-            {/* Carousel controls (visible when bulk) */}
-            {bulkMode && (
-              <div className="flex items-center gap-1">
-                <button
-                  className="p-2 rounded-full bg-white border hover:bg-gray-100"
-                  title="Previous"
-                  onClick={prevStudent}
-                >
-                  <ChevronLeft size={18} />
-                </button>
-                <div className="px-2 text-xs text-gray-600">
-                  {bulkList.length ? `${bulkIndex + 1}/${bulkList.length}` : "0/0"}
-                </div>
-                <button
-                  className="p-2 rounded-full bg-white border hover:bg-gray-100"
-                  title="Next"
-                  onClick={nextStudent}
-                >
-                  <ChevronRight size={18} />
-                </button>
-              </div>
-            )}
-
             {adjustMode && (
               <button
                 title="Done"
@@ -1693,32 +1584,97 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
               </button>
             )}
 
-            {/* Save template layout */}
-            <TemplateLayout
-              canvas={canvas}
-              activeTemplateId={activeTemplateId}
-              tplSize={tplSize}
-              setSavedPlaceholders={setSavedPlaceholders}
-              frameCorner={frameCorner}
-            />
-
-            {/* Right sidebar toggle */}
-            <button
-              className="md:hidden p-2 rounded hover:bg-gray-100"
-              onClick={() => setIsRightbarOpen((s) => !s)}
-              title="Toggle template sidebar"
-            >
-              <MenuIcon size={20} />
-            </button>
+            
           </div>
         </header>
       )}
 
+      {/* VERTICAL TOOLBAR */}
+      <div className="fixed top-16 left-2 z-40 flex flex-col gap-2">
+        <button
+          title="Add Text"
+          onClick={addText}
+          className="p-2 rounded bg-white shadow hover:bg-blue-100"
+        >
+          <Type size={20} />
+        </button>
+        <button
+          title="Add Rectangle"
+          onClick={addRect}
+          className="p-2 rounded bg-white shadow hover:bg-blue-100"
+        >
+          <Square size={20} />
+        </button>
+        <button
+          title="Add Circle"
+          onClick={addCircle}
+          className="p-2 rounded bg-white shadow hover:bg-blue-100"
+        >
+          <Circle size={20} />
+        </button>
+        <input
+          type="file"
+          accept="image/*"
+          id="upload-image"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              const reader = new FileReader();
+              reader.onload = () => {
+                setCropSrc(reader.result);
+                cropCallbackRef.current = (croppedUrl) => addImage(croppedUrl);
+              };
+              reader.readAsDataURL(file);
+            }
+          }}
+        />
+        <label
+          htmlFor="upload-image"
+          className="p-2 rounded bg-white shadow hover:bg-blue-100 cursor-pointer"
+          title="Upload Image"
+        >
+          <ImageIcon size={20} />
+        </label>
+        <UndoRedoControls
+          undo={undo}
+          redo={redo}
+          duplicateObject={duplicateObject}
+          downloadPDF={downloadPDF}
+          vertical
+        />
+      </div>
+
       {/* LEFT SIDEBAR */}
       <aside
-        className={`fixed top-14 bottom-14 md:bottom-16 left-0 md:w-80 w-72 bg-white border-r z-30 overflow-y-auto transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
-          }`}
+        className={`fixed top-14 bottom-14 md:bottom-16 md:left-0 right-0 md:w-80 w-72 bg-white md:border-r border-l z-30 overflow-y-auto transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? "translate-x-0" : "translate-x-full md:translate-x-0"}`}
       >
+        <div className="p-3 border-b flex flex-col gap-3">
+          <button
+            className="px-3 py-2 rounded bg-indigo-600 text-white shadow hover:bg-indigo-700 text-sm"
+            onClick={() => setIsRightbarOpen(true)}
+          >
+            Choose Template
+          </button>
+          <FormControlLabel
+            sx={{ mr: 1 }}
+            control={
+              <Switch
+                checked={bulkMode}
+                onChange={(e) => setBulkMode(e.target.checked)}
+                size="small"
+              />
+            }
+            label={<span className="text-sm">Bulk</span>}
+          />
+          <TemplateLayout
+            canvas={canvas}
+            activeTemplateId={activeTemplateId}
+            tplSize={tplSize}
+            setSavedPlaceholders={setSavedPlaceholders}
+            frameCorner={frameCorner}
+          />
+        </div>
         <PrintSettings
           usePrintSizing={usePrintSizing}
           setUsePrintSizing={setUsePrintSizing}
@@ -1808,7 +1764,7 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
               </select>
 
               <div className="text-[11px] text-gray-500 mt-2">
-                Bulk mode uses the filtered list above. Use Prev/Next or swipe on mobile.
+                Bulk mode uses the filtered list above. Use the Prev/Next buttons to navigate.
               </div>
             </div>
           )}
@@ -2111,10 +2067,9 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
       {/* CENTER / Canva-like viewport */}
       <main
         ref={viewportRef}
-        className={`absolute bg-gray-100 top-14 right-0 ${isSidebarOpen ? "left-0 md:left-80" : "left-0 md:left-80"
-          } ${isRightbarOpen ? "md:right-80" : "right-0"} bottom-14 md:bottom-16 overflow-hidden flex items-center justify-center`}
-        onTouchStart={onTouchStart}
-        onTouchEnd={onTouchEnd}
+        className={`absolute bg-gray-100 top-14 left-0 right-0 ${isSidebarOpen ? "md:left-80" : "md:left-0"} ${
+          isRightbarOpen ? "md:right-80" : "right-0"
+        } bottom-14 md:bottom-16 overflow-hidden flex items-center justify-center`}
       >
         <div
           ref={stageRef}
@@ -2126,27 +2081,30 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
           }}
           className="shadow-lg border bg-white relative"
         >
-          {/* Mobile overlay carousel arrows in bulk mode */}
-          {bulkMode && (
-            <>
-              <button
-                className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-white/90 rounded-full shadow md:hidden"
-                onClick={prevStudent}
-                title="Previous"
-              >
-                <ChevronLeft size={18} />
-              </button>
-              <button
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-white/90 rounded-full shadow md:hidden"
-                onClick={nextStudent}
-                title="Next"
-              >
-                <ChevronRight size={18} />
-              </button>
-            </>
-          )}
           <CanvasArea ref={canvasRef} width={tplSize.w} height={tplSize.h} />
         </div>
+
+        {bulkMode && (
+          <div className="mt-4 flex items-center justify-center gap-2">
+            <button
+              className="p-2 rounded-full bg-white border hover:bg-gray-100"
+              title="Previous"
+              onClick={prevStudent}
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <div className="px-2 text-xs text-gray-600">
+              {bulkList.length ? `${bulkIndex + 1}/${bulkList.length}` : "0/0"}
+            </div>
+            <button
+              className="p-2 rounded-full bg-white border hover:bg-gray-100"
+              title="Next"
+              onClick={nextStudent}
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        )}
 
         {cropSrc && (
           <ImageCropModal
@@ -2167,80 +2125,62 @@ const CanvasEditor = ({ templateId: propTemplateId, onSaved, hideHeader = false 
         }`}
       >
         <div className="p-3 border-b flex items-center justify-between">
-          {showChooseButton ? (
-            <button
-              className="px-3 py-2 rounded bg-indigo-600 text-white shadow hover:bg-indigo-700 text-sm"
-              onClick={() => {
-                setIsRightbarOpen(true);
-                setShowChooseButton(false); // switch to header mode
-              }}
-            >
-              Choose Template
-            </button>
-          ) : (
-            <>
-              <div className="text-sm font-semibold">Templates</div>
-              <button
-                className="md:hidden p-2 rounded hover:bg-gray-100"
-                onClick={() => setIsRightbarOpen((s) => !s)}
-                title="Close"
-              >
-                <MenuIcon size={18} />
-              </button>
-            </>
-          )}
+          <div className="text-sm font-semibold">Templates</div>
+          <button
+            className="md:hidden p-2 rounded hover:bg-gray-100"
+            onClick={() => setIsRightbarOpen(false)}
+            title="Close"
+          >
+            <MenuIcon size={18} />
+          </button>
         </div>
 
-        {/* Show template grid only when Templates header is active */}
-        {!showChooseButton && (
-          <div className="p-3">
-            {loadingTemplate && (
-              <div className="text-xs text-gray-500 mb-2">Loading template…</div>
-            )}
-            <div className="grid grid-cols-2 gap-3">
-              {templates.map((t) => (
-                <button
-                  key={t._id || t.id}
-                  onClick={() => {
-                    loadTemplateById(t._id || t.id);
-                  }}
-                  className={`border rounded overflow-hidden text-left hover:shadow focus:ring-2 focus:ring-indigo-500 ${
-                    (t._id || t.id) === activeTemplateId
-                      ? "ring-2 ring-indigo-500"
-                      : ""
-                  }`}
-                  title={t.title || "Template"}
-                >
-                  <div className="aspect-[4/5] bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
-                    {t.image ? (
-                      <img
-                        src={t.image}
-                        alt={t.title || "template thumbnail"}
-                        className="w-full h-full object-cover"
-                        crossOrigin="anonymous"
-                      />
-                    ) : (
-                      <span>Preview</span>
-                    )}
+        <div className="p-3">
+          {loadingTemplate && (
+            <div className="text-xs text-gray-500 mb-2">Loading template…</div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            {templates.map((t) => (
+              <button
+                key={t._id || t.id}
+                onClick={() => {
+                  loadTemplateById(t._id || t.id);
+                }}
+                className={`border rounded overflow-hidden text-left hover:shadow focus:ring-2 focus:ring-indigo-500 ${
+                  (t._id || t.id) === activeTemplateId
+                    ? "ring-2 ring-indigo-500"
+                    : ""
+                }`}
+                title={t.title || "Template"}
+              >
+                <div className="aspect-[4/5] bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
+                  {t.image ? (
+                    <img
+                      src={t.image}
+                      alt={t.title || "template thumbnail"}
+                      className="w-full h-full object-cover"
+                      crossOrigin="anonymous"
+                    />
+                  ) : (
+                    <span>Preview</span>
+                  )}
+                </div>
+                <div className="px-2 py-1">
+                  <div className="text-xs font-medium truncate">
+                    {t.title || "Untitled"}
                   </div>
-                  <div className="px-2 py-1">
-                    <div className="text-xs font-medium truncate">
-                      {t.title || "Untitled"}
-                    </div>
-                    <div className="text-[10px] text-gray-500">
-                      {t.width || t.w || 400}×{t.height || t.h || 550}
-                    </div>
+                  <div className="text-[10px] text-gray-500">
+                    {t.width || t.w || 400}×{t.height || t.h || 550}
                   </div>
-                </button>
-              ))}
-            </div>
-
-            {/* Layers Panel (below templates) */}
-            <div className="mt-4 border-t pt-3">
-              <LayersPanel canvas={canvas} onSelect={(o)=> setActiveObj(o)} />
-            </div>
+                </div>
+              </button>
+            ))}
           </div>
-        )}
+          {/* Layers Panel (below templates) */}
+          <div className="mt-4 border-t pt-3">
+            <LayersPanel canvas={canvas} onSelect={(o)=> setActiveObj(o)} />
+          </div>
+        </div>
       </aside>
 
       {/* BOTTOM BAR */}

@@ -7,7 +7,6 @@ import ManageExamModal from '../components/common/ManageExamModal';
 const AllExams = () => {
   const [admissions, setAdmissions] = useState([]);
   const [courses, setCourses] = useState([]);
-  const [exams, setExams] = useState([]);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -42,21 +41,9 @@ const AllExams = () => {
     }
   };
 
-  const fetchExams = async () => {
-    try {
-      const { data } = await axios.get(`${BASE_URL}/api/exams`, {
-        params: { institute_uuid },
-      });
-      setExams(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error('Error fetching exams:', err);
-    }
-  };
-
   useEffect(() => {
     fetchAdmissions();
     fetchCourses();
-    fetchExams();
   }, []);
 
   // Debounce for search

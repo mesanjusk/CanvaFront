@@ -1,12 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { fabric } from 'fabric';
 import imageCompression from 'browser-image-compression';
 import toast, { Toaster } from 'react-hot-toast';
 
 const AddTemplate = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
   const canvasRef = useRef(null);
   const fabricCanvasRef = useRef(null);
   const [existingImageURLs, setExistingImageURLs] = useState([]);
@@ -66,23 +64,12 @@ const AddTemplate = () => {
         });
         setTemplates(Array.isArray(templateRes.data) ? templateRes.data : templateRes.data?.result || []);
       } catch (error) {
+        console.error(error);
         toast.error('Failed to fetch dropdown or templates.');
       }
     };
     fetchDropdowns();
   }, []);
-
- const getCanvasJson = () => {
-  try {
-    const storedJson = localStorage.getItem("canvasJson");
-    return storedJson ? JSON.parse(storedJson) : {};
-    
-  } catch (err) {
-    console.error("Error parsing canvas JSON:", err);
-    return {};
-  }
-};
-
 
   const handleInputChange = (field) => (e) => {
     const value = e?.target?.value ?? e;
@@ -116,6 +103,7 @@ const AddTemplate = () => {
       setImage(compressedFile);
       setPreviewImage([{ url: URL.createObjectURL(compressedFile) }]);
     } catch (error) {
+      console.error(error);
       toast.error('Image compression failed.');
     }
 

@@ -3,8 +3,14 @@ import React from "react";
 import IconButton from "./IconButton";
 import { Undo, Redo, Copy, FileDown } from "lucide-react";
 
-const UndoRedoControls = ({ undo, redo, duplicateObject, downloadPDF }) => (
-  <div className="flex gap-2">
+const UndoRedoControls = ({
+  undo,
+  redo,
+  duplicateObject,
+  downloadPDF,
+  vertical = false,
+}) => (
+  <div className={`flex gap-2 ${vertical ? "flex-col" : ""}`}>
     <IconButton onClick={undo} title="Undo">
       <Undo size={22} />
     </IconButton>

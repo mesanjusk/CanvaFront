@@ -39,6 +39,7 @@ import Students from './pages/Students';
 import Fees from './pages/Fees';
 import ToolsPanel from './pages/ToolsPanel';
 import CanvasEditor from './components/CanvasEditor';
+import ErrorBoundary from './components/ErrorBoundary';
 import TemplateGallery from './pages/TemplateGallery';
 import TemplateManager from './pages/TemplateManager';
 import AddTemplate from './pages/addTemplate';
@@ -60,8 +61,8 @@ export default function App() {
       <Route path="/upload" element={<ImageUploader />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password/:id" element={<ResetPassword />} />
-      <Route path="/CanvasEditor" element={<CanvasEditor />} />
-      <Route path="/editor/:templateId" element={<CanvasEditor />} />
+      <Route path="/CanvasEditor" element={<ErrorBoundary><CanvasEditor /></ErrorBoundary>} />
+      <Route path="/editor/:templateId" element={<ErrorBoundary><CanvasEditor /></ErrorBoundary>} />
       <Route path="templates" element={<TemplateGallery />} />
       <Route path="/home" element={<CanvaHome />} />
       <Route path="/subcategory/:categoryId" element={<Subcategory />} />

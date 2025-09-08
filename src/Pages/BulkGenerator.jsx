@@ -12,6 +12,7 @@ import FloatingObjectToolbar from '../components/FloatingObjectToolbar';
 import CanvasEditor from '../components/CanvasEditor';
 import PreviewModal from '../components/PreviewModal';
 import toast from 'react-hot-toast';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 const A4 = { width: 2480, height: 3508 };
 const A3 = { width: 3508, height: 4961 };
@@ -434,11 +435,13 @@ const drawImageWithText = async (ctx, student, x, y, width, height, imageUrl) =>
 
       {showEditor && editorTemplate && (
         <div className="fixed inset-0 z-40 bg-white overflow-auto">
-          <CanvasEditor
-            templateId={editorTemplate._id}
-            hideHeader
-            onSaved={() => { setShowEditor(false); fetchTemplates(); loadTemplate(editorTemplate._id); }}
-          />
+          <ErrorBoundary>
+            <CanvasEditor
+              templateId={editorTemplate._id}
+              hideHeader
+              onSaved={() => { setShowEditor(false); fetchTemplates(); loadTemplate(editorTemplate._id); }}
+            />
+          </ErrorBoundary>
           <button
             onClick={() => setShowEditor(false)}
             className="absolute top-2 right-2 bg-gray-800 text-white px-2 py-1 rounded"

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import CanvasEditor from '../components/CanvasEditor';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 const templates = [
   { id: 1, title: 'A4 Portrait', width: 2480, height: 3508 },
@@ -25,7 +26,9 @@ const PrintLayout = () => {
       </div>
       {selected && (
         <div className="border p-2">
-          <CanvasEditor templateId={selected} hideHeader />
+          <ErrorBoundary>
+            <CanvasEditor templateId={selected} hideHeader />
+          </ErrorBoundary>
         </div>
       )}
     </div>

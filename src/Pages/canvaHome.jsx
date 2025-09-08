@@ -2,7 +2,7 @@
 import Banner from "./Banner";
 import AllCategory from "../reports/allCategory.jsx";
 import Navbar from "../components/Navbar.jsx";
-import Navbar from "../components/BottomNavBar.jsx"; 
+import BottomNavBar from "../components/BottomNavBar.jsx"; 
 
 
 export default function CanvaHome() {

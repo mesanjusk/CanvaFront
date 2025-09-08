@@ -1643,6 +1643,44 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
           downloadPDF={downloadPDF}
           vertical
         />
+
+        {/* FRAME MASK BUTTONS */}
+        <button
+          title="Add Circle Frame"
+          onClick={() => addFrameSlot("circle")}
+          className="p-2 rounded bg-white shadow hover:bg-blue-100"
+        >
+          <Circle size={20} />
+        </button>
+        <button
+          title="Add Triangle Frame"
+          onClick={() => addFrameSlot("triangle")}
+          className="p-2 rounded bg-white shadow hover:bg-blue-100"
+        >
+          <Triangle size={20} />
+        </button>
+        <button
+          title="Add Hexagon Frame"
+          onClick={() => addFrameSlot("hexagon")}
+          className="p-2 rounded bg-white shadow hover:bg-blue-100"
+        >
+          <Hexagon size={20} />
+        </button>
+        <button
+          title="Add Star Frame"
+          onClick={() => addFrameSlot("star")}
+          className="p-2 rounded bg-white shadow hover:bg-blue-100"
+        >
+          <Star size={20} />
+        </button>
+        <button
+          title="Add Heart Frame"
+          onClick={() => addFrameSlot("heart")}
+          className="p-2 rounded bg-white shadow hover:bg-blue-100"
+        >
+          <Heart size={20} />
+        </button>
+
       </div>
 
       {/* LEFT SIDEBAR */}
@@ -1667,49 +1705,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
             }
             label={<span className="text-sm">Bulk</span>}
           />
-          <TemplateLayout
-            canvas={canvas}
-            activeTemplateId={activeTemplateId}
-            tplSize={tplSize}
-            setSavedPlaceholders={setSavedPlaceholders}
-            frameCorner={frameCorner}
-          />
-        </div>
-        <PrintSettings
-          usePrintSizing={usePrintSizing}
-          setUsePrintSizing={setUsePrintSizing}
-          pagePreset={pagePreset}
-          setPagePreset={setPagePreset}
-          customPage={customPage}
-          setCustomPage={setCustomPage}
-          pageOrientation={pageOrientation}
-          setPageOrientation={setPageOrientation}
-          dpi={dpi}
-          setDpi={setDpi}
-          bleed={bleed}
-          setBleed={setBleed}
-          safe={safe}
-          setSafe={setSafe}
-          showMarks={showMarks}
-          setShowMarks={setShowMarks}
-          showReg={showReg}
-          setShowReg={setShowReg}
-          imposeOn={imposeOn}
-          setImposeOn={setImposeOn}
-          sheetPreset={sheetPreset}
-          setSheetPreset={setSheetPreset}
-          sheetCustom={sheetCustom}
-          setSheetCustom={setSheetCustom}
-          rows={rows}
-          setRows={setRows}
-          cols={cols}
-          setCols={setCols}
-          gap={gap}
-          setGap={setGap}
-          outer={outer}
-          setOuter={setOuter}
-        />
-        {/* Filters (collapsible) */}
+          {/* Filters (collapsible) */}
         {bulkMode && (
           <div className="border-b">
             <button
@@ -1763,20 +1759,56 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
                   ))}
                 </select>
 
-                <div className="text-[11px] text-gray-500 mt-2">
-                  Bulk mode uses the filtered list above. Use the Prev/Next buttons to navigate.
-                </div>
+                
               </div>
             )}
           </div>
         )}
-
-        <FrameSection
-          showFrames={showFrames}
-          setShowFrames={setShowFrames}
-          addFrameSlot={addFrameSlot}
+          <TemplateLayout
+            canvas={canvas}
+            activeTemplateId={activeTemplateId}
+            tplSize={tplSize}
+            setSavedPlaceholders={setSavedPlaceholders}
+            frameCorner={frameCorner}
+          />
+        </div>
+        <PrintSettings
+          usePrintSizing={usePrintSizing}
+          setUsePrintSizing={setUsePrintSizing}
+          pagePreset={pagePreset}
+          setPagePreset={setPagePreset}
+          customPage={customPage}
+          setCustomPage={setCustomPage}
+          pageOrientation={pageOrientation}
+          setPageOrientation={setPageOrientation}
+          dpi={dpi}
+          setDpi={setDpi}
+          bleed={bleed}
+          setBleed={setBleed}
+          safe={safe}
+          setSafe={setSafe}
+          showMarks={showMarks}
+          setShowMarks={setShowMarks}
+          showReg={showReg}
+          setShowReg={setShowReg}
+          imposeOn={imposeOn}
+          setImposeOn={setImposeOn}
+          sheetPreset={sheetPreset}
+          setSheetPreset={setSheetPreset}
+          sheetCustom={sheetCustom}
+          setSheetCustom={setSheetCustom}
+          rows={rows}
+          setRows={setRows}
+          cols={cols}
+          setCols={setCols}
+          gap={gap}
+          setGap={setGap}
+          outer={outer}
+          setOuter={setOuter}
         />
+        
 
+      
         {/* Selected object (collapsible) */}
         {activeObj && (
           <div className="border-b">
@@ -2145,8 +2177,8 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
                   loadTemplateById(t._id || t.id);
                 }}
                 className={`border rounded overflow-hidden text-left hover:shadow focus:ring-2 focus:ring-indigo-500 ${(t._id || t.id) === activeTemplateId
-                    ? "ring-2 ring-indigo-500"
-                    : ""
+                  ? "ring-2 ring-indigo-500"
+                  : ""
                   }`}
                 title={t.title || "Template"}
               >

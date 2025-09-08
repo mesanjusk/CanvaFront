@@ -72,8 +72,7 @@ const FrameSection = ({ addFrameSlot }) => {
           </div>
 
           <div className="text-[11px] text-gray-500 mt-2">
-            Tip: Drag an image over a dashed frame to snap & mask it.
-            Double-click an image to adjust inside the frame.
+           
           </div>
         </div>
       )}

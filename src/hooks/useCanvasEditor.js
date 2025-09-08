@@ -45,7 +45,6 @@ const saveHistory = () => {
 
   const resetHistory = () => {
     setHistory([]);
-    setRedoStack([]);
   };
 
 const undo = () => {

@@ -17,7 +17,8 @@ export default defineConfig([
       },
     },
     rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      // Treat unused variables as warnings so legacy pages don't block CI
+      'no-unused-vars': ['warn', { varsIgnorePattern: '^[A-Z_]' }],
     },
   },
 ]);

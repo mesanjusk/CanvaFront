@@ -9,7 +9,9 @@ const Dashboard = () => {
 
   // Safe JSON parse for institute
   let instituteObj = {};
-  try { instituteObj = JSON.parse(localStorage.getItem('institute')) || {}; } catch {}
+  try { instituteObj = JSON.parse(localStorage.getItem('institute')) || {}; } catch {
+    // ignore JSON parse errors
+  }
   const instituteName = instituteObj.institute_name ||
     localStorage.getItem('institute_title') ||
     'Your Institute';

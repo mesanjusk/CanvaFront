@@ -111,6 +111,6 @@ const Toolbar = React.memo(({
       `}</style>
     </div>
   );
-};
+});
 
 export default Toolbar;

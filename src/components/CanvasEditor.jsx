@@ -61,6 +61,7 @@ import FrameSection from "./FrameSection";
 import ShapeStylePanel from "./ShapeStylePanel";
 import { buildClipShape, buildOverlayShape, moveOverlayAboveImage, applyMaskAndFrame, removeMaskAndFrame } from "../utils/shapeUtils";
 import { PRESET_SIZES, mmToPx, pxToMm, drawCropMarks, drawRegistrationMark } from "../utils/printUtils";
+import { removeBackground } from "../utils/backgroundUtils";
 
 /* ===================== Helpers added for Canva-like behavior ===================== */
 const isText = (o) => o && (o.type === "text" || o.type === "i-text");
@@ -250,7 +251,6 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
 
   // Collapsible sections
   const [showFilters, setShowFilters] = useState(true);
-  const [showFrames, setShowFrames] = useState(true);
   const [showSelectedSection, setShowSelectedSection] = useState(true);
   const [showImageTools, setShowImageTools] = useState(true);
 
@@ -380,6 +380,40 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     img.set({ left: box.cx, top: box.cy, originX: "center", originY: "center" });
     img.setCoords();
     canvas.requestRenderAll();
+  };
+
+  const removeSelectedImageBackground = async () => {
+    if (!activeObj || activeObj.type !== "image") {
+      toast.error("Select an image first");
+      return;
+    }
+    try {
+      const res = await fetch(activeObj.getSrc());
+      const blob = await res.blob();
+      const url = await removeBackground(blob);
+      fabric.Image.fromURL(
+        url,
+        (img) => {
+          img.set({
+            left: activeObj.left,
+            top: activeObj.top,
+            scaleX: activeObj.scaleX,
+            scaleY: activeObj.scaleY,
+            angle: activeObj.angle,
+            originX: "center",
+            originY: "center",
+          });
+          canvas.remove(activeObj);
+          canvas.add(img);
+          canvas.setActiveObject(img);
+          saveHistory();
+        },
+        { crossOrigin: "anonymous" }
+      );
+    } catch (err) {
+      console.error(err);
+      toast.error("Background removal failed");
+    }
   };
 
   // Canva-like: Adjust mode freezes frame; image draggable/scalable inside
@@ -1822,6 +1856,12 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
               <div className="px-3 pb-3">
                 <div className="flex flex-wrap gap-2">
                   <IconButton onClick={cropImage} title="Crop"><Crop size={18} /></IconButton>
+
+                  {activeObj?.type === "image" && (
+                    <IconButton onClick={removeSelectedImageBackground} title="Remove Background">
+                      <Scissors size={18} />
+                    </IconButton>
+                  )}
 
                   <IconButton
                     onClick={() => {

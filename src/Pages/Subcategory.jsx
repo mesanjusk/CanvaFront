@@ -4,16 +4,18 @@ import axios from "axios";
 import { ChevronLeft } from "lucide-react";
 import Navbar from "../components/Navbar";
 import BottomNavBar from "../components/BottomNavBar.jsx";
+import useMediaQuery from "../hooks/useMediaQuery";
 
 export default function Subcategory() {
   const { categoryId } = useParams();
-const id = categoryId;
+  const id = categoryId;
 
   const navigate = useNavigate();
+  const isMobile = useMediaQuery("(max-width: 768px)");
 
   const [subcategories, setSubcategories] = useState([]);
   const [allTemplates, setAllTemplates] = useState([]);
-  const [selectedCategoryName, setSelectedCategoryName] = useState('');
+  const [selectedCategoryName, setSelectedCategoryName] = useState("");
   const [originalTemplates, setOriginalTemplates] = useState([]);
 
   useEffect(() => {
@@ -164,7 +166,7 @@ const handleClick = async (item) => {
         )}
       </div>
       
-      <BottomNavBar />
+      {isMobile && <BottomNavBar />}
     </>
   );
 }

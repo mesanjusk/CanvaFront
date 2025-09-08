@@ -1,4 +1,4 @@
-// CanvasEditor.jsx (Merged with Canva-like features)
+// CanvasEditor.jsx — updated with Canva-like behaviors, mobile FAB, grid, snapping, filters
 import React, {
   useEffect,
   useMemo,
@@ -46,7 +46,15 @@ import {
   AlignVerticalJustifyCenter,
   PaintBucket,
   Sparkles,
-  Contrast as ContrastIcon
+  Contrast as ContrastIcon,
+  Bold,
+  Italic,
+  Underline,
+  CaseUpper,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Ruler
 } from "lucide-react";
 import { Layout as LayoutIcon, BookOpen, Scissors } from "lucide-react";
 import IconButton from "./IconButton";
@@ -65,7 +73,7 @@ import SelectionToolbar from "./SelectionToolbar";
 import BottomToolbar from "./BottomToolbar";
 import BottomNavBar from "./BottomNavBar";
 
-/* ===================== Helpers added for Canva-like behavior ===================== */
+/* ===================== Helpers ===================== */
 const isText = (o) => o && (o.type === "text" || o.type === "i-text");
 const isShape = (o) => o && (o.type === "rect" || o.type === "circle" || o.type === "triangle" || o.type === "polygon" || o.type === "path");
 
@@ -81,7 +89,7 @@ const setGradientFill = (obj, colors = ["#ff6b6b", "#845ef7"]) => {
   obj.set("fill", grad);
 };
 
-
+/* ====== Center guides (existing) ====== */
 const useSmartGuides = (canvasRef, enable = true, tolerance = 8) => {
   const showV = useRef(false);
   const showH = useRef(false);
@@ -125,6 +133,41 @@ const useSmartGuides = (canvasRef, enable = true, tolerance = 8) => {
   }, [canvasRef, enable, tolerance]);
 };
 
+/* ====== Object-to-object snapping (edges/centers) ====== */
+const useObjectSnapping = (canvas, enable = true, tolerance = 6) => {
+  useEffect(() => {
+    if (!canvas || !enable) return;
+    const onMove = (e) => {
+      const t = e.target;
+      if (!t) return;
+      const objs = canvas.getObjects().filter(o => o !== t && !o.isEditing);
+      const tRect = t.getBoundingRect(true, true);
+      const tCx = tRect.left + tRect.width / 2;
+      const tCy = tRect.top + tRect.height / 2;
+
+      let snappedX = null, snappedY = null;
+      objs.forEach(o => {
+        const r = o.getBoundingRect(true, true);
+        const oCx = r.left + r.width / 2;
+        const oCy = r.top + r.height / 2;
+        // centers
+        if (Math.abs(tCx - oCx) <= tolerance) snappedX = oCx - tRect.width / 2;
+        if (Math.abs(tCy - oCy) <= tolerance) snappedY = oCy - tRect.height / 2;
+        // left/right edges
+        if (Math.abs(tRect.left - r.left) <= tolerance) snappedX = r.left;
+        if (Math.abs((tRect.left + tRect.width) - (r.left + r.width)) <= tolerance) snappedX = r.left + r.width - tRect.width;
+        // top/bottom edges
+        if (Math.abs(tRect.top - r.top) <= tolerance) snappedY = r.top;
+        if (Math.abs((tRect.top + tRect.height) - (r.top + r.height)) <= tolerance) snappedY = r.top + r.height - tRect.height;
+      });
+      if (snappedX !== null) t.set({ left: snappedX });
+      if (snappedY !== null) t.set({ top: snappedY });
+    };
+    canvas.on("object:moving", onMove);
+    return () => canvas.off("object:moving", onMove);
+  }, [canvas, enable, tolerance]);
+};
+
 /** Layers panel */
 const LayersPanel = ({ canvas, onSelect }) => {
   const [, force] = useState(0);
@@ -157,6 +200,11 @@ const LayersPanel = ({ canvas, onSelect }) => {
   const bringFwd = (obj) => { obj.bringForward(); canvas.requestRenderAll(); };
   const sendBack = (obj) => { obj.sendBackwards(); canvas.requestRenderAll(); };
 
+  const renameLayer = (obj) => {
+    const name = prompt("Layer name:", obj.customId || obj.field || obj.type);
+    if (name !== null) { obj.customId = name; canvas.requestRenderAll(); }
+  };
+
   return (
     <div className="p-3">
       <div className="flex items-center gap-2 mb-2">
@@ -173,6 +221,7 @@ const LayersPanel = ({ canvas, onSelect }) => {
                 {o.lockMovementX ? <Unlock size={16} /> : <Lock size={16} />}
               </button>
               <div className="truncate cursor-pointer text-xs" title={o.customId || o.field || o.type}
+                onDoubleClick={() => renameLayer(o)}
                 onClick={() => { canvas.setActiveObject(o); canvas.requestRenderAll(); onSelect?.(o); }}>
                 {o.customId || o.field || o.type}
               </div>
@@ -189,7 +238,7 @@ const LayersPanel = ({ canvas, onSelect }) => {
 };
 
 /* =============================================================================
-   Main Editor (your original component, extended)
+   Main Editor
 ============================================================================= */
 const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   const { templateId: routeId } = useParams();
@@ -205,6 +254,14 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   const viewportRef = useRef(null);
   const stageRef = useRef(null);
   const [zoom, setZoom] = useState(1);
+
+  // Grid state
+  const [showGrid, setShowGrid] = useState(false);
+  const [gridSize, setGridSize] = useState(20);
+
+  // replace image input
+  const replaceInputRef = useRef(null);
+
   // hooks
   const {
     canvasRef,
@@ -232,9 +289,29 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     resetHistory,
   } = useCanvasEditor(canvasRef, tplSize.w, tplSize.h);
 
-  // enable smart guides now that canvasRef exists
+  // enable guides & snapping
   useSmartGuides(canvasRef, true, 8);
+  useObjectSnapping(canvas, true, 6);
 
+  // grid background rendering
+  useEffect(() => {
+    const c = canvasRef.current;
+    if (!c) return;
+    const prevBg = c._renderBackground;
+    c._renderBackground = function(ctx){
+      if (typeof prevBg === "function") prevBg.call(this, ctx);
+      if (!showGrid) return;
+      const w = this.getWidth(), h = this.getHeight();
+      ctx.save();
+      ctx.strokeStyle = "rgba(0,0,0,0.08)";
+      ctx.lineWidth = 1;
+      for (let x = 0.5; x < w; x += gridSize) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+      for (let y = 0.5; y < h; y += gridSize) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+      ctx.restore();
+    };
+    c.requestRenderAll();
+    return () => { if (!c) return; c._renderBackground = prevBg; c.requestRenderAll(); };
+  }, [canvasRef, showGrid, gridSize]);
 
   const handleZoomChange = (val) => {
     const z = val / 100;
@@ -266,7 +343,6 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     return () => window.removeEventListener("resize", onResize);
   }, [fitToViewport]);
 
-
   useEffect(() => {
     if (canvasRef.current) fitToViewport();
   }, [fitToViewport]);
@@ -279,8 +355,6 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
       return newSize;
     });
   };
-
-// (placeholder smart guides call removed; real one runs after hooks)
 
   // data
   const [allStudents, setStudents] = useState([]);
@@ -311,12 +385,6 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   const [isRightbarOpen, setIsRightbarOpen] = useState(false); // right
   const [rightPanel, setRightPanel] = useState(null);
 
-  // Open templates panel by default so users can pick one
-  useEffect(() => {
-    setRightPanel('templates');
-    setIsRightbarOpen(true);
-  }, []);
-
   const [frameShape] = useState("rounded");
   const [frameBorder] = useState("#ffffff");
   const [frameWidth] = useState(6);
@@ -326,7 +394,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   // Collapsible sections
   const [showFilters, setShowFilters] = useState(true);
 
-  /* ========================= PRINT & IMPOSITION (NEW) ========================= */
+  /* ========================= PRINT & IMPOSITION ========================= */
   const [usePrintSizing, setUsePrintSizing] = useState(false);
   const [pagePreset, setPagePreset] = useState("A4");
   const [pageOrientation, setPageOrientation] = useState("portrait"); // portrait|landscape
@@ -372,13 +440,11 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     bottom: mmToPx(safe.bottom, dpi),
     left: mmToPx(safe.left, dpi),
   }), [safe, dpi]);
-  /* ========================================================================== */
 
   const studentObjectsRef = useRef([]);
   const bgRef = useRef(null);
   const logoRef = useRef(null);
   const signatureRef = useRef(null);
-
 
   const getSavedProps = useCallback(
     (field) => savedPlaceholders.find((p) => p.field === field) || null,
@@ -440,6 +506,16 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
             originX: "center",
             originY: "center",
           });
+          // keep frame if any
+          if (activeObj.frameOverlay) {
+            img.shape = activeObj.shape;
+            img.clipPath = activeObj.clipPath;
+            img.frameOverlay = activeObj.frameOverlay;
+            if (img.frameOverlay) {
+              img.frameOverlay.ownerImage = img;
+              moveOverlayAboveImage(canvas, img, img.frameOverlay);
+            }
+          }
           canvas.remove(activeObj);
           canvas.add(img);
           canvas.setActiveObject(img);
@@ -453,6 +529,54 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
       toast.error("Background removal failed");
     }
   };
+
+  // Replace image while keeping frame/position
+  const replaceActiveImage = (file) => {
+    if (!activeObj || activeObj.type !== "image") return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      fabric.Image.fromURL(dataUrl, (img) => {
+        img.set({
+          left: activeObj.left,
+          top: activeObj.top,
+          scaleX: activeObj.scaleX,
+          scaleY: activeObj.scaleY,
+          angle: activeObj.angle,
+          originX: activeObj.originX,
+          originY: activeObj.originY,
+        });
+        if (activeObj.frameOverlay) {
+          img.shape = activeObj.shape;
+          img.clipPath = activeObj.clipPath;
+          img.frameOverlay = activeObj.frameOverlay;
+          img.frameOverlay.ownerImage = img;
+          moveOverlayAboveImage(canvas, img, img.frameOverlay);
+        }
+        canvas.remove(activeObj);
+        canvas.add(img);
+        canvas.setActiveObject(img);
+        canvas.requestRenderAll();
+        saveHistory();
+      }, { crossOrigin: "anonymous" });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Image filters for active image
+  const [imgFilters, setImgFilters] = useState({ brightness: 0, contrast: 0, saturation: 0 });
+  const applyImageFilters = (img) => {
+    if (!img || img.type !== "image") return;
+    const { Brightness, Contrast, Saturation } = fabric.Image.filters;
+    const f = [];
+    if (imgFilters.brightness !== 0) f.push(new Brightness({ brightness: imgFilters.brightness }));
+    if (imgFilters.contrast !== 0) f.push(new Contrast({ contrast: imgFilters.contrast }));
+    if (imgFilters.saturation !== 0) f.push(new Saturation({ saturation: imgFilters.saturation }));
+    img.filters = f;
+    img.applyFilters();
+    canvas.requestRenderAll();
+  };
+  useEffect(() => { if (activeObj && activeObj.type === "image") applyImageFilters(activeObj); }, [imgFilters]); // eslint-disable-line
 
   // Canva-like: Adjust mode freezes frame; image draggable/scalable inside
   const enterAdjustMode = (img) => {
@@ -774,8 +898,6 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
         const res = await axios.get(`https://canvaback.onrender.com/api/template/${id}`);
         await applyTemplateResponse(res.data || {});
         setActiveTemplateId(id);
-        setRightPanel('templates');
-        setIsRightbarOpen(true);
         resetHistory();
         saveHistory();
       } catch {
@@ -793,7 +915,6 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     loadTemplateById(templateId);
   }, [templateId]);
 
-  
   /* ==================== Render template + student objects ================== */
   useEffect(() => {
     if (!canvas) return;
@@ -965,7 +1086,8 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     bulkIndex,
     filteredStudents,
   ]);
-/* ============================= Canvas events ============================ */
+
+  /* ============================= Canvas events ============================ */
   useEffect(() => {
     if (!canvas) return;
     const onDbl = (e) => {
@@ -1008,11 +1130,13 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     };
   }, [canvas, saveHistory]);
 
-  // Keyboard shortcuts: delete/backspace, undo/redo, group/ungroup
+  // Keyboard shortcuts
   useEffect(() => {
     const onKey = (e) => {
       const cmd = e.metaKey || e.ctrlKey;
+      const sel = canvas?.getActiveObject();
 
+      // Undo / Redo
       if (cmd && (e.key === "z" || e.key === "Z")) {
         e.preventDefault();
         if (e.shiftKey) redo();
@@ -1020,9 +1144,46 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
         return;
       }
 
+      // Duplicate
+      if (cmd && (e.key === "d" || e.key === "D")) {
+        e.preventDefault();
+        duplicateObject?.();
+        return;
+      }
+
+      // Copy / Paste
+      if (cmd && (e.key === "c" || e.key === "C")) {
+        e.preventDefault();
+        if (!sel) return;
+        canvas?.clone && canvas.clone((cloned) => {
+          window.__clipboard = cloned;
+        }, sel);
+        return;
+      }
+      if (cmd && (e.key === "v" || e.key === "V")) {
+        e.preventDefault();
+        const clip = window.__clipboard;
+        if (!clip) return;
+        clip.clone((clonedObj) => {
+          canvas?.discardActiveObject();
+          clonedObj.set({ left: (clonedObj.left || 0) + 20, top: (clonedObj.top || 0) + 20, evented: true });
+          if (clonedObj.type === "activeSelection") {
+            clonedObj.canvas = canvas;
+            clonedObj.forEachObject((obj) => canvas.add(obj));
+            clonedObj.setCoords();
+          } else {
+            canvas?.add(clonedObj);
+          }
+          canvas?.setActiveObject(clonedObj);
+          canvas?.requestRenderAll();
+          saveHistory();
+        });
+        return;
+      }
+
+      // Group / Ungroup (also in UI)
       if (cmd && (e.key === "g" || e.key === "G")) {
         e.preventDefault();
-        const sel = canvas?.getActiveObject();
         if (!sel) return;
         if (sel.type === "activeSelection") {
           const grp = sel.toGroup();
@@ -1037,6 +1198,33 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
         return;
       }
 
+      // Select all
+      if (cmd && (e.key === "a" || e.key === "A")) {
+        e.preventDefault();
+        const objs = canvas?.getObjects() || [];
+        const as = new fabric.ActiveSelection(objs, { canvas });
+        canvas?.setActiveObject(as);
+        canvas?.requestRenderAll();
+        return;
+      }
+
+      // Lock toggle
+      if (!cmd && (e.key === "l" || e.key === "L")) {
+        if (!sel) return;
+        const locked = !!sel.lockMovementX;
+        sel.set({
+          lockMovementX: !locked,
+          lockMovementY: !locked,
+          lockScalingX: !locked,
+          lockScalingY: !locked,
+          lockRotation: !locked,
+          hasControls: locked,
+        });
+        canvas?.requestRenderAll();
+        return;
+      }
+
+      // Delete
       if (e.key === "Delete" || e.key === "Backspace") {
         const obj = canvas?.getActiveObject();
         if (!obj) return;
@@ -1052,11 +1240,24 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
         setActiveStudentPhoto(null);
         saveHistory();
         e.preventDefault();
+        return;
+      }
+
+      // Nudge
+      if (sel && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+        e.preventDefault();
+        const delta = e.shiftKey ? 10 : 1;
+        const d = { ArrowUp: [0, -delta], ArrowDown: [0, delta], ArrowLeft: [-delta, 0], ArrowRight: [delta, 0] }[e.key];
+        sel.top += d[1];
+        sel.left += d[0];
+        sel.setCoords();
+        canvas?.requestRenderAll();
+        saveHistory();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [canvas, undo, redo, saveHistory, setActiveObj]);
+  }, [canvas, undo, redo, duplicateObject, saveHistory, setActiveObj]);
 
   // Update design canvas to match selected page size (only when print sizing is enabled)
   useEffect(() => {
@@ -1090,7 +1291,6 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
       ctx.save(); ctx.strokeStyle = 'rgba(34,197,94,0.8)'; ctx.setLineDash([2, 2]); ctx.strokeRect(safeX + 0.5, safeY + 0.5, safeW - 1, safeH - 1); ctx.restore();
       if (showMarks) { const markLen = mmToPx(4, dpi); const off = mmToPx(1.5, dpi); drawCropMarks(ctx, W, H, markLen, off, '#000', 1); }
       if (showReg) { drawRegistrationMark(ctx, W / 2, H / 2, 8, 1); }
-      // plus any previous overlays (e.g., smart guides) if they were set before
       if (typeof prevOverlay === "function") prevOverlay(ctx);
     };
     canvas.requestRenderAll();
@@ -1098,7 +1298,6 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   }, [canvas, bleedPx, safePx, showMarks, showReg, dpi, usePrintSizing]);
 
   /* ============================ Replace / Extract ========================== */
-
   const extractActiveImage = () => {
     if (!canvas) return;
     const obj = canvas.getActiveObject();
@@ -1120,11 +1319,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     saveHistory();
   };
 
-  /* ============================ Align & Z-index ============================ */
-  // Alignment and z-index tools were previously exposed via a bottom toolbar.
-  // They have been removed in favor of a compact selection toolbar.
-
-  // Distribute tools
+  /* ============================= Align & Distribute ============================ */
   const distributeH = () => {
     const sel = canvas?.getActiveObject();
     if (!sel || sel.type !== "activeSelection") { toast.error("Select multiple objects"); return; }
@@ -1158,7 +1353,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
 
   useEffect(() => {
     if (bulkMode) rebuildBulkFromFiltered();
-  }, [bulkMode, filteredStudents]);
+  }, [bulkMode, filteredStudents]); // eslint-disable-line
 
   const gotoIndex = (idx) => {
     if (!bulkList.length) return;
@@ -1261,7 +1456,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     }
   };
 
-  /* ============================ PRINT EXPORTS (NEW) ============================ */
+  /* ============================ PRINT EXPORTS ============================ */
   const getTrimBoundsPx = useCallback(() => {
     const W = contentPx.W;
     const H = contentPx.H;
@@ -1363,7 +1558,6 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
     doc.save(`imposed_${rows}x${cols}_${sheetPreset}_${ts}.pdf`);
   };
-  /* ============================================================================ */
 
   /* ================================= UI =================================== */
   return (
@@ -1384,29 +1578,36 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
             </button>
           </div>
 
-          {/* Contextual mini-toolbar (fill/gradient + text effects) */}
+          {/* Contextual mini-toolbar (text/shape quick tools) */}
           {activeObj && (isText(activeObj) || isShape(activeObj)) && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 max-w-[60vw] overflow-x-auto rounded-full bg-white px-2 py-1 border">
               <input
                 type="color"
                 value={typeof activeObj.fill === "string" ? activeObj.fill : "#000000"}
                 onChange={(e) => {
                   activeObj.set({ fill: e.target.value });
-                  canvasRef.current.requestRenderAll();
+                  canvasRef.current?.requestRenderAll();
                 }}
                 className="w-8 h-8 p-0 border rounded cursor-pointer"
-                title="Change Fill Color"
+                title="Fill Color"
               />
               <button
                 className="px-2 py-1 rounded border text-xs hover:bg-gray-100"
                 onClick={() => { setGradientFill(activeObj); canvas.requestRenderAll(); }}
-                title="Apply Gradient Fill"
+                title="Gradient Fill"
               >
                 <PaintBucket size={14} />
               </button>
 
-              {(isText(activeObj)) && (
+              {isText(activeObj) && (
                 <Fragment>
+                  <div className="flex items-center gap-1">
+                    <IconButton title="Bold" onClick={() => { activeObj.set("fontWeight", activeObj.fontWeight === "bold" ? "normal" : "bold"); canvas.requestRenderAll(); }}><Bold size={16} /></IconButton>
+                    <IconButton title="Italic" onClick={() => { activeObj.set("fontStyle", activeObj.fontStyle === "italic" ? "normal" : "italic"); canvas.requestRenderAll(); }}><Italic size={16} /></IconButton>
+                    <IconButton title="Underline" onClick={() => { activeObj.set("underline", !activeObj.underline); canvas.requestRenderAll(); }}><Underline size={16} /></IconButton>
+                    <IconButton title="Uppercase" onClick={() => { activeObj.set("text", (activeObj.text || "").toUpperCase()); canvas.requestRenderAll(); }}><CaseUpper size={16} /></IconButton>
+                  </div>
+
                   <input
                     type="number"
                     min={8}
@@ -1415,8 +1616,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
                     onChange={(e) => {
                       const size = parseInt(e.target.value);
                       if (!isNaN(size)) {
-                        const canvas = canvasRef.current;
-                        const obj = canvas.getActiveObject();
+                        const obj = canvasRef.current?.getActiveObject();
                         if (obj && isText(obj)) {
                           obj.set({ fontSize: size });
                           obj.setCoords();
@@ -1426,13 +1626,12 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
                       }
                     }}
                     className="w-16 p-1 border rounded"
-                    title="Change Font Size"
+                    title="Font Size"
                   />
                   <select
                     value={activeObj.fontFamily || "Arial"}
                     onChange={(e) => {
-                      const canvas = canvasRef.current;
-                      const obj = canvas.getActiveObject();
+                      const obj = canvasRef.current?.getActiveObject();
                       if (obj && isText(obj)) {
                         obj.set({ fontFamily: e.target.value });
                         obj.setCoords();
@@ -1441,7 +1640,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
                       }
                     }}
                     className="p-1 border rounded"
-                    title="Change Font Family"
+                    title="Font Family"
                   >
                     <option value="Arial">Arial</option>
                     <option value="Helvetica">Helvetica</option>
@@ -1450,6 +1649,28 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
                     <option value="Georgia">Georgia</option>
                     <option value="Verdana">Verdana</option>
                   </select>
+
+                  <div className="flex items-center gap-1">
+                    <IconButton title="Align Left" onClick={() => { activeObj.set("textAlign", "left"); canvas.requestRenderAll(); }}><AlignLeft size={16} /></IconButton>
+                    <IconButton title="Align Center" onClick={() => { activeObj.set("textAlign", "center"); canvas.requestRenderAll(); }}><AlignCenter size={16} /></IconButton>
+                    <IconButton title="Align Right" onClick={() => { activeObj.set("textAlign", "right"); canvas.requestRenderAll(); }}><AlignRight size={16} /></IconButton>
+                  </div>
+
+                  <div className="flex items-center gap-1 text-xs">
+                    <label className="ml-2">Spacing</label>
+                    <input
+                      type="range" min={-50} max={200}
+                      value={Math.round((activeObj.charSpacing || 0) / 10)}
+                      onChange={(e) => { activeObj.set("charSpacing", parseInt(e.target.value, 10) * 10); canvas.requestRenderAll(); }}
+                    />
+                    <label className="ml-2">Line</label>
+                    <input
+                      type="range" min={0.8} max={3} step={0.05}
+                      value={activeObj.lineHeight || 1.16}
+                      onChange={(e) => { activeObj.set("lineHeight", parseFloat(e.target.value)); canvas.requestRenderAll(); }}
+                    />
+                  </div>
+
                   <button
                     className="px-2 py-1 rounded border text-xs hover:bg-gray-100"
                     title="Text Shadow"
@@ -1507,6 +1728,16 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
             >
               Fit
             </button>
+
+            {/* Grid toggle */}
+            <button
+              className={`hidden sm:flex items-center gap-1 px-3 py-2 rounded-full ${showGrid ? "bg-indigo-600 text-white" : "bg-white"} border hover:bg-gray-50 text-sm`}
+              onClick={() => setShowGrid(v => !v)}
+              title="Toggle Grid"
+            >
+              <Ruler size={16} /> Grid
+            </button>
+
             {/* Group / Ungroup */}
             <button
               className="hidden sm:flex items-center gap-1 px-3 py-2 rounded-full bg-white border hover:bg-gray-50 text-sm"
@@ -1569,7 +1800,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
               <Download size={18} />
             </button>
 
-            {/* NEW: Print Exports */}
+            {/* Print Exports */}
             <button
               title="Export Single PDF (with bleed/marks)"
               onClick={exportSinglePDF}
@@ -1597,7 +1828,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
               </button>
             )}
 
-            {/* NEW: Bulk multi-page PDF */}
+            {/* Bulk multi-page PDF */}
             {bulkMode && (
               <button
                 title="Download PDF (All)"
@@ -1607,16 +1838,22 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
                 <FileDown size={16} /> Download PDF (All)
               </button>
             )}
-
-
           </div>
         </header>
       )}
 
+      {/* Mobile FAB to toggle tools */}
+      <button
+        onClick={() => setShowMobileTools(v => !v)}
+        className="md:hidden fixed bottom-20 left-4 z-50 rounded-full p-3 shadow bg-indigo-600 text-white"
+        title="Tools"
+        aria-label="Toggle Tools"
+      >
+        <MenuIcon size={20} />
+      </button>
 
-      <div className={`fixed top-16 left-2 z-40 flex-col gap-2 ${showMobileTools ? "flex" : "hidden"} md:flex`}>
-
-
+      {/* LEFT VERTICAL TOOLBAR */}
+      <div className={`fixed top-16 left-2 z-40 flex-col gap-2  "flex" : "hidden"} md:flex`}>
         <button
           title="Choose Template"
           onClick={() => { setRightPanel('templates'); setIsRightbarOpen(true); }}
@@ -1690,6 +1927,27 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
         >
           <ImageIcon size={20} />
         </label>
+
+        {/* Grid fine control (mobile-hidden, desktop visible) */}
+        <div className="hidden md:flex items-center gap-1 p-2 rounded bg-white shadow">
+          <Ruler size={16} />
+          <input
+            type="checkbox"
+            checked={showGrid}
+            onChange={(e) => setShowGrid(e.target.checked)}
+            title="Show Grid"
+          />
+          <input
+            type="number"
+            min={5}
+            max={200}
+            value={gridSize}
+            onChange={(e) => setGridSize(Math.max(5, Math.min(200, parseInt(e.target.value || "20", 10))))}
+            className="w-14 p-1 border rounded text-xs"
+            title="Grid size"
+          />
+        </div>
+
         <UndoRedoControls
           undo={undo}
           redo={redo}
@@ -1697,15 +1955,6 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
           downloadPDF={downloadPDF}
           vertical
         />
-      </div>
-      <div className="fixed bottom-20 right-4 md:hidden z-40">
-        <button
-          onClick={() => setShowMobileTools((v) => !v)}
-          className="p-3 rounded-full bg-blue-600 text-white shadow-lg"
-          title="Tools"
-        >
-          <MenuIcon size={24} />
-        </button>
       </div>
 
       {/* CENTER / Canva-like viewport */}
@@ -1955,9 +2204,17 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
                     <IconButton onClick={cropImage} title="Crop"><Crop size={18} /></IconButton>
 
                     {activeObj?.type === "image" && (
-                      <IconButton onClick={removeSelectedImageBackground} title="Remove Background">
-                        <Scissors size={18} />
-                      </IconButton>
+                      <>
+                        <IconButton onClick={removeSelectedImageBackground} title="Remove Background">
+                          <Scissors size={18} />
+                        </IconButton>
+                        <IconButton
+                          title="Replace Image"
+                          onClick={() => replaceInputRef.current && replaceInputRef.current.click()}
+                        >
+                          <RefreshCw size={18} />
+                        </IconButton>
+                      </>
                     )}
 
                     <IconButton
@@ -2004,6 +2261,33 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
                     )}
                   </div>
 
+                  {/* Image filter sliders */}
+                  {activeObj?.type === "image" && (
+                    <div className="space-y-2 mb-3">
+                      <div className="text-xs font-medium text-gray-600">Image Adjust</div>
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs w-16">Bright</label>
+                        <input type="range" min={-1} max={1} step={0.05} value={imgFilters.brightness}
+                          onChange={(e) => setImgFilters(v => ({ ...v, brightness: parseFloat(e.target.value) }))} />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs w-16">Contrast</label>
+                        <input type="range" min={-1} max={1} step={0.05} value={imgFilters.contrast}
+                          onChange={(e) => setImgFilters(v => ({ ...v, contrast: parseFloat(e.target.value) }))} />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs w-16">Satur.</label>
+                        <input type="range" min={-1} max={1} step={0.05} value={imgFilters.saturation}
+                          onChange={(e) => setImgFilters(v => ({ ...v, saturation: parseFloat(e.target.value) }))} />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button size="small" variant="outlined" onClick={() => setImgFilters({ brightness: 0, contrast: 0, saturation: 0 })}>
+                          Reset
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
                   {activeStudentPhoto && (
                     <Stack direction="row" spacing={1} justifyContent="start" className="mt-3">
                       <Button
@@ -2044,6 +2328,19 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
           )}
         </div>
       </aside>
+
+      {/* hidden input for replace image */}
+      <input
+        ref={replaceInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) replaceActiveImage(file);
+          e.target.value = "";
+        }}
+      />
 
       <BottomNavBar />
 

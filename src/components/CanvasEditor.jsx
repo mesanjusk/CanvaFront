@@ -13,7 +13,7 @@ import { useCanvasTools } from "../hooks/useCanvasTools";
 import { getStoredUser, getStoredInstituteUUID } from "../utils/storageUtils";
 import { Button, Stack, Slider, Switch, FormControlLabel } from "@mui/material";
 import axios from "axios";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { fabric } from "fabric";
 import {
   Menu as MenuIcon,
@@ -191,6 +191,7 @@ const LayersPanel = ({ canvas, onSelect }) => {
 const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   const { templateId: routeId } = useParams();
   const templateId = propTemplateId || routeId;
+  const navigate = useNavigate();
 
   // template-driven size + responsive fit
   const [tplSize, setTplSize] = useState({ w: 400, h: 550 });
@@ -213,6 +214,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   const [activeStudentPhoto, setActiveStudentPhoto] = useState(null);
   const [selectedInstitute, setSelectedInstitute] = useState(null);
   const [showToolbar, setShowToolbar] = useState(false);
+  const [showMobileTools, setShowMobileTools] = useState(false);
 
   // templates (right sidebar)
   const [templates, setTemplates] = useState([]);
@@ -1352,7 +1354,15 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
       {/* TOP BAR */}
       {!hideHeader && (
         <header className="fixed top-0 left-0 right-0 h-14 bg-white border-b z-40 flex items-center justify-between px-3 md:px-4 gap-3">
-          <div className="flex items-center gap-2 overflow-x-auto"></div>
+          <div className="flex items-center gap-2 overflow-x-auto">
+            <button
+              onClick={() => navigate(-1)}
+              className="p-2 rounded hover:bg-gray-100"
+              title="Back"
+            >
+              <ChevronLeft size={20} />
+            </button>
+          </div>
 
           {/* Contextual mini-toolbar (fill/gradient + text effects) */}
           {activeObj && (isText(activeObj) || isShape(activeObj)) && (
@@ -1553,7 +1563,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
       )}
 
 
-      <div className="fixed top-16 left-2 z-40 flex flex-col gap-2">
+      <div className={`fixed top-16 left-2 z-40 flex-col gap-2 ${showMobileTools ? "flex" : "hidden"} md:flex`}>
         <button
           title="Choose Template"
           onClick={() => { setRightPanel('templates'); setIsRightbarOpen(true); }}
@@ -1634,6 +1644,15 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
           downloadPDF={downloadPDF}
           vertical
         />
+      </div>
+      <div className="fixed bottom-20 right-4 md:hidden z-40">
+        <button
+          onClick={() => setShowMobileTools((v) => !v)}
+          className="p-3 rounded-full bg-blue-600 text-white shadow-lg"
+          title="Tools"
+        >
+          <MenuIcon size={24} />
+        </button>
       </div>
 
       {/* CENTER / Canva-like viewport */}
@@ -1974,7 +1993,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
 
       {/* BOTTOM BAR */}
       {showToolbar && (
-        <div className="absolute bottom-2 left-0 right-0 flex justify-center">
+        <div className="absolute bottom-2 left-0 right-0 flex justify-center md:static md:mt-4">
           <BottomToolbar
             alignLeft={alignLeft}
             alignCenter={alignCenter}

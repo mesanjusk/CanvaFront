@@ -40,7 +40,7 @@ const BottomToolbar = ({
   sendToBack,
 }) => {
   return (
-    <div className="fixed bottom-0 w-full bg-white border-t shadow z-30 px-2 py-2 overflow-x-auto scrollbar-thin flex justify-start items-center gap-1 md:hidden">
+    <div className="fixed bottom-0 left-0 right-0 w-full bg-white border-t shadow z-30 px-2 py-2 overflow-x-auto scrollbar-thin flex justify-start items-center gap-1 md:static md:w-auto md:rounded md:border md:shadow-none">
       <ButtonWithTip title="Align Left" onClick={alignLeft} ariaLabel="Align Left">
         <AlignLeftIcon size={22} />
       </ButtonWithTip>

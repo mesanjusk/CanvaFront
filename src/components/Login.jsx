@@ -67,7 +67,7 @@ useEffect(() => {
         );
 
         toast.success(`Welcome, ${user.name}`);
-        navigate(`/${user.username}`);
+        navigate(`/home`);   // ✅ force redirect to home after auto-login
       } else {
         toast.error("Invalid or expired session, please login again");
         navigate("/login");
@@ -78,6 +78,7 @@ useEffect(() => {
       navigate("/login");
     });
 }, [searchParams, navigate]);
+
 
 
   // fetch branding on first load so login page shows correct logo/tagline

@@ -29,6 +29,57 @@ const Login = () => {
     }
   }, [navigate, branding]);
 
+  // ✅ Auto-login if token present in URL 
+useEffect(() => {
+  const token = searchParams.get("token");
+  if (!token) return;
+
+  localStorage.setItem("authToken", token);
+
+  // Verify token with backend
+  axios.post(`https://canvaback.onrender.com/api/auth/verify`, { token })
+    .then(async (res) => {
+      if (res.data.success) {
+        const user = res.data.user;
+        const institute = res.data.institute;
+
+        // Store data in same format your app expects
+        storeUserData({
+          id: user.id,
+          name: user.name,
+          role: user.role,
+          username: user.username,
+        });
+        storeInstituteData({
+          institute_uuid: institute.institute_uuid,
+          institute_name: institute.institute_name,
+          institute_id: institute.institute_id,
+          theme_color: institute.theme_color,
+        });
+
+        // Branding + masters
+        await fetchBranding(institute.institute_uuid, setBranding);
+        await fetchAndStoreMasters();
+
+        document.documentElement.style.setProperty(
+          '--theme-color',
+          institute.theme_color || '#5b5b5b'
+        );
+
+        toast.success(`Welcome, ${user.name}`);
+        navigate(`/${user.username}`);
+      } else {
+        toast.error("Invalid or expired session, please login again");
+        navigate("/login");
+      }
+    })
+    .catch(() => {
+      toast.error("Token verification failed");
+      navigate("/login");
+    });
+}, [searchParams, navigate]);
+
+
   // fetch branding on first load so login page shows correct logo/tagline
   useEffect(() => {
     if (!branding) {

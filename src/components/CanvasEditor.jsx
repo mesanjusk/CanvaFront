@@ -377,6 +377,7 @@ const [showSignature, setShowSignature] = useState(false);
 
   // gallaries (right sidebar)
   const [gallaries, setGallaries] = useState([]);
+  const [activeGallaryId, setActiveGallaryId] = useState(gallaryId || null);
   const [loadingGallary, setLoadingGallary] = useState(false);
 
   // templates (right sidebar)
@@ -857,6 +858,85 @@ const [showSignature, setShowSignature] = useState(false);
     };
     loadGallaries();
   }, []);
+
+  /// helper to load/apply a gallary
+const applyGallaryResponse = useCallback(
+  async (data) => {
+    if (!canvas) return;
+
+    // Clear any old logo/signature first
+    const existingLogo = canvas.getObjects().find((o) => o.customId === "logo");
+    if (existingLogo) canvas.remove(existingLogo);
+
+    const existingSignature = canvas.getObjects().find((o) => o.customId === "signature");
+    if (existingSignature) canvas.remove(existingSignature);
+
+    // Reset toggle states when switching gallary
+    setShowLogo(false);
+    setShowSignature(false);
+
+    // Add logo if gallary has one
+    if (data?.logo) {
+      fabric.Image.fromURL(
+        data.logo,
+        (img) => {
+          img.set({
+            left: 20,
+            top: 20,
+            scaleX: 0.3,
+            scaleY: 0.3,
+          });
+          img.customId = "logo";
+          img.field = "logo";
+          canvas.add(img);
+          canvas.requestRenderAll();
+        },
+        { crossOrigin: "anonymous" }
+      );
+    }
+
+    // Add signature if gallary has one
+    if (data?.signature) {
+      fabric.Image.fromURL(
+        data.signature,
+        (img) => {
+          img.set({
+            left: canvas.width - 150,
+            top: canvas.height - 80,
+            scaleX: 0.3,
+            scaleY: 0.3,
+          });
+          img.customId = "signature";
+          img.field = "signature";
+          canvas.add(img);
+          canvas.requestRenderAll();
+        },
+        { crossOrigin: "anonymous" }
+      );
+    }
+  },
+  [canvas]
+);
+
+
+    const loadGallaryById = useCallback(
+    async (id) => {
+      if (!id) return;
+      setLoadingGallary(true);
+      try {
+        const res = await axios.get(`https://canvaback.onrender.com/api/gallary/${id}`);
+        await applyGallaryResponse(res.data || {});
+        setActiveGallaryId(id);
+        resetHistory();
+        saveHistory();
+      } catch {
+        toast.error("Failed to load gallary");
+      } finally {
+        setLoadingGallary(false);
+      }
+    },
+    [applyGallaryResponse, resetHistory, saveHistory]
+  );
 
   // Templates list (for right sidebar)
   useEffect(() => {

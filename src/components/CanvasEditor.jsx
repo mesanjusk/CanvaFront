@@ -847,6 +847,7 @@ const [showSignature, setShowSignature] = useState(false);
   useEffect(() => {
     const loadGallaries = async () => {
       try {
+        const user = getStoredUser();
         const institute_uuid = user?.institute_uuid || getStoredInstituteUUID();
         const res = await axios.get(`https://canvaback.onrender.com/api/gallary/GetGallaryList/${institute_uuid}`);
         setGallaries(res.data?.data || res.data || []);

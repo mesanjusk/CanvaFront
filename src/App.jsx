@@ -50,6 +50,7 @@ import VideoEditor from './pages/VideoEditor';
 import PrintLayout from './pages/PrintLayout';
 import CanvaHome from './Pages/canvaHome';
 import Subcategory from './Pages/Subcategory';
+import AddGallary from './Pages/addGallary';
 
 export default function App() {
   return (
@@ -103,7 +104,7 @@ export default function App() {
         <Route path="video" element={<VideoEditor />} />
         <Route path="print-layout" element={<PrintLayout />} />
         
-          
+          <Route path="Gallary" element={<AddGallary />} />
           <Route path="addTemplate" element={<AddTemplate />} />
           <Route path="addCategory" element={<AddCategory />} />
           <Route path="addSubcategory" element={<AddSubcategory />} />

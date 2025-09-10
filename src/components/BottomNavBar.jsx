@@ -30,7 +30,7 @@ const BottomNavBar = () => {
         <Bell size={24} />
         <span>Alerts</span>
       </button>
-      <button className="flex flex-col items-center text-gray-600 text-xs">
+      <button className="flex flex-col items-center text-gray-600 text-xs" onClick={() => navigate("/dashboard/Gallary")}>
         <User size={24} />
         <span>Profile</span>
       </button>

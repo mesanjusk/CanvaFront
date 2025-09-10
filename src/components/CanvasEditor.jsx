@@ -243,8 +243,8 @@ const LayersPanel = ({ canvas, onSelect }) => {
 const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   const { templateId: routeId } = useParams();
   const templateId = propTemplateId || routeId;
-  const [showLogo, setShowLogo] = useState(true);
-const [showSignature, setShowSignature] = useState(true);
+  const [showLogo, setShowLogo] = useState(false);
+const [showSignature, setShowSignature] = useState(false);
 
   const navigate = useNavigate();
 
@@ -891,6 +891,10 @@ const [showSignature, setShowSignature] = useState(true);
       } else {
         setTemplateImage(null);
       }
+      // after applying template response (inside applyTemplateResponse or after loadTemplateById finishes)
+setShowLogo(false);
+setShowSignature(false);
+
     },
     [setCanvasSize]
   );
@@ -2154,29 +2158,34 @@ if (showSignature && selectedInstitute?.signature) {
                   {showFilters && (
                     <div className="px-3 pb-3">
 
-                      <label className="block text-xs mb-1 font-semibold">Profile</label>
+                     <div className="mb-2">
+  <div className="text-xs font-medium mb-1">Profile</div>
 
-<div className="flex flex-col gap-2 mb-3">
-  <label className="flex items-center gap-2 text-xs">
-    <input
-      type="checkbox"
-      className="accent-[#25D366]"
-      checked={showLogo}
-      onChange={(e) => setShowLogo(e.target.checked)}
-    />
-    Logo
-  </label>
+  <div className="flex items-center gap-4">
+    <label className="inline-flex items-center gap-2">
+      <input
+        id="logoCheckbox"
+        type="checkbox"
+        checked={showLogo}
+        onChange={(e) => setShowLogo(e.target.checked)}
+        className="accent-[#25D366]"
+      />
+      <span className="text-sm">Logo</span>
+    </label>
 
-  <label className="flex items-center gap-2 text-xs">
-    <input
-      type="checkbox"
-      className="accent-[#25D366]"
-      checked={showSignature}
-      onChange={(e) => setShowSignature(e.target.checked)}
-    />
-    Signature
-  </label>
+    <label className="inline-flex items-center gap-2">
+      <input
+        id="signatureCheckbox"
+        type="checkbox"
+        checked={showSignature}
+        onChange={(e) => setShowSignature(e.target.checked)}
+        className="accent-[#25D366]"
+      />
+      <span className="text-sm">Signature</span>
+    </label>
+  </div>
 </div>
+
 
 
                       <label className="block text-xs mb-1">Course</label>

@@ -243,6 +243,9 @@ const LayersPanel = ({ canvas, onSelect }) => {
 const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   const { templateId: routeId } = useParams();
   const templateId = propTemplateId || routeId;
+  const [showLogo, setShowLogo] = useState(true);
+const [showSignature, setShowSignature] = useState(true);
+
   const navigate = useNavigate();
 
   const isMobile = useMediaQuery("(max-width: 768px)");
@@ -1033,45 +1036,82 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     }
 
     // 4) Institute logo & signature
-    if (selectedInstitute?.logo) {
-      const savedLogo = getSavedProps("logo");
-      safeLoadImage(selectedInstitute.logo, (img) => {
-        if (savedLogo) {
-          const scaleX = savedLogo.width && img.width ? savedLogo.width / img.width : savedLogo.scaleX ?? 1;
-          const scaleY = savedLogo.height && img.height ? savedLogo.height / img.height : savedLogo.scaleY ?? 1;
-          img.set({ left: savedLogo.left ?? 20, top: savedLogo.top ?? 20, scaleX, scaleY, angle: savedLogo.angle ?? 0 });
-        } else {
-          img.scaleToWidth(Math.round(canvas.width * 0.2));
-          img.set({ left: 20, top: 20 });
-        }
-        img.customId = "logo";
-        img.field = "logo";
-        logoRef.current = img;
-        canvas.add(img);
-        img.setCoords();
-        canvas.requestRenderAll();
-      });
-    }
+if (showLogo && selectedInstitute?.logo) {
+  // check if logo already exists
+  let existingLogo = canvas.getObjects().find(obj => obj.customId === "logo");
+  if (!existingLogo) {
+    const savedLogo = getSavedProps("logo");
+    safeLoadImage(selectedInstitute.logo, (img) => {
+      if (savedLogo) {
+        const scaleX = savedLogo.width && img.width ? savedLogo.width / img.width : savedLogo.scaleX ?? 1;
+        const scaleY = savedLogo.height && img.height ? savedLogo.height / img.height : savedLogo.scaleY ?? 1;
+        img.set({
+          left: savedLogo.left ?? 20,
+          top: savedLogo.top ?? 20,
+          scaleX,
+          scaleY,
+          angle: savedLogo.angle ?? 0
+        });
+      } else {
+        img.scaleToWidth(Math.round(canvas.width * 0.2));
+        img.set({ left: 20, top: 20 });
+      }
+      img.customId = "logo";
+      img.field = "logo";
+      logoRef.current = img;
+      canvas.add(img);
+      img.setCoords();
+      canvas.requestRenderAll();
+    });
+  }
+} else {
+  // if user unchecks showLogo, remove from canvas
+  const existingLogo = canvas.getObjects().find(obj => obj.customId === "logo");
+  if (existingLogo) {
+    canvas.remove(existingLogo);
+    logoRef.current = null;
+    canvas.requestRenderAll();
+  }
+}
 
-    if (selectedInstitute?.signature) {
-      const savedSign = getSavedProps("signature");
-      safeLoadImage(selectedInstitute.signature, (img) => {
-        if (savedSign) {
-          const scaleX = savedSign.width && img.width ? savedSign.width / img.width : savedSign.scaleX ?? 1;
-          const scaleY = savedSign.height && img.height ? savedSign.height / img.height : savedSign.scaleY ?? 1;
-          img.set({ left: savedSign.left ?? canvas.width - 150, top: savedSign.top ?? canvas.height - 80, scaleX, scaleY, angle: savedSign.angle ?? 0 });
-        } else {
-          img.scaleToWidth(Math.round(canvas.width * 0.3));
-          img.set({ left: canvas.width - 150, top: canvas.height - 80 });
-        }
-        img.customId = "signature";
-        img.field = "signature";
-        signatureRef.current = img;
-        canvas.add(img);
-        img.setCoords();
-        canvas.requestRenderAll();
-      });
-    }
+if (showSignature && selectedInstitute?.signature) {
+  // check if signature already exists
+  let existingSignature = canvas.getObjects().find(obj => obj.customId === "signature");
+  if (!existingSignature) {
+    const savedSign = getSavedProps("signature");
+    safeLoadImage(selectedInstitute.signature, (img) => {
+      if (savedSign) {
+        const scaleX = savedSign.width && img.width ? savedSign.width / img.width : savedSign.scaleX ?? 1;
+        const scaleY = savedSign.height && img.height ? savedSign.height / img.height : savedSign.scaleY ?? 1;
+        img.set({
+          left: savedSign.left ?? canvas.width - 150,
+          top: savedSign.top ?? canvas.height - 80,
+          scaleX,
+          scaleY,
+          angle: savedSign.angle ?? 0
+        });
+      } else {
+        img.scaleToWidth(Math.round(canvas.width * 0.3));
+        img.set({ left: canvas.width - 150, top: canvas.height - 80 });
+      }
+      img.customId = "signature";
+      img.field = "signature";
+      signatureRef.current = img;
+      canvas.add(img);
+      img.setCoords();
+      canvas.requestRenderAll();
+    });
+  }
+} else {
+  // if user unchecks showSignature, remove from canvas
+  const existingSignature = canvas.getObjects().find(obj => obj.customId === "signature");
+  if (existingSignature) {
+    canvas.remove(existingSignature);
+    signatureRef.current = null;
+    canvas.requestRenderAll();
+  }
+}
+
 
     canvas.requestRenderAll();
   }, [
@@ -2113,6 +2153,32 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
                   </button>
                   {showFilters && (
                     <div className="px-3 pb-3">
+
+                      <label className="block text-xs mb-1 font-semibold">Profile</label>
+
+<div className="flex flex-col gap-2 mb-3">
+  <label className="flex items-center gap-2 text-xs">
+    <input
+      type="checkbox"
+      className="accent-[#25D366]"
+      checked={showLogo}
+      onChange={(e) => setShowLogo(e.target.checked)}
+    />
+    Logo
+  </label>
+
+  <label className="flex items-center gap-2 text-xs">
+    <input
+      type="checkbox"
+      className="accent-[#25D366]"
+      checked={showSignature}
+      onChange={(e) => setShowSignature(e.target.checked)}
+    />
+    Signature
+  </label>
+</div>
+
+
                       <label className="block text-xs mb-1">Course</label>
                       <select
                         className="w-full border rounded px-2 py-1 mb-2"

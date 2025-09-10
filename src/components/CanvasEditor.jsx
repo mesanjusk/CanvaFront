@@ -375,6 +375,10 @@ const [showSignature, setShowSignature] = useState(false);
   const [showToolbar, setShowToolbar] = useState(false);
   const [showMobileTools, setShowMobileTools] = useState(false);
 
+  // gallaries (right sidebar)
+  const [gallaries, setGallaries] = useState([]);
+  const [loadingGallary, setLoadingGallary] = useState(false);
+
   // templates (right sidebar)
   const [templates, setTemplates] = useState([]);
   const [activeTemplateId, setActiveTemplateId] = useState(templateId || null);
@@ -837,6 +841,19 @@ const [showSignature, setShowSignature] = useState(false);
       }
     };
     fetchInstitute();
+  }, []);
+
+  // Gallary list (for right sidebar)
+  useEffect(() => {
+    const loadGallaries = async () => {
+      try {
+        const res = await axios.get(`https://canvaback.onrender.com/api/gallary/GetGallaryList/${institute_uuid}`);
+        setGallaries(res.data?.data || res.data || []);
+      } catch (err) {
+        console.error("Error fetching gallaries:", err);
+      }
+    };
+    loadGallaries();
   }, []);
 
   // Templates list (for right sidebar)
@@ -1903,6 +1920,13 @@ if (showSignature && selectedInstitute?.signature) {
       {/* LEFT VERTICAL TOOLBAR */}
       <div className={`fixed top-16 left-2 z-40 flex-col gap-2  "flex" : "hidden"} md:flex`}>
         <button
+          title="Choose Gallary"
+          onClick={() => { setRightPanel('gallaries'); setIsRightbarOpen(true); }}
+          className="p-2 rounded bg-white shadow hover:bg-blue-100"
+        >
+          <Images size={20} />
+        </button>
+        <button
           title="Choose Template"
           onClick={() => { setRightPanel('templates'); setIsRightbarOpen(true); }}
           className="p-2 rounded bg-white shadow hover:bg-blue-100"
@@ -2086,6 +2110,64 @@ if (showSignature && selectedInstitute?.signature) {
           </button>
         </div>
         <div className="p-3">
+          {rightPanel === "gallaries" && (
+  <Fragment>
+    {loadingGallary && (
+      <div className="text-xs text-gray-500 mb-2">Loading gallary…</div>
+    )}
+    <div className="grid grid-cols-2 gap-3">
+      {gallaries.map((g) => (
+        <div
+          key={g._id || g.Gallary_uuid}
+          className="border rounded overflow-hidden hover:shadow"
+        >
+          <div className="aspect-[4/5] bg-gray-100 flex flex-col items-center justify-center gap-2 p-2">
+            {g.logo ? (
+              <img
+                src={g.logo}
+                alt="Institute Logo"
+                className="w-16 h-16 object-contain border rounded bg-white"
+                crossOrigin="anonymous"
+              />
+            ) : (
+              <span className="text-xs text-gray-400">No Logo</span>
+            )}
+
+            {g.signature ? (
+              <img
+                src={g.signature}
+                alt="Signature"
+                className="w-16 h-16 object-contain border rounded bg-white"
+                crossOrigin="anonymous"
+              />
+            ) : (
+              <span className="text-xs text-gray-400">No Signature</span>
+            )}
+          </div>
+
+          <div className="px-2 py-1 text-xs">
+            <div className="font-medium truncate">
+              {g.institute_uuid || "Unknown Institute"}
+            </div>
+          </div>
+
+          {/* Optional action button */}
+          <button
+            onClick={() => loadGallaryById(g._id || g.Gallary_uuid)}
+            className="w-full text-center text-xs py-1 bg-indigo-50 hover:bg-indigo-100 border-t"
+          >
+            Use This Gallary
+          </button>
+        </div>
+      ))}
+    </div>
+
+    <div className="mt-4 border-t pt-3">
+      <LayersPanel canvas={canvas} onSelect={(o) => setActiveObj(o)} />
+    </div>
+  </Fragment>
+)}
+
           {rightPanel === "templates" && (
             <Fragment>
               {loadingTemplate && (

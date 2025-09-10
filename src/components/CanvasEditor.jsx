@@ -851,7 +851,7 @@ const [showSignature, setShowSignature] = useState(false);
         const user = getStoredUser();
         const institute_uuid = user?.institute_uuid || getStoredInstituteUUID();
         const res = await axios.get(`https://canvaback.onrender.com/api/gallary/GetGallaryList/${institute_uuid}`);
-        setGallaries(res.data?.data || res.data || []);
+        setGallaries(res.data?.result || res.data || []);
       } catch (err) {
         console.error("Error fetching gallaries:", err);
       }
@@ -918,17 +918,22 @@ const applyGallaryResponse = useCallback(
   [canvas]
 );
 
-
     const loadGallaryById = useCallback(
     async (id) => {
       if (!id) return;
       setLoadingGallary(true);
       try {
         const res = await axios.get(`https://canvaback.onrender.com/api/gallary/${id}`);
-        await applyGallaryResponse(res.data || {});
-        setActiveGallaryId(id);
-        resetHistory();
-        saveHistory();
+       const gallary = res.data?.result || res.data;
+
+      // Reset toggles when switching gallary
+      setShowLogo(false);
+      setShowSignature(false);
+
+      await applyGallaryResponse(gallary);
+      setActiveGallaryId(id);
+      resetHistory();
+      saveHistory();
       } catch {
         toast.error("Failed to load gallary");
       } finally {
@@ -2229,12 +2234,6 @@ if (showSignature && selectedInstitute?.signature) {
             )}
           </div>
 
-          <div className="px-2 py-1 text-xs">
-            <div className="font-medium truncate">
-              {g.institute_uuid || "Unknown Institute"}
-            </div>
-          </div>
-
           {/* Optional action button */}
           <button
             onClick={() => loadGallaryById(g._id || g.Gallary_uuid)}
@@ -2587,7 +2586,7 @@ if (showSignature && selectedInstitute?.signature) {
         }}
       />
 
-      {isMobile && <BottomNavBar />}
+     <BottomNavBar />
 
     </div>
   );

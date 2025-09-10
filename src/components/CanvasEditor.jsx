@@ -1131,6 +1131,8 @@ if (showSignature && selectedInstitute?.signature) {
     bulkList,
     bulkIndex,
     filteredStudents,
+    showLogo,
+    showSignature
   ]);
 
   /* ============================= Canvas events ============================ */

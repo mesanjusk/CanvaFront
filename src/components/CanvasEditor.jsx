@@ -2101,7 +2101,7 @@ if (showSignature && selectedInstitute?.signature) {
             min={5}
             max={200}
             value={gridSize}
-            onChange={(e) => setGridSize(Math.max(5, Math.min(200, parseInt(e.target.value || "20", 10))))}
+            onChange={(e) => setGridSize(Math.max(5, Math.min(200, parseInt(e.target.value || 10))))}
             className="w-14 p-1 border rounded text-xs"
             title="Grid size"
           />

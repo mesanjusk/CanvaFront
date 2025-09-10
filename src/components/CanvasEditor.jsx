@@ -377,7 +377,7 @@ const [showSignature, setShowSignature] = useState(false);
 
   // gallaries (right sidebar)
   const [gallaries, setGallaries] = useState([]);
-  const [activeGallaryId, setActiveGallaryId] = useState(gallaryId || null);
+  const [activeGallaryId, setActiveGallaryId] = useState(null);
   const [loadingGallary, setLoadingGallary] = useState(false);
 
   // templates (right sidebar)

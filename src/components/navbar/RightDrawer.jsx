@@ -34,6 +34,7 @@ const RightDrawer = ({
                 { path: '/dashboard/allexams', label: 'Manage Exams', icon: <EventNoteIcon fontSize="small" /> },
                 { path: '/dashboard/education', label: 'Education', icon: <SchoolIcon fontSize="small" /> },
                 { path: '/dashboard/exam', label: 'Exam', icon: <EventNoteIcon fontSize="small" /> },
+                { path: '/dashboard/addTemplate', label: 'Template', icon: <EventNoteIcon fontSize="small" /> },
               ].map((item) => (
                 <div
                   key={item.path}

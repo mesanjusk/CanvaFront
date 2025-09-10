@@ -26,10 +26,12 @@ const AddGallary = () => {
   const [editPreviewLogo, setEditPreviewLogo] = useState(null);
   const [editPreviewSignature, setEditPreviewSignature] = useState(null);
 
+  const institute_uuid = localStorage.getItem("institute_uuid");
+
   // ✅ Fetch Gallaries
   const fetchGallaries = async () => {
     try {
-      const res = await axios.get(`${API_URL}/GetGallaryList/12345`); // pass institute_id dynamically
+      const res = await axios.get(`${API_URL}/GetGallaryList/${institute_uuid}`); 
       const gallaryList = Array.isArray(res.data?.result) ? res.data.result : [];
       setGallaries(gallaryList);
     } catch {
@@ -75,7 +77,7 @@ const AddGallary = () => {
     const formData = new FormData();
     formData.append('logo', logo);
     formData.append('signature', signature);
-    formData.append('institute_uuid', '12345'); // pass dynamically
+    formData.append('institute_uuid', institute_uuid); 
 
     try {
       await axios.post(API_URL, formData);
@@ -104,7 +106,7 @@ const AddGallary = () => {
     const formData = new FormData();
     if (editLogo) formData.append('logo', editLogo);
     if (editSignature) formData.append('signature', editSignature);
-    formData.append('institute_uuid', '12345'); // pass dynamically
+    formData.append('institute_uuid', institute_uuid); 
 
     try {
       await axios.put(`${API_URL}/${editId}`, formData);

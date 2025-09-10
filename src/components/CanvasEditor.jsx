@@ -848,6 +848,7 @@ const [showSignature, setShowSignature] = useState(false);
     const loadGallaries = async () => {
       try {
         const res = await axios.get(`https://canvaback.onrender.com/api/gallary/GetGallaryList/${institute_uuid}`);
+        console.log("Gallary API response:", res.data);
         setGallaries(res.data?.data || res.data || []);
       } catch (err) {
         console.error("Error fetching gallaries:", err);

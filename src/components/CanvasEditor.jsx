@@ -2090,7 +2090,9 @@ if (showSignature && selectedInstitute?.signature) {
       >
         <div className="p-3 border-b flex items-center justify-between">
           <div className="text-sm font-semibold">
-            {rightPanel === "templates"
+            {rightPanel === "gallaries"
+              ? "Gallary"
+              : rightPanel === "templates"
               ? "Templates"
               : rightPanel === "bulk"
               ? "Bulk Settings"

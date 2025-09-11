@@ -2096,15 +2096,6 @@ if (showSignature && selectedInstitute?.signature) {
             onChange={(e) => setShowGrid(e.target.checked)}
             title="Show Grid"
           />
-          <input
-            type="number"
-            min={5}
-            max={200}
-            value={gridSize}
-            onChange={(e) => setGridSize(Math.max(5, Math.min(200, parseInt(e.target.value || 10))))}
-            className="w-14 p-1 border rounded text-xs"
-            title="Grid size"
-          />
         </div>
 
         <UndoRedoControls
@@ -2199,48 +2190,31 @@ if (showSignature && selectedInstitute?.signature) {
           </button>
         </div>
         <div className="p-3">
-          {rightPanel === "gallaries" && (
+         {rightPanel === "gallaries" && (
   <Fragment>
     {loadingGallary && (
       <div className="text-xs text-gray-500 mb-2">Loading gallary…</div>
     )}
+
     <div className="grid grid-cols-2 gap-3">
       {gallaries.map((g) => (
         <div
           key={g._id || g.Gallary_uuid}
-          className="border rounded overflow-hidden hover:shadow"
+          className="border rounded overflow-hidden hover:shadow cursor-pointer"
+          onClick={() => loadGallaryById(g._id || g.Gallary_uuid)}
         >
           <div className="aspect-[4/5] bg-gray-100 flex flex-col items-center justify-center gap-2 p-2">
-            {g.logo ? (
+            {g.image ? (
               <img
-                src={g.logo}
-                alt="Institute Logo"
-                className="w-16 h-16 object-contain border rounded bg-white"
+                src={g.image}
+                alt="Gallary"
+                className="w-24 h-24 object-contain border rounded bg-white"
                 crossOrigin="anonymous"
               />
             ) : (
-              <span className="text-xs text-gray-400">No Logo</span>
-            )}
-
-            {g.signature ? (
-              <img
-                src={g.signature}
-                alt="Signature"
-                className="w-16 h-16 object-contain border rounded bg-white"
-                crossOrigin="anonymous"
-              />
-            ) : (
-              <span className="text-xs text-gray-400">No Signature</span>
+              <span className="text-xs text-gray-400">No Image</span>
             )}
           </div>
-
-          {/* Optional action button */}
-          <button
-            onClick={() => loadGallaryById(g._id || g.Gallary_uuid)}
-            className="w-full text-center text-xs py-1 bg-indigo-50 hover:bg-indigo-100 border-t"
-          >
-            Use This Gallary
-          </button>
         </div>
       ))}
     </div>
@@ -2250,6 +2224,7 @@ if (showSignature && selectedInstitute?.signature) {
     </div>
   </Fragment>
 )}
+
 
           {rightPanel === "templates" && (
             <Fragment>
@@ -2586,7 +2561,7 @@ if (showSignature && selectedInstitute?.signature) {
         }}
       />
 
-     <BottomNavBar />
+     {isMobile && <BottomNavBar />}
 
     </div>
   );

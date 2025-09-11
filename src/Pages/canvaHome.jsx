@@ -19,7 +19,7 @@ export default function CanvaHome() {
       </section>
       <AllCategory />
 
-      {isMobile && <BottomNavBar />}
+      <BottomNavBar />
     </div>
   );
 }

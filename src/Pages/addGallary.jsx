@@ -1,242 +1,170 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import toast from 'react-hot-toast';
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import toast from "react-hot-toast";
 
-const API_URL = 'https://canvaback.onrender.com/api/gallary';
+const API_URL = "https://canvaback.onrender.com/api/gallary";
 
-const AddGallary = () => {
+const AddGallary = ({ onImageSelect }) => {
   const [gallaries, setGallaries] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
-
-  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
-  const [modalImageSrc, setModalImageSrc] = useState(null);
-
-  // Create Modal
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [logo, setLogo] = useState(null);
-  const [signature, setSignature] = useState(null);
-  const [previewLogo, setPreviewLogo] = useState(null);
-  const [previewSignature, setPreviewSignature] = useState(null);
-
-  // Edit Modal
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editId, setEditId] = useState(null);
-  const [editLogo, setEditLogo] = useState(null);
-  const [editSignature, setEditSignature] = useState(null);
-  const [editPreviewLogo, setEditPreviewLogo] = useState(null);
-  const [editPreviewSignature, setEditPreviewSignature] = useState(null);
+
+  const [imageFile, setImageFile] = useState(null);
+  const [preview, setPreview] = useState(null);
 
   const institute_uuid = localStorage.getItem("institute_uuid");
 
-  // ✅ Fetch Gallaries
+  // Fetch list
   const fetchGallaries = async () => {
     try {
-      const res = await axios.get(`${API_URL}/GetGallaryList/${institute_uuid}`); 
-      const gallaryList = Array.isArray(res.data?.result) ? res.data.result : [];
-      setGallaries(gallaryList);
+      const res = await axios.get(
+        `${API_URL}/GetGallaryList/${institute_uuid}`
+      );
+      setGallaries(Array.isArray(res.data?.result) ? res.data.result : []);
     } catch {
-      toast.error('Failed to fetch gallaries.');
+      toast.error("Failed to fetch gallary list");
     }
   };
-
   useEffect(() => {
     fetchGallaries();
   }, []);
 
-  // ✅ File Change Preview
-  const handleFileChange = (e, type, mode = 'create') => {
+  const handleFileChange = (e) => {
     const file = e.target.files[0];
+    if (!file) return;
+    setImageFile(file);
     const reader = new FileReader();
-    reader.onloadend = () => {
-      if (mode === 'create') {
-        if (type === 'logo') {
-          setLogo(file);
-          setPreviewLogo(reader.result);
-        } else {
-          setSignature(file);
-          setPreviewSignature(reader.result);
-        }
-      } else {
-        if (type === 'logo') {
-          setEditLogo(file);
-          setEditPreviewLogo(reader.result);
-        } else {
-          setEditSignature(file);
-          setEditPreviewSignature(reader.result);
-        }
-      }
-    };
-    if (file) reader.readAsDataURL(file);
+    reader.onloadend = () => setPreview(reader.result);
+    reader.readAsDataURL(file);
   };
 
-  // ✅ Create Gallary
-  const handleCreateSubmit = async (e) => {
+  // Create new record
+  const handleCreate = async (e) => {
     e.preventDefault();
-    if (!logo || !signature) return toast.error('Logo and Signature required.');
-
+    if (!imageFile) return toast.error("Select an image first");
     const formData = new FormData();
-    formData.append('logo', logo);
-    formData.append('signature', signature);
-    formData.append('institute_uuid', institute_uuid); 
+    formData.append("image", imageFile);
+    formData.append("institute_uuid", institute_uuid);
 
     try {
       await axios.post(API_URL, formData);
-      toast.success('Gallary created.');
+      toast.success("Image uploaded");
       setIsCreateModalOpen(false);
-      setLogo(null);
-      setSignature(null);
+      setImageFile(null);
+      setPreview(null);
       fetchGallaries();
     } catch {
-      toast.error('Upload failed.');
+      toast.error("Upload failed");
     }
   };
 
-  // ✅ Open Edit Modal
-  const openEditModal = (g) => {
+  // Edit record
+  const openEdit = (g) => {
     setEditId(g._id);
-    setEditPreviewLogo(g.logo);
-    setEditPreviewSignature(g.signature);
-    setEditLogo(null);
-    setEditSignature(null);
+    setPreview(g.image);
+    setImageFile(null);
     setIsEditModalOpen(true);
   };
 
-  // ✅ Edit Gallary
-  const handleEditSubmit = async () => {
+  const handleEdit = async () => {
+    if (!imageFile) return toast.error("Choose a new image");
     const formData = new FormData();
-    if (editLogo) formData.append('logo', editLogo);
-    if (editSignature) formData.append('signature', editSignature);
-    formData.append('institute_uuid', institute_uuid); 
+    formData.append("image", imageFile);
+    formData.append("institute_uuid", institute_uuid);
 
     try {
       await axios.put(`${API_URL}/${editId}`, formData);
-      toast.success('Gallary updated.');
+      toast.success("Image updated");
       setIsEditModalOpen(false);
+      setImageFile(null);
+      setPreview(null);
       fetchGallaries();
     } catch {
-      toast.error('Update failed.');
+      toast.error("Update failed");
     }
   };
 
-  // ✅ Delete Gallary
   const handleDelete = async (id) => {
-    if (!window.confirm('Delete this gallary?')) return;
+    if (!window.confirm("Delete this image?")) return;
     try {
       await axios.delete(`${API_URL}/${id}`);
-      toast.success('Deleted');
+      toast.success("Deleted");
       fetchGallaries();
     } catch {
-      toast.error('Delete failed');
+      toast.error("Delete failed");
     }
   };
 
-  const openImageModal = (src) => {
-    setModalImageSrc(src);
-    setIsImageModalOpen(true);
+  // When user clicks an image for template use
+  const useImage = (src) => {
+    if (onImageSelect) onImageSelect(src);
+    toast.success("Image selected for template");
   };
 
   return (
     <div className="max-w-4xl mx-auto p-4">
-      <h2 className="text-2xl font-bold mb-6 text-center">Gallary</h2>
+      <h2 className="text-2xl font-bold mb-6 text-center">Gallery</h2>
 
-      <div className="flex items-center gap-4 mb-4">
-        <input
-          type="text"
-          placeholder="Search..."
-          className="flex-1 p-2 border border-gray-300 rounded-md"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-        <button
-          onClick={() => setIsCreateModalOpen(true)}
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-        >
-          + New Gallary
-        </button>
+      <button
+        onClick={() => setIsCreateModalOpen(true)}
+        className="mb-6 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+      >
+        + New Image
+      </button>
+
+      {/* Grid of images */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        {gallaries.map((g) => (
+          <div
+            key={g._id || g.Gallary_uuid}
+            className="border rounded overflow-hidden group relative"
+          >
+            <img
+              src={g.image}
+              alt="Gallery"
+              className="w-full h-48 object-cover cursor-pointer group-hover:scale-105 transition-transform"
+              onClick={() => useImage(g.image)}
+              crossOrigin="anonymous"
+            />
+          
+          </div>
+        ))}
       </div>
-
-      <table className="w-full border border-gray-300 rounded-md">
-        <thead className="bg-gray-100">
-          <tr>
-            <th className="p-2 border">Logo</th>
-            <th className="p-2 border">Signature</th>
-            <th className="p-2 border">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {gallaries
-            .filter((g) =>
-              [g.logo, g.signature].some((img) =>
-                img?.toLowerCase().includes(searchTerm.toLowerCase())
-              )
-            )
-            .map((g) => (
-              <tr key={g._id} className="text-center">
-                <td className="p-2 border">
-                  <img
-                    src={g.logo}
-                    className="h-12 mx-auto cursor-pointer"
-                    onClick={() => openImageModal(g.logo)}
-                  />
-                </td>
-                <td className="p-2 border">
-                  <img
-                    src={g.signature}
-                    className="h-12 mx-auto cursor-pointer"
-                    onClick={() => openImageModal(g.signature)}
-                  />
-                </td>
-                <td className="p-2 border space-x-2">
-                  <button
-                    onClick={() => openEditModal(g)}
-                    className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDelete(g._id)}
-                    className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-        </tbody>
-      </table>
-
-      {/* Image Modal */}
-      {isImageModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50"
-          onClick={() => setIsImageModalOpen(false)}>
-          <img
-            src={modalImageSrc}
-            alt="Full"
-            className="max-h-[90vh] max-w-[90vw] rounded shadow-lg"
-            onClick={(e) => e.stopPropagation()}
-          />
-          <button className="absolute top-4 right-4 text-white text-3xl font-bold">&times;</button>
-        </div>
-      )}
 
       {/* Create Modal */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-lg">
-            <h3 className="text-xl font-semibold mb-4">New Gallary</h3>
-            <form onSubmit={handleCreateSubmit} className="space-y-4">
-              <input type="file" accept="image/*"
-                onChange={(e) => handleFileChange(e, 'logo', 'create')}
-                className="w-full p-2 border border-gray-300 rounded-md" />
-              {previewLogo && <img src={previewLogo} alt="Preview Logo" className="h-24 rounded border" />}
-              <input type="file" accept="image/*"
-                onChange={(e) => handleFileChange(e, 'signature', 'create')}
-                className="w-full p-2 border border-gray-300 rounded-md" />
-              {previewSignature && <img src={previewSignature} alt="Preview Signature" className="h-24 rounded border" />}
-              <div className="flex justify-end space-x-4">
-                <button type="button" onClick={() => setIsCreateModalOpen(false)}
-                  className="px-4 py-2 border rounded hover:bg-gray-100">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Upload</button>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-white rounded p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Add Image</h3>
+            <form onSubmit={handleCreate} className="space-y-4">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="w-full border p-2 rounded"
+              />
+              {preview && (
+                <img
+                  src={preview}
+                  alt="Preview"
+                  className="h-40 object-contain rounded"
+                />
+              )}
+              <div className="flex justify-end gap-4">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateModalOpen(false)}
+                  className="px-4 py-2 border rounded hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  Upload
+                </button>
               </div>
             </form>
           </div>
@@ -245,22 +173,35 @@ const AddGallary = () => {
 
       {/* Edit Modal */}
       {isEditModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-lg">
-            <h3 className="text-xl font-semibold mb-4">Edit Gallary</h3>
-            <input type="file" accept="image/*"
-              onChange={(e) => handleFileChange(e, 'logo', 'edit')}
-              className="w-full p-2 border border-gray-300 rounded-md mb-2" />
-            {editPreviewLogo && <img src={editPreviewLogo} alt="Edit Logo" className="h-24 rounded border mb-2" />}
-            <input type="file" accept="image/*"
-              onChange={(e) => handleFileChange(e, 'signature', 'edit')}
-              className="w-full p-2 border border-gray-300 rounded-md mb-2" />
-            {editPreviewSignature && <img src={editPreviewSignature} alt="Edit Signature" className="h-24 rounded border mb-2" />}
-            <div className="flex justify-end space-x-4">
-              <button onClick={() => setIsEditModalOpen(false)}
-                className="px-4 py-2 border rounded hover:bg-gray-100">Cancel</button>
-              <button onClick={handleEditSubmit}
-                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Save</button>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-white rounded p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Edit Image</h3>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="w-full border p-2 rounded"
+            />
+            {preview && (
+              <img
+                src={preview}
+                alt="Preview"
+                className="h-40 object-contain rounded mt-2"
+              />
+            )}
+            <div className="flex justify-end gap-4 mt-4">
+              <button
+                onClick={() => setIsEditModalOpen(false)}
+                className="px-4 py-2 border rounded hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleEdit}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Save
+              </button>
             </div>
           </div>
         </div>

@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { downloadPDF as pdfExporter, downloadHighRes as highResExporter } from "../utils/downloadUtils";
 
 export function useCanvasEditor(canvasRef, canvasWidth, canvasHeight) {
@@ -28,19 +28,25 @@ export function useCanvasEditor(canvasRef, canvasWidth, canvasHeight) {
 
 
   
+const historyRaf = useRef(null);
+
 const saveHistory = () => {
   if (!canvas) return;
-  sanitizeTextStyles();
+  if (historyRaf.current) cancelAnimationFrame(historyRaf.current);
+  historyRaf.current = requestAnimationFrame(() => {
+    historyRaf.current = null;
+    sanitizeTextStyles();
 
-  const json = canvas.toJSON();
+    const json = canvas.toJSON();
 
-  setHistory((prev) => {
-    // Trim forward history if we undo then add new changes
-    const updated = prev.slice(0, historyIndex + 1);
-    return [...updated, json];
+    setHistory((prev) => {
+      // Trim forward history if we undo then add new changes
+      const updated = prev.slice(0, historyIndex + 1);
+      return [...updated, json];
+    });
+
+    setHistoryIndex((i) => i + 1);
   });
-
-  setHistoryIndex((i) => i + 1);
 };
 
   const resetHistory = () => {

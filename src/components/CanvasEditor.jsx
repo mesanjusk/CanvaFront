@@ -135,36 +135,97 @@ const useSmartGuides = (canvasRef, enable = true, tolerance = 8) => {
 
 /* ====== Object-to-object snapping (edges/centers) ====== */
 const useObjectSnapping = (canvas, enable = true, tolerance = 6) => {
+  const vGuide = useRef(null);
+  const hGuide = useRef(null);
+
   useEffect(() => {
     if (!canvas || !enable) return;
+
+    const prevOverlay = canvas._renderOverlay;
+    canvas._renderOverlay = function (ctx) {
+      if (typeof prevOverlay === "function") prevOverlay.call(this, ctx);
+      ctx.save();
+      ctx.strokeStyle = "rgba(99,102,241,0.85)";
+      ctx.lineWidth = 1;
+      if (vGuide.current !== null) {
+        ctx.beginPath();
+        ctx.moveTo(vGuide.current + 0.5, 0);
+        ctx.lineTo(vGuide.current + 0.5, canvas.getHeight());
+        ctx.stroke();
+      }
+      if (hGuide.current !== null) {
+        ctx.beginPath();
+        ctx.moveTo(0, hGuide.current + 0.5);
+        ctx.lineTo(canvas.getWidth(), hGuide.current + 0.5);
+        ctx.stroke();
+      }
+      ctx.restore();
+    };
+
     const onMove = (e) => {
       const t = e.target;
       if (!t) return;
-      const objs = canvas.getObjects().filter(o => o !== t && !o.isEditing);
+      const objs = canvas.getObjects().filter((o) => o !== t && !o.isEditing);
       const tRect = t.getBoundingRect(true, true);
       const tCx = tRect.left + tRect.width / 2;
       const tCy = tRect.top + tRect.height / 2;
 
-      let snappedX = null, snappedY = null;
-      objs.forEach(o => {
+      let snappedX = null,
+        snappedY = null,
+        guideX = null,
+        guideY = null;
+      objs.forEach((o) => {
         const r = o.getBoundingRect(true, true);
         const oCx = r.left + r.width / 2;
         const oCy = r.top + r.height / 2;
         // centers
-        if (Math.abs(tCx - oCx) <= tolerance) snappedX = oCx - tRect.width / 2;
-        if (Math.abs(tCy - oCy) <= tolerance) snappedY = oCy - tRect.height / 2;
+        if (Math.abs(tCx - oCx) <= tolerance) {
+          snappedX = oCx - tRect.width / 2;
+          guideX = oCx;
+        }
+        if (Math.abs(tCy - oCy) <= tolerance) {
+          snappedY = oCy - tRect.height / 2;
+          guideY = oCy;
+        }
         // left/right edges
-        if (Math.abs(tRect.left - r.left) <= tolerance) snappedX = r.left;
-        if (Math.abs((tRect.left + tRect.width) - (r.left + r.width)) <= tolerance) snappedX = r.left + r.width - tRect.width;
+        if (Math.abs(tRect.left - r.left) <= tolerance) {
+          snappedX = r.left;
+          guideX = r.left;
+        }
+        if (Math.abs(tRect.left + tRect.width - (r.left + r.width)) <= tolerance) {
+          snappedX = r.left + r.width - tRect.width;
+          guideX = r.left + r.width;
+        }
         // top/bottom edges
-        if (Math.abs(tRect.top - r.top) <= tolerance) snappedY = r.top;
-        if (Math.abs((tRect.top + tRect.height) - (r.top + r.height)) <= tolerance) snappedY = r.top + r.height - tRect.height;
+        if (Math.abs(tRect.top - r.top) <= tolerance) {
+          snappedY = r.top;
+          guideY = r.top;
+        }
+        if (Math.abs(tRect.top + tRect.height - (r.top + r.height)) <= tolerance) {
+          snappedY = r.top + r.height - tRect.height;
+          guideY = r.top + r.height;
+        }
       });
       if (snappedX !== null) t.set({ left: snappedX });
       if (snappedY !== null) t.set({ top: snappedY });
+      vGuide.current = guideX;
+      hGuide.current = guideY;
+      canvas.requestRenderAll();
     };
+
+    const clearGuides = () => {
+      vGuide.current = null;
+      hGuide.current = null;
+      canvas.requestRenderAll();
+    };
+
     canvas.on("object:moving", onMove);
-    return () => canvas.off("object:moving", onMove);
+    canvas.on("mouse:up", clearGuides);
+    return () => {
+      canvas.off("object:moving", onMove);
+      canvas.off("mouse:up", clearGuides);
+      canvas._renderOverlay = prevOverlay;
+    };
   }, [canvas, enable, tolerance]);
 };
 
@@ -281,6 +342,18 @@ const [showSignature, setShowSignature] = useState(false);
     setCanvasSize,
   } = useCanvasTools({ width: tplSize.w, height: tplSize.h });
 
+  const handleUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setCropSrc(reader.result);
+        cropCallbackRef.current = (croppedUrl) => addImage(croppedUrl);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const {
     activeObj,
     setActiveObj,
@@ -374,6 +447,12 @@ const [showSignature, setShowSignature] = useState(false);
   const [selectedInstitute, setSelectedInstitute] = useState(null);
   const [showToolbar, setShowToolbar] = useState(false);
   const [showMobileTools, setShowMobileTools] = useState(false);
+
+  // Helper to close the mobile FAB after performing an action
+  const withFabClose = (fn) => (...args) => {
+    fn(...args);
+    if (isMobile) setShowMobileTools(false);
+  };
 
   // gallaries (right sidebar)
   const [gallaries, setGallaries] = useState([]);
@@ -2011,7 +2090,7 @@ if (showSignature && selectedInstitute?.signature) {
       </button>
 
       {/* LEFT VERTICAL TOOLBAR */}
-      <div className={`fixed top-16 left-2 z-40 flex-col gap-2  "flex" : "hidden"} md:flex`}>
+      <div className={`fixed top-16 left-2 z-40 flex-col gap-2 ${showMobileTools ? "flex" : "hidden"} md:flex`}>
         <button
           title="Choose Gallary"
           onClick={() => { setRightPanel('gallaries'); setIsRightbarOpen(true); }}
@@ -2049,21 +2128,21 @@ if (showSignature && selectedInstitute?.signature) {
         </button>
         <button
           title="Add Text"
-          onClick={addText}
+          onClick={withFabClose(addText)}
           className="p-2 rounded bg-white shadow hover:bg-blue-100"
         >
           <Type size={20} />
         </button>
         <button
           title="Add Rectangle"
-          onClick={addRect}
+          onClick={withFabClose(addRect)}
           className="p-2 rounded bg-white shadow hover:bg-blue-100"
         >
           <Square size={20} />
         </button>
         <button
           title="Add Circle"
-          onClick={addCircle}
+          onClick={withFabClose(addCircle)}
           className="p-2 rounded bg-white shadow hover:bg-blue-100"
         >
           <Circle size={20} />
@@ -2073,20 +2152,11 @@ if (showSignature && selectedInstitute?.signature) {
           accept="image/*"
           id="upload-image"
           style={{ display: "none" }}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) {
-              const reader = new FileReader();
-              reader.onload = () => {
-                setCropSrc(reader.result);
-                cropCallbackRef.current = (croppedUrl) => addImage(croppedUrl);
-              };
-              reader.readAsDataURL(file);
-            }
-          }}
+          onChange={handleUpload}
         />
         <label
           htmlFor="upload-image"
+          onClick={withFabClose(() => {})}
           className="p-2 rounded bg-white shadow hover:bg-blue-100 cursor-pointer"
           title="Upload Image"
         >

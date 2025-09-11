@@ -71,7 +71,6 @@ import { PRESET_SIZES, mmToPx, pxToMm, drawCropMarks, drawRegistrationMark } fro
 import { removeBackground } from "../utils/backgroundUtils";
 import SelectionToolbar from "./SelectionToolbar";
 import BottomNavBar from "./BottomNavBar";
-import useMediaQuery from "../hooks/useMediaQuery";
 
 /* ===================== Helpers ===================== */
 const isText = (o) => o && (o.type === "text" || o.type === "i-text");
@@ -248,7 +247,6 @@ const [showSignature, setShowSignature] = useState(false);
 
   const navigate = useNavigate();
 
-  const isMobile = useMediaQuery("(max-width: 768px)");
 
   // template-driven size + responsive fit
   const [tplSize, setTplSize] = useState(() => {
@@ -1949,6 +1947,15 @@ if (showSignature && selectedInstitute?.signature) {
               </button>
             )}
 
+            {/* Template selection */}
+            <button
+              title="Choose Template"
+              onClick={() => { setRightPanel('templates'); setIsRightbarOpen(true); }}
+              className="hidden sm:flex items-center gap-1 px-3 py-2 rounded-full bg-white border hover:bg-gray-50 text-sm"
+            >
+              <Images size={16} /> Template
+            </button>
+
             {/* Download current */}
             <button
               title="Download PNG"
@@ -1958,13 +1965,13 @@ if (showSignature && selectedInstitute?.signature) {
               <Download size={18} />
             </button>
 
-            {/* Print Exports */}
+            {/* Export PDF */}
             <button
-              title="Export Single PDF (with bleed/marks)"
+              title="Export PDF"
               onClick={exportSinglePDF}
-              className="hidden sm:flex items-center gap-1 px-3 py-2 rounded-full bg-purple-600 text-white shadow hover:bg-purple-700 text-sm"
+              className="p-2 rounded-full bg-purple-600 text-white shadow hover:bg-purple-700"
             >
-              <FileDown size={16} /> Single PDF
+              <FileDown size={18} />
             </button>
             <button
               title="Export Imposed Sheet PDF"
@@ -2020,13 +2027,6 @@ if (showSignature && selectedInstitute?.signature) {
           <Images size={20} />
         </button>
         <button
-          title="Choose Template"
-          onClick={() => { setRightPanel('templates'); setIsRightbarOpen(true); }}
-          className="p-2 rounded bg-white shadow hover:bg-blue-100"
-        >
-          <Images size={20} />
-        </button>
-        <button
           title="Bulk Settings"
           onClick={() => { setRightPanel('bulk'); setIsRightbarOpen(true); }}
           className="p-2 rounded bg-white shadow hover:bg-blue-100"
@@ -2039,13 +2039,6 @@ if (showSignature && selectedInstitute?.signature) {
           className="p-2 rounded bg-white shadow hover:bg-blue-100"
         >
           <LayoutIcon size={20} />
-        </button>
-        <button
-          title="Selected Object"
-          onClick={() => { setRightPanel('object'); setIsRightbarOpen(true); }}
-          className="p-2 rounded bg-white shadow hover:bg-blue-100"
-        >
-          <Move size={20} />
         </button>
         <button
           title="Add Text"
@@ -2561,7 +2554,7 @@ if (showSignature && selectedInstitute?.signature) {
         }}
       />
 
-     {isMobile && <BottomNavBar />}
+     <BottomNavBar />
 
     </div>
   );

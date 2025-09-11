@@ -9,7 +9,7 @@ const BottomNavBar = () => {
       aria-label="Primary"
       className="fixed bottom-0 left-0 right-0 h-14 bg-white border-t shadow-md z-40 flex justify-around items-center"
     >
-      <button className="flex flex-col items-center text-gray-600 text-xs">
+      <button className="flex flex-col items-center text-gray-600 text-xs" onClick={() => navigate("/home")}>
         <Home size={24} />
         <span>Home</span>
       </button>

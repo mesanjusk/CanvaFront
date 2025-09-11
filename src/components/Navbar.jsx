@@ -116,7 +116,7 @@ useEffect(() => {
           </button>
           <div className="leading-tight">
             <button
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate('/home')}
               className="font-bold text-lg text-blue-600 hover:underline focus:outline-none"
             >
               {instituteTitle}

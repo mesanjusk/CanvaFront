@@ -97,7 +97,7 @@ const AddGallary = ({ onImageSelect }) => {
   };
 
   // When user clicks an image for template use
-  const useImage = (src) => {
+  const handleImageSelect = (src) => {
     if (onImageSelect) onImageSelect(src);
     toast.success("Image selected for template");
   };
@@ -124,7 +124,7 @@ const AddGallary = ({ onImageSelect }) => {
               src={g.image}
               alt="Gallery"
               className="w-full h-48 object-cover cursor-pointer group-hover:scale-105 transition-transform"
-              onClick={() => useImage(g.image)}
+              onClick={() => handleImageSelect(g.image)}
               crossOrigin="anonymous"
             />
           

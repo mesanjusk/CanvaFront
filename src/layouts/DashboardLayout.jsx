@@ -3,8 +3,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import Navbar from '../components/Navbar';
-import Footer from '../components/Footer';
 import FloatingButtons from "./floatingButton";
+import BottomNavBar from '../components/BottomNavBar';
 
 // Removed unused imports admission, enquiry, BASE_URL
 
@@ -35,7 +35,7 @@ export default function DashboardLayout() {
         </div>
         <FloatingButtons buttonType="bars" buttonsList={buttonsList} direction="up" />
       </div>
-      <Footer />
+      <BottomNavBar />
     </>
   );
 }

@@ -129,24 +129,6 @@ useEffect(() => {
 
         <div className="flex items-center pr-3 gap-4 relative">
 
-          {/* 1. Square 'F' */}
-          <button
-            className="flex items-center gap-2 focus:outline-none"
-            onClick={() => navigate('/home')}
-          >
-            <div className="w-8 h-8 bg-blue-200 flex items-center justify-center rounded text-lg font-bold text-blue-700">
-              F
-            </div>
-          </button>
-
-          {/* 2. Heart Icon */}
-          <button
-            className="flex items-center gap-2 focus:outline-none"
-            onClick={() => {/* your action here */ }}
-          >
-            <FaHeart className="text-2xl text-red-500" />
-          </button>
-
           {/* 3. User Icon */}
           <button
             className="flex items-center gap-2 focus:outline-none"

@@ -1887,7 +1887,13 @@ if (showSignature && selectedInstitute?.signature) {
               onClick={() => setShowGrid(v => !v)}
               title="Toggle Grid"
             >
-              <Ruler size={16} /> Grid
+              <Ruler size={16} /> Grid 
+               <input
+            type="checkbox"
+            checked={showGrid}
+            onChange={(e) => setShowGrid(e.target.checked)}
+            title="Show Grid"
+          />
             </button>
 
             {/* Group / Ungroup */}
@@ -2090,12 +2096,6 @@ if (showSignature && selectedInstitute?.signature) {
         {/* Grid fine control (mobile-hidden, desktop visible) */}
         <div className="hidden md:flex items-center gap-1 p-2 rounded bg-white shadow">
           <Ruler size={16} />
-          <input
-            type="checkbox"
-            checked={showGrid}
-            onChange={(e) => setShowGrid(e.target.checked)}
-            title="Show Grid"
-          />
         </div>
 
         <UndoRedoControls

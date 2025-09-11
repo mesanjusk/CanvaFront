@@ -126,7 +126,7 @@ useEffect(() => {
       }
       await fetchBranding(insti, setBranding);
       await fetchAndStoreMasters();
-      setTimeout(() => navigate(`/${data.login_username}`), 600);
+      setTimeout(() => navigate(`/home`), 600);
     } catch (err) {
       console.error('Login error:', err);
       toast.error(err.response?.data?.message || 'Server error during login');

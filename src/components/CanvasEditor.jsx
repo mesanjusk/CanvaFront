@@ -72,6 +72,7 @@ import { removeBackground } from "../utils/backgroundUtils";
 import SelectionToolbar from "./SelectionToolbar";
 import BottomNavBar from "./BottomNavBar";
 
+let __CLIPBOARD = null;
 /* ===================== Helpers ===================== */
 const isText = (o) => o && (o.type === "text" || o.type === "i-text");
 const isShape = (o) => o && (o.type === "rect" || o.type === "circle" || o.type === "triangle" || o.type === "polygon" || o.type === "path");
@@ -304,7 +305,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   const { templateId: routeId } = useParams();
   const templateId = propTemplateId || routeId;
   const [showLogo, setShowLogo] = useState(false);
-const [showSignature, setShowSignature] = useState(false);
+  const [showSignature, setShowSignature] = useState(false);
 
   const navigate = useNavigate();
 
@@ -364,6 +365,11 @@ const [showSignature, setShowSignature] = useState(false);
     saveHistory,
     resetHistory,
   } = useCanvasEditor(canvasRef, tplSize.w, tplSize.h);
+  // Debounced history saver to avoid perf spikes
+  const saveHistoryDebounced = React.useMemo(() => {
+    let t;
+    return () => { clearTimeout(t); t = setTimeout(() => saveHistory(), 150); };
+  }, [saveHistory]);
 
   // enable guides & snapping
   useSmartGuides(canvasRef, true, 8);
@@ -374,7 +380,7 @@ const [showSignature, setShowSignature] = useState(false);
     const c = canvasRef.current;
     if (!c) return;
     const prevBg = c._renderBackground;
-    c._renderBackground = function(ctx){
+    c._renderBackground = function (ctx) {
       if (typeof prevBg === "function") prevBg.call(this, ctx);
       if (!showGrid) return;
       const w = this.getWidth(), h = this.getHeight();
@@ -607,7 +613,7 @@ const [showSignature, setShowSignature] = useState(false);
           canvas.add(img);
           canvas.setActiveObject(img);
           URL.revokeObjectURL(url);
-          saveHistory();
+          saveHistoryDebounced();
         },
         { crossOrigin: "anonymous" }
       );
@@ -644,7 +650,7 @@ const [showSignature, setShowSignature] = useState(false);
         canvas.add(img);
         canvas.setActiveObject(img);
         canvas.requestRenderAll();
-        saveHistory();
+        saveHistoryDebounced();
       }, { crossOrigin: "anonymous" });
     };
     reader.readAsDataURL(file);
@@ -771,7 +777,7 @@ const [showSignature, setShowSignature] = useState(false);
     canvas.add(overlay);
     canvas.setActiveObject(overlay);
     canvas.requestRenderAll();
-    saveHistory();
+    saveHistoryDebounced();
   };
 
   const intersects = (a, b) => {
@@ -829,7 +835,7 @@ const [showSignature, setShowSignature] = useState(false);
     setAdjustMode(false);
     canvas.setActiveObject(img);
     canvas.requestRenderAll();
-    saveHistory();
+    saveHistoryDebounced();
   };
 
   useEffect(() => {
@@ -937,80 +943,80 @@ const [showSignature, setShowSignature] = useState(false);
   }, []);
 
   /// helper to load/apply a gallary
-const applyGallaryResponse = useCallback(
-  async (data) => {
-    if (!canvas) return;
+  const applyGallaryResponse = useCallback(
+    async (data) => {
+      if (!canvas) return;
 
-    // Clear any old logo/signature first
-    const existingLogo = canvas.getObjects().find((o) => o.customId === "logo");
-    if (existingLogo) canvas.remove(existingLogo);
+      // Clear any old logo/signature first
+      const existingLogo = canvas.getObjects().find((o) => o.customId === "logo");
+      if (existingLogo) canvas.remove(existingLogo);
 
-    const existingSignature = canvas.getObjects().find((o) => o.customId === "signature");
-    if (existingSignature) canvas.remove(existingSignature);
+      const existingSignature = canvas.getObjects().find((o) => o.customId === "signature");
+      if (existingSignature) canvas.remove(existingSignature);
 
-    // Reset toggle states when switching gallary
-    setShowLogo(false);
-    setShowSignature(false);
+      // Reset toggle states when switching gallary
+      setShowLogo(false);
+      setShowSignature(false);
 
-    // Add logo if gallary has one
-    if (data?.logo) {
-      fabric.Image.fromURL(
-        data.logo,
-        (img) => {
-          img.set({
-            left: 20,
-            top: 20,
-            scaleX: 0.3,
-            scaleY: 0.3,
-          });
-          img.customId = "logo";
-          img.field = "logo";
-          canvas.add(img);
-          canvas.requestRenderAll();
-        },
-        { crossOrigin: "anonymous" }
-      );
-    }
+      // Add logo if gallary has one
+      if (data?.logo) {
+        fabric.Image.fromURL(
+          data.logo,
+          (img) => {
+            img.set({
+              left: 20,
+              top: 20,
+              scaleX: 0.3,
+              scaleY: 0.3,
+            });
+            img.customId = "logo";
+            img.field = "logo";
+            canvas.add(img);
+            canvas.requestRenderAll();
+          },
+          { crossOrigin: "anonymous" }
+        );
+      }
 
-    // Add signature if gallary has one
-    if (data?.signature) {
-      fabric.Image.fromURL(
-        data.signature,
-        (img) => {
-          img.set({
-            left: canvas.width - 150,
-            top: canvas.height - 80,
-            scaleX: 0.3,
-            scaleY: 0.3,
-          });
-          img.customId = "signature";
-          img.field = "signature";
-          canvas.add(img);
-          canvas.requestRenderAll();
-        },
-        { crossOrigin: "anonymous" }
-      );
-    }
-  },
-  [canvas]
-);
+      // Add signature if gallary has one
+      if (data?.signature) {
+        fabric.Image.fromURL(
+          data.signature,
+          (img) => {
+            img.set({
+              left: canvas.width - 150,
+              top: canvas.height - 80,
+              scaleX: 0.3,
+              scaleY: 0.3,
+            });
+            img.customId = "signature";
+            img.field = "signature";
+            canvas.add(img);
+            canvas.requestRenderAll();
+          },
+          { crossOrigin: "anonymous" }
+        );
+      }
+    },
+    [canvas]
+  );
 
-    const loadGallaryById = useCallback(
+  const loadGallaryById = useCallback(
     async (id) => {
       if (!id) return;
       setLoadingGallary(true);
       try {
         const res = await axios.get(`https://canvaback.onrender.com/api/gallary/${id}`);
-       const gallary = res.data?.result || res.data;
+        const gallary = res.data?.result || res.data;
 
-      // Reset toggles when switching gallary
-      setShowLogo(false);
-      setShowSignature(false);
+        // Reset toggles when switching gallary
+        setShowLogo(false);
+        setShowSignature(false);
 
-      await applyGallaryResponse(gallary);
-      setActiveGallaryId(id);
-      resetHistory();
-      saveHistory();
+        await applyGallaryResponse(gallary);
+        setActiveGallaryId(id);
+        resetHistory();
+        saveHistoryDebounced();
       } catch {
         toast.error("Failed to load gallary");
       } finally {
@@ -1073,8 +1079,8 @@ const applyGallaryResponse = useCallback(
         setTemplateImage(null);
       }
       // after applying template response (inside applyTemplateResponse or after loadTemplateById finishes)
-setShowLogo(false);
-setShowSignature(false);
+      setShowLogo(false);
+      setShowSignature(false);
 
     },
     [setCanvasSize]
@@ -1089,7 +1095,7 @@ setShowSignature(false);
         await applyTemplateResponse(res.data || {});
         setActiveTemplateId(id);
         resetHistory();
-        saveHistory();
+        saveHistoryDebounced();
       } catch {
         toast.error("Failed to load template");
       } finally {
@@ -1150,7 +1156,7 @@ setShowSignature(false);
       if (!url) return;
       fabric.Image.fromURL(
         url,
-        (img) => { try { cb && cb(img); } catch(e) { console.error(e); } },
+        (img) => { try { cb && cb(img); } catch (e) { console.error(e); } },
         { crossOrigin: "anonymous" }
       );
     };
@@ -1221,81 +1227,81 @@ setShowSignature(false);
     }
 
     // 4) Institute logo & signature
-if (showLogo && selectedInstitute?.logo) {
-  // check if logo already exists
-  let existingLogo = canvas.getObjects().find(obj => obj.customId === "logo");
-  if (!existingLogo) {
-    const savedLogo = getSavedProps("logo");
-    safeLoadImage(selectedInstitute.logo, (img) => {
-      if (savedLogo) {
-        const scaleX = savedLogo.width && img.width ? savedLogo.width / img.width : savedLogo.scaleX ?? 1;
-        const scaleY = savedLogo.height && img.height ? savedLogo.height / img.height : savedLogo.scaleY ?? 1;
-        img.set({
-          left: savedLogo.left ?? 20,
-          top: savedLogo.top ?? 20,
-          scaleX,
-          scaleY,
-          angle: savedLogo.angle ?? 0
+    if (showLogo && selectedInstitute?.logo) {
+      // check if logo already exists
+      let existingLogo = canvas.getObjects().find(obj => obj.customId === "logo");
+      if (!existingLogo) {
+        const savedLogo = getSavedProps("logo");
+        safeLoadImage(selectedInstitute.logo, (img) => {
+          if (savedLogo) {
+            const scaleX = savedLogo.width && img.width ? savedLogo.width / img.width : savedLogo.scaleX ?? 1;
+            const scaleY = savedLogo.height && img.height ? savedLogo.height / img.height : savedLogo.scaleY ?? 1;
+            img.set({
+              left: savedLogo.left ?? 20,
+              top: savedLogo.top ?? 20,
+              scaleX,
+              scaleY,
+              angle: savedLogo.angle ?? 0
+            });
+          } else {
+            img.scaleToWidth(Math.round(canvas.width * 0.2));
+            img.set({ left: 20, top: 20 });
+          }
+          img.customId = "logo";
+          img.field = "logo";
+          logoRef.current = img;
+          canvas.add(img);
+          img.setCoords();
+          canvas.requestRenderAll();
         });
-      } else {
-        img.scaleToWidth(Math.round(canvas.width * 0.2));
-        img.set({ left: 20, top: 20 });
       }
-      img.customId = "logo";
-      img.field = "logo";
-      logoRef.current = img;
-      canvas.add(img);
-      img.setCoords();
-      canvas.requestRenderAll();
-    });
-  }
-} else {
-  // if user unchecks showLogo, remove from canvas
-  const existingLogo = canvas.getObjects().find(obj => obj.customId === "logo");
-  if (existingLogo) {
-    canvas.remove(existingLogo);
-    logoRef.current = null;
-    canvas.requestRenderAll();
-  }
-}
+    } else {
+      // if user unchecks showLogo, remove from canvas
+      const existingLogo = canvas.getObjects().find(obj => obj.customId === "logo");
+      if (existingLogo) {
+        canvas.remove(existingLogo);
+        logoRef.current = null;
+        canvas.requestRenderAll();
+      }
+    }
 
-if (showSignature && selectedInstitute?.signature) {
-  // check if signature already exists
-  let existingSignature = canvas.getObjects().find(obj => obj.customId === "signature");
-  if (!existingSignature) {
-    const savedSign = getSavedProps("signature");
-    safeLoadImage(selectedInstitute.signature, (img) => {
-      if (savedSign) {
-        const scaleX = savedSign.width && img.width ? savedSign.width / img.width : savedSign.scaleX ?? 1;
-        const scaleY = savedSign.height && img.height ? savedSign.height / img.height : savedSign.scaleY ?? 1;
-        img.set({
-          left: savedSign.left ?? canvas.width - 150,
-          top: savedSign.top ?? canvas.height - 80,
-          scaleX,
-          scaleY,
-          angle: savedSign.angle ?? 0
+    if (showSignature && selectedInstitute?.signature) {
+      // check if signature already exists
+      let existingSignature = canvas.getObjects().find(obj => obj.customId === "signature");
+      if (!existingSignature) {
+        const savedSign = getSavedProps("signature");
+        safeLoadImage(selectedInstitute.signature, (img) => {
+          if (savedSign) {
+            const scaleX = savedSign.width && img.width ? savedSign.width / img.width : savedSign.scaleX ?? 1;
+            const scaleY = savedSign.height && img.height ? savedSign.height / img.height : savedSign.scaleY ?? 1;
+            img.set({
+              left: savedSign.left ?? canvas.width - 150,
+              top: savedSign.top ?? canvas.height - 80,
+              scaleX,
+              scaleY,
+              angle: savedSign.angle ?? 0
+            });
+          } else {
+            img.scaleToWidth(Math.round(canvas.width * 0.3));
+            img.set({ left: canvas.width - 150, top: canvas.height - 80 });
+          }
+          img.customId = "signature";
+          img.field = "signature";
+          signatureRef.current = img;
+          canvas.add(img);
+          img.setCoords();
+          canvas.requestRenderAll();
         });
-      } else {
-        img.scaleToWidth(Math.round(canvas.width * 0.3));
-        img.set({ left: canvas.width - 150, top: canvas.height - 80 });
       }
-      img.customId = "signature";
-      img.field = "signature";
-      signatureRef.current = img;
-      canvas.add(img);
-      img.setCoords();
-      canvas.requestRenderAll();
-    });
-  }
-} else {
-  // if user unchecks showSignature, remove from canvas
-  const existingSignature = canvas.getObjects().find(obj => obj.customId === "signature");
-  if (existingSignature) {
-    canvas.remove(existingSignature);
-    signatureRef.current = null;
-    canvas.requestRenderAll();
-  }
-}
+    } else {
+      // if user unchecks showSignature, remove from canvas
+      const existingSignature = canvas.getObjects().find(obj => obj.customId === "signature");
+      if (existingSignature) {
+        canvas.remove(existingSignature);
+        signatureRef.current = null;
+        canvas.requestRenderAll();
+      }
+    }
 
 
     canvas.requestRenderAll();
@@ -1346,9 +1352,9 @@ if (showSignature && selectedInstitute?.signature) {
 
   useEffect(() => {
     if (!canvas) return;
-    const onModified = () => saveHistory();
-    const onAdded = () => saveHistory();
-    const onRemoved = () => saveHistory();
+    const onModified = () => saveHistoryDebounced();
+    const onAdded = () => saveHistoryDebounced();
+    const onRemoved = () => saveHistoryDebounced();
     canvas.on("object:modified", onModified);
     canvas.on("object:added", onAdded);
     canvas.on("object:removed", onRemoved);
@@ -1385,13 +1391,13 @@ if (showSignature && selectedInstitute?.signature) {
         e.preventDefault();
         if (!sel) return;
         canvas?.clone && canvas.clone((cloned) => {
-          window.__clipboard = cloned;
+          __CLIPBOARD = cloned;
         }, sel);
         return;
       }
       if (cmd && (e.key === "v" || e.key === "V")) {
         e.preventDefault();
-        const clip = window.__clipboard;
+        const clip = __CLIPBOARD;
         if (!clip) return;
         clip.clone((clonedObj) => {
           canvas?.discardActiveObject();
@@ -1405,7 +1411,7 @@ if (showSignature && selectedInstitute?.signature) {
           }
           canvas?.setActiveObject(clonedObj);
           canvas?.requestRenderAll();
-          saveHistory();
+          saveHistoryDebounced();
         });
         return;
       }
@@ -1418,11 +1424,11 @@ if (showSignature && selectedInstitute?.signature) {
           const grp = sel.toGroup();
           canvas.setActiveObject(grp);
           canvas.requestRenderAll();
-          saveHistory();
+          saveHistoryDebounced();
         } else if (sel.type === "group") {
           sel.toActiveSelection();
           canvas.requestRenderAll();
-          saveHistory();
+          saveHistoryDebounced();
         }
         return;
       }
@@ -1467,7 +1473,7 @@ if (showSignature && selectedInstitute?.signature) {
         }
         setActiveObj(null);
         setActiveStudentPhoto(null);
-        saveHistory();
+        saveHistoryDebounced();
         e.preventDefault();
         return;
       }
@@ -1481,7 +1487,7 @@ if (showSignature && selectedInstitute?.signature) {
         sel.left += d[0];
         sel.setCoords();
         canvas?.requestRenderAll();
-        saveHistory();
+        saveHistoryDebounced();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -1545,7 +1551,7 @@ if (showSignature && selectedInstitute?.signature) {
       hasControls: true,
     });
     canvas.requestRenderAll();
-    saveHistory();
+    saveHistoryDebounced();
   };
 
   /* ============================= Align & Distribute ============================ */
@@ -1556,7 +1562,7 @@ if (showSignature && selectedInstitute?.signature) {
     const left = objs[0].left; const right = objs[objs.length - 1].left;
     const step = (right - left) / (objs.length - 1 || 1);
     objs.forEach((o, i) => { o.set({ left: left + i * step }); o.setCoords(); });
-    canvas.discardActiveObject(); const as = new fabric.ActiveSelection(objs, { canvas }); canvas.setActiveObject(as); canvas.requestRenderAll(); saveHistory();
+    canvas.discardActiveObject(); const as = new fabric.ActiveSelection(objs, { canvas }); canvas.setActiveObject(as); canvas.requestRenderAll(); saveHistoryDebounced();
   };
   const distributeV = () => {
     const sel = canvas?.getActiveObject();
@@ -1565,7 +1571,7 @@ if (showSignature && selectedInstitute?.signature) {
     const top = objs[0].top; const bottom = objs[objs.length - 1].top;
     const step = (bottom - top) / (objs.length - 1 || 1);
     objs.forEach((o, i) => { o.set({ top: top + i * step }); o.setCoords(); });
-    canvas.discardActiveObject(); const as = new fabric.ActiveSelection(objs, { canvas }); canvas.setActiveObject(as); canvas.requestRenderAll(); saveHistory();
+    canvas.discardActiveObject(); const as = new fabric.ActiveSelection(objs, { canvas }); canvas.setActiveObject(as); canvas.requestRenderAll(); saveHistoryDebounced();
   };
 
   /* ============================= Carousel (bulk) =========================== */
@@ -1964,13 +1970,13 @@ if (showSignature && selectedInstitute?.signature) {
               onClick={() => setShowGrid(v => !v)}
               title="Toggle Grid"
             >
-              <Ruler size={16} /> Grid 
-               <input
-            type="checkbox"
-            checked={showGrid}
-            onChange={(e) => setShowGrid(e.target.checked)}
-            title="Show Grid"
-          />
+              <Ruler size={16} /> Grid
+              <input
+                type="checkbox"
+                checked={showGrid}
+                onChange={(e) => setShowGrid(e.target.checked)}
+                title="Show Grid"
+              />
             </button>
 
             {/* Group / Ungroup */}
@@ -1983,11 +1989,11 @@ if (showSignature && selectedInstitute?.signature) {
                   const grp = sel.toGroup();
                   canvas.setActiveObject(grp);
                   canvas.requestRenderAll();
-                  saveHistory();
+                  saveHistoryDebounced();
                 } else if (sel.type === "group") {
                   sel.toActiveSelection();
                   canvas.requestRenderAll();
-                  saveHistory();
+                  saveHistoryDebounced();
                 } else {
                   toast("Select multiple objects to group");
                 }
@@ -2149,23 +2155,18 @@ if (showSignature && selectedInstitute?.signature) {
         />
         <label
           htmlFor="upload-image"
-          onClick={withFabClose(() => {})}
+          onClick={withFabClose(() => { })}
           className="p-2 rounded bg-white shadow hover:bg-blue-100 cursor-pointer"
           title="Upload Image"
         >
           <ImageIcon size={20} />
         </label>
 
-        {/* Grid fine control (mobile-hidden, desktop visible) */}
-        <div className="hidden md:flex items-center gap-1 p-2 rounded bg-white shadow">
-          <Ruler size={16} />
-        </div>
 
         <UndoRedoControls
           undo={undo}
           redo={redo}
           duplicateObject={duplicateObject}
-          downloadPDF={downloadPDF}
           vertical
         />
       </div>
@@ -2232,14 +2233,14 @@ if (showSignature && selectedInstitute?.signature) {
             {rightPanel === "gallaries"
               ? "Gallary"
               : rightPanel === "templates"
-              ? "Templates"
-              : rightPanel === "bulk"
-              ? "Bulk Settings"
-              : rightPanel === "frames"
-              ? "Frames"
-              : rightPanel === "object"
-              ? "Object Settings"
-              : ""}
+                ? "Templates"
+                : rightPanel === "bulk"
+                  ? "Bulk Settings"
+                  : rightPanel === "frames"
+                    ? "Frames"
+                    : rightPanel === "object"
+                      ? "Object Settings"
+                      : ""}
           </div>
           <button
             className="p-2 rounded hover:bg-gray-100"
@@ -2253,40 +2254,40 @@ if (showSignature && selectedInstitute?.signature) {
           </button>
         </div>
         <div className="p-3">
-         {rightPanel === "gallaries" && (
-  <Fragment>
-    {loadingGallary && (
-      <div className="text-xs text-gray-500 mb-2">Loading gallary…</div>
-    )}
+          {rightPanel === "gallaries" && (
+            <Fragment>
+              {loadingGallary && (
+                <div className="text-xs text-gray-500 mb-2">Loading gallary…</div>
+              )}
 
-    <div className="grid grid-cols-2 gap-3">
-      {gallaries.map((g) => (
-        <div
-          key={g._id || g.Gallary_uuid}
-          className="border rounded overflow-hidden hover:shadow cursor-pointer"
-          onClick={() => loadGallaryById(g._id || g.Gallary_uuid)}
-        >
-          <div className="aspect-[4/5] bg-gray-100 flex flex-col items-center justify-center gap-2 p-2">
-            {g.image ? (
-              <img
-                src={g.image}
-                alt="Gallary"
-                className="w-24 h-24 object-contain border rounded bg-white"
-                crossOrigin="anonymous"
-              />
-            ) : (
-              <span className="text-xs text-gray-400">No Image</span>
-            )}
-          </div>
-        </div>
-      ))}
-    </div>
+              <div className="grid grid-cols-2 gap-3">
+                {gallaries.map((g) => (
+                  <div
+                    key={g._id || g.Gallary_uuid}
+                    className="border rounded overflow-hidden hover:shadow cursor-pointer"
+                    onClick={() => loadGallaryById(g._id || g.Gallary_uuid)}
+                  >
+                    <div className="aspect-[4/5] bg-gray-100 flex flex-col items-center justify-center gap-2 p-2">
+                      {g.image ? (
+                        <img
+                          src={g.image}
+                          alt="Gallary"
+                          className="w-24 h-24 object-contain border rounded bg-white"
+                          crossOrigin="anonymous"
+                        />
+                      ) : (
+                        <span className="text-xs text-gray-400">No Image</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
 
-    <div className="mt-4 border-t pt-3">
-      <LayersPanel canvas={canvas} onSelect={(o) => setActiveObj(o)} />
-    </div>
-  </Fragment>
-)}
+              <div className="mt-4 border-t pt-3">
+                <LayersPanel canvas={canvas} onSelect={(o) => setActiveObj(o)} />
+              </div>
+            </Fragment>
+          )}
 
 
           {rightPanel === "templates" && (
@@ -2363,33 +2364,33 @@ if (showSignature && selectedInstitute?.signature) {
                   {showFilters && (
                     <div className="px-3 pb-3">
 
-                     <div className="mb-2">
-  <div className="text-xs font-medium mb-1">Profile</div>
+                      <div className="mb-2">
+                        <div className="text-xs font-medium mb-1">Profile</div>
 
-  <div className="flex items-center gap-4">
-    <label className="inline-flex items-center gap-2">
-      <input
-        id="logoCheckbox"
-        type="checkbox"
-        checked={showLogo}
-        onChange={(e) => setShowLogo(e.target.checked)}
-        className="accent-[#25D366]"
-      />
-      <span className="text-sm">Logo</span>
-    </label>
+                        <div className="flex items-center gap-4">
+                          <label className="inline-flex items-center gap-2">
+                            <input
+                              id="logoCheckbox"
+                              type="checkbox"
+                              checked={showLogo}
+                              onChange={(e) => setShowLogo(e.target.checked)}
+                              className="accent-[#25D366]"
+                            />
+                            <span className="text-sm">Logo</span>
+                          </label>
 
-    <label className="inline-flex items-center gap-2">
-      <input
-        id="signatureCheckbox"
-        type="checkbox"
-        checked={showSignature}
-        onChange={(e) => setShowSignature(e.target.checked)}
-        className="accent-[#25D366]"
-      />
-      <span className="text-sm">Signature</span>
-    </label>
-  </div>
-</div>
+                          <label className="inline-flex items-center gap-2">
+                            <input
+                              id="signatureCheckbox"
+                              type="checkbox"
+                              checked={showSignature}
+                              onChange={(e) => setShowSignature(e.target.checked)}
+                              className="accent-[#25D366]"
+                            />
+                            <span className="text-sm">Signature</span>
+                          </label>
+                        </div>
+                      </div>
 
 
 
@@ -2511,7 +2512,7 @@ if (showSignature && selectedInstitute?.signature) {
                         }
                         setActiveObj(null);
                         setActiveStudentPhoto(null);
-                        saveHistory();
+                        saveHistoryDebounced();
                       }}
                       title="Delete"
                     >
@@ -2624,7 +2625,7 @@ if (showSignature && selectedInstitute?.signature) {
         }}
       />
 
-     <BottomNavBar />
+      <BottomNavBar />
 
     </div>
   );

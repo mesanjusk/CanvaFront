@@ -10,18 +10,29 @@ import { fabric } from "fabric";
 const CanvasArea = forwardRef(({ width, height }, ref) => {
   const localRef = useRef(null);
   const [canvas, setCanvas] = useState(null);
+  const canvasEl = useRef(null);
 
   // Initialize Fabric canvas once
   useEffect(() => {
     const w = Number(width) || 400;
     const h = Number(height) || 550;
-    const c = new fabric.Canvas("main-canvas", {
-      width: w,
-      height: h,
-      backgroundColor: "#fff",
-      preserveObjectStacking: true,
-    });
-    localRef.current = c;
+    
+const c = new fabric.Canvas(canvasEl.current, {
+  width: w,
+  height: h,
+  backgroundColor: "#fff",
+  preserveObjectStacking: true,
+});
+// HiDPI scaling
+const dpr = window.devicePixelRatio || 1;
+c.setDimensions({ width: w * dpr, height: h * dpr });
+c.setViewportTransform([dpr, 0, 0, dpr, 0, 0]);
+// CSS pixel size
+if (canvasEl.current) {
+  canvasEl.current.style.width = w + "px";
+  canvasEl.current.style.height = h + "px";
+}
+localRef.current = c;
     setCanvas(c);
     if (ref) ref.current = c;
     return () => {
@@ -35,16 +46,25 @@ const CanvasArea = forwardRef(({ width, height }, ref) => {
     if (!canvas) return;
     const w = Number(width) || 400;
     const h = Number(height) || 550;
-    if (canvas.getWidth() !== w) canvas.setWidth(w);
-    if (canvas.getHeight() !== h) canvas.setHeight(h);
-    canvas.renderAll();
+    
+const dpr = window.devicePixelRatio || 1;
+if (canvas.getWidth() !== w * dpr || canvas.getHeight() !== h * dpr) {
+  canvas.setDimensions({ width: w * dpr, height: h * dpr });
+  canvas.setViewportTransform([dpr, 0, 0, dpr, 0, 0]);
+  if (canvasEl.current) {
+    canvasEl.current.style.width = w + "px";
+    canvasEl.current.style.height = h + "px";
+  }
+}
+canvas.requestRenderAll();
+
   }, [canvas, width, height]);
 
   useImperativeHandle(ref, () => canvas, [canvas]);
 
   return (
     <div className="bg-white shadow border w-full h-full">
-      <canvas id="main-canvas" />
+      <canvas ref={canvasEl} />
     </div>
   );
 });

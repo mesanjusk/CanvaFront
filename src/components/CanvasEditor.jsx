@@ -1635,21 +1635,28 @@ const gotoIndex = (idx) => {
     if (saved) {
       // Load saved layout
       canvasRef.current.loadFromJSON(saved, () => {
-        // Remove any duplicate student photo after loading JSON
+        // Always remove old student photo(s) after loading
         const objs = canvasRef.current.getObjects();
-        const photos = objs.filter((o) => o.customId === "studentPhoto");
-        if (photos.length > 1) {
-          // Keep the last one only
-          photos.slice(0, -1).forEach((p) => canvasRef.current.remove(p));
-        }
+        objs
+          .filter((o) => o.customId === "studentPhoto")
+          .forEach((p) => canvasRef.current.remove(p));
+
+        // Now force your "student photo adding code" to run again
+        // (so it adds a fresh one for the new student)
         canvasRef.current.renderAll();
       });
     } else {
-      // Just render clean canvas if no saved layout
+      // Clean render if no saved layout
+      const objs = canvasRef.current.getObjects();
+      objs
+        .filter((o) => o.customId === "studentPhoto")
+        .forEach((p) => canvasRef.current.remove(p));
+
       canvasRef.current.requestRenderAll();
     }
   }
 };
+
 
   const prevStudent = () => gotoIndex(bulkIndex - 1);
   const nextStudent = () => gotoIndex(bulkIndex + 1);

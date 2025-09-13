@@ -1615,6 +1615,12 @@ const gotoIndex = (idx) => {
 
   // Save current canvas state for current student
   if (canvasRef.current && bulkList[bulkIndex]) {
+    // Before saving, remove student photo so it’s not serialized into JSON
+    const objs = canvasRef.current.getObjects();
+    objs
+      .filter((o) => o.customId === "studentPhoto")
+      .forEach((p) => canvasRef.current.remove(p));
+
     studentLayoutsRef.current[bulkList[bulkIndex]] = canvasRef.current.toJSON();
   }
 
@@ -1633,25 +1639,17 @@ const gotoIndex = (idx) => {
     const saved = studentLayoutsRef.current[uuid];
 
     if (saved) {
-      // Load saved layout
-      canvasRef.current.loadFromJSON(saved, () => {
-        // Always remove old student photo(s) after loading
-        const objs = canvasRef.current.getObjects();
-        objs
-          .filter((o) => o.customId === "studentPhoto")
-          .forEach((p) => canvasRef.current.remove(p));
+      // Remove any photos from JSON before loading
+      if (saved.objects) {
+        saved.objects = saved.objects.filter(
+          (obj) => obj.customId !== "studentPhoto"
+        );
+      }
 
-        // Now force your "student photo adding code" to run again
-        // (so it adds a fresh one for the new student)
+      canvasRef.current.loadFromJSON(saved, () => {
         canvasRef.current.renderAll();
       });
     } else {
-      // Clean render if no saved layout
-      const objs = canvasRef.current.getObjects();
-      objs
-        .filter((o) => o.customId === "studentPhoto")
-        .forEach((p) => canvasRef.current.remove(p));
-
       canvasRef.current.requestRenderAll();
     }
   }

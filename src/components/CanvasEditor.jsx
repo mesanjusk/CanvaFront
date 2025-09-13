@@ -1098,6 +1098,17 @@ const loadGallaryById = useCallback(
     loadTemplateById(templateId);
   }, [templateId]);
 
+
+  useEffect(() => {
+  // ✅ This will log whenever the checkboxes toggle
+  console.log("showLogo:", showLogo, "showSignature:", showSignature);
+
+  // ✅ This will log whenever the institute object changes
+  console.log("selectedInstitute logo:", selectedInstitute?.logo);
+  console.log("selectedInstitute signature:", selectedInstitute?.signature);
+
+}, [showLogo, showSignature, selectedInstitute]);
+
   /* ==================== Render template + student objects ================== */
   useEffect(() => {
     if (!canvas) return;

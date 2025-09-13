@@ -1582,6 +1582,14 @@ const loadGallaryById = useCallback(
     if (canvasRef.current && bulkList[bulkIndex]) {
       studentLayoutsRef.current[bulkList[bulkIndex]] = canvasRef.current.toJSON();
     }
+
+  if (canvasRef.current) {
+    const existingPhoto = canvasRef.current
+      .getObjects()
+      .find((o) => o.customId === "studentPhoto");
+    if (existingPhoto) canvasRef.current.remove(existingPhoto);
+  }
+
     const n = ((idx % bulkList.length) + bulkList.length) % bulkList.length;
     setBulkIndex(n);
     const uuid = bulkList[n];
@@ -1594,6 +1602,9 @@ const loadGallaryById = useCallback(
           canvasRef.current.renderAll();
         });
       }
+      else {
+      canvasRef.current.requestRenderAll();
+    }
     }
   };
 

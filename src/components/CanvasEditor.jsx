@@ -1610,37 +1610,46 @@ if (photoUrl) {
     if (bulkMode) rebuildBulkFromFiltered();
   }, [bulkMode, filteredStudents]); // eslint-disable-line
 
-  const gotoIndex = (idx) => {
-    if (!bulkList.length) return;
-    if (canvasRef.current && bulkList[bulkIndex]) {
-      studentLayoutsRef.current[bulkList[bulkIndex]] = canvasRef.current.toJSON();
-    }
+const gotoIndex = (idx) => {
+  if (!bulkList.length) return;
+
+  // Save current canvas state for current student
+  if (canvasRef.current && bulkList[bulkIndex]) {
+    studentLayoutsRef.current[bulkList[bulkIndex]] = canvasRef.current.toJSON();
+  }
+
+  // Calculate new index
+  const n = ((idx % bulkList.length) + bulkList.length) % bulkList.length;
+  setBulkIndex(n);
+
+  const uuid = bulkList[n];
+  const st =
+    (filteredStudents.length ? filteredStudents : allStudents).find(
+      (s) => s.uuid === uuid
+    ) || null;
+  setSelectedStudent(st);
 
   if (canvasRef.current) {
-    const existingPhoto = canvasRef.current
-      .getObjects()
-      .find((o) => o.customId === "studentPhoto");
-    if (existingPhoto) canvasRef.current.remove(existingPhoto);
-  }
-  
-    const n = ((idx % bulkList.length) + bulkList.length) % bulkList.length;
-    setBulkIndex(n);
-    const uuid = bulkList[n];
-    const st = (filteredStudents.length ? filteredStudents : allStudents).find((s) => s.uuid === uuid) || null;
-    setSelectedStudent(st);
-    if (canvasRef.current) {
-      const saved = studentLayoutsRef.current[uuid];
-      if (saved) {
-        canvasRef.current.loadFromJSON(saved, () => {
-          canvasRef.current.renderAll();
-        });
-      }
-      else {
-     
+    const saved = studentLayoutsRef.current[uuid];
+
+    if (saved) {
+      // Load saved layout
+      canvasRef.current.loadFromJSON(saved, () => {
+        // Remove any duplicate student photo after loading JSON
+        const objs = canvasRef.current.getObjects();
+        const photos = objs.filter((o) => o.customId === "studentPhoto");
+        if (photos.length > 1) {
+          // Keep the last one only
+          photos.slice(0, -1).forEach((p) => canvasRef.current.remove(p));
+        }
+        canvasRef.current.renderAll();
+      });
+    } else {
+      // Just render clean canvas if no saved layout
       canvasRef.current.requestRenderAll();
     }
-    }
-  };
+  }
+};
 
   const prevStudent = () => gotoIndex(bulkIndex - 1);
   const nextStudent = () => gotoIndex(bulkIndex + 1);

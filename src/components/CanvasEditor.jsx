@@ -928,103 +928,90 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   }, []);
 
   // Gallary list (for right sidebar)
-  useEffect(() => {
-    const loadGallaries = async () => {
-      try {
-        const user = getStoredUser();
-        const institute_uuid = user?.institute_uuid || getStoredInstituteUUID();
-        const res = await axios.get(`https://canvaback.onrender.com/api/gallary/GetGallaryList/${institute_uuid}`);
-        setGallaries(res.data?.result || res.data || []);
-      } catch (err) {
-        console.error("Error fetching gallaries:", err);
+useEffect(() => {
+  const loadGallaries = async () => {
+    try {
+      const user = getStoredUser();
+      const institute_uuid =
+        user?.institute_uuid || getStoredInstituteUUID();
+
+      const { data } = await axios.get(
+        `https://canvaback.onrender.com/api/gallary/GetGallaryList/${institute_uuid}`
+      );
+
+      // Ensure we always pass an array to state
+      const list = Array.isArray(data?.result)
+        ? data.result
+        : Array.isArray(data)
+        ? data
+        : [];
+
+      setGallaries(list);
+    } catch (err) {
+      console.error("Error fetching gallaries:", err);
+      setGallaries([]); // fallback to empty array on error
+    }
+  };
+
+  loadGallaries();
+}, []);
+
+
+/// helper to load/apply a gallary
+const applyGallaryResponse = useCallback(
+  async (data) => {
+    if (!canvas || !data?.image) return;
+
+    // Remove any previously added gallery image
+    canvas.getObjects().forEach((obj) => {
+      if (obj.customId === "gallaryImage") {
+        canvas.remove(obj);
       }
-    };
-    loadGallaries();
-  }, []);
+    });
 
-  /// helper to load/apply a gallary
-  const applyGallaryResponse = useCallback(
-    async (data) => {
-      if (!canvas) return;
+    // Add the new gallery image
+    fabric.Image.fromURL(
+      data.image,
+      (img) => {
+        img.set({
+          left: 20,
+          top: 20,
+          scaleX: 0.5,
+          scaleY: 0.5,
+        });
+        img.customId = "gallaryImage";
+        canvas.add(img);
+        canvas.requestRenderAll();
+      },
+      { crossOrigin: "anonymous" }
+    );
+  },
+  [canvas]
+);
 
-      // Clear any old logo/signature first
-      const existingLogo = canvas.getObjects().find((o) => o.customId === "logo");
-      if (existingLogo) canvas.remove(existingLogo);
+const loadGallaryById = useCallback(
+  async (id) => {
+    if (!id) return;
+    setLoadingGallary(true);
+    try {
+      const res = await axios.get(
+        `https://canvaback.onrender.com/api/gallary/${id}`
+      );
+      const gallary = res.data?.result || res.data;
 
-      const existingSignature = canvas.getObjects().find((o) => o.customId === "signature");
-      if (existingSignature) canvas.remove(existingSignature);
-
-      // Reset toggle states when switching gallary
-      setShowLogo(false);
-      setShowSignature(false);
-
-      // Add logo if gallary has one
-      if (data?.logo) {
-        fabric.Image.fromURL(
-          data.logo,
-          (img) => {
-            img.set({
-              left: 20,
-              top: 20,
-              scaleX: 0.3,
-              scaleY: 0.3,
-            });
-            img.customId = "logo";
-            img.field = "logo";
-            canvas.add(img);
-            canvas.requestRenderAll();
-          },
-          { crossOrigin: "anonymous" }
-        );
-      }
-
-      // Add signature if gallary has one
-      if (data?.signature) {
-        fabric.Image.fromURL(
-          data.signature,
-          (img) => {
-            img.set({
-              left: canvas.width - 150,
-              top: canvas.height - 80,
-              scaleX: 0.3,
-              scaleY: 0.3,
-            });
-            img.customId = "signature";
-            img.field = "signature";
-            canvas.add(img);
-            canvas.requestRenderAll();
-          },
-          { crossOrigin: "anonymous" }
-        );
-      }
-    },
-    [canvas]
-  );
-
-  const loadGallaryById = useCallback(
-    async (id) => {
-      if (!id) return;
-      setLoadingGallary(true);
-      try {
-        const res = await axios.get(`https://canvaback.onrender.com/api/gallary/${id}`);
-        const gallary = res.data?.result || res.data;
-
-        // Reset toggles when switching gallary
-        setShowLogo(false);
-        setShowSignature(false);
-
-        await applyGallaryResponse(gallary);
-        setActiveGallaryId(id);
-        resetHistory();
-        saveHistoryDebounced();
-      } catch {
-        toast.error("Failed to load gallary");
-      } finally {
-        setLoadingGallary(false);
-      }
-    },
-    [applyGallaryResponse, resetHistory, saveHistory]
-  );
+      await applyGallaryResponse(gallary);
+      setActiveGallaryId(id);
+      resetHistory();
+      saveHistoryDebounced();
+    } catch (err) {
+      console.error("Failed to load gallary:", err);
+      toast.error("Failed to load gallary");
+    } finally {
+      setLoadingGallary(false);
+    }
+  },
+  [applyGallaryResponse, resetHistory, saveHistory]
+);
 
   // Templates list (for right sidebar)
   useEffect(() => {

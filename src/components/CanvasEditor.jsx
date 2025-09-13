@@ -1109,35 +1109,6 @@ const loadGallaryById = useCallback(
     studentObjectsRef.current.forEach((o) => canvas.remove(o));
     studentObjectsRef.current = [];
 
-    const addTemplateBg = () => {
-      if (!templateImage) return;
-      try {
-        if (typeof templateImage.clone === "function") {
-          templateImage.clone((bg) => {
-            if (!bg) return;
-            bg.scaleX = canvas.width / bg.width;
-            bg.scaleY = canvas.height / bg.height;
-            bg.set({ selectable: false, evented: false });
-            canvas.add(bg);
-            bg.sendToBack();
-            bgRef.current = bg;
-            canvas.requestRenderAll();
-          });
-        } else {
-          // Fallback: draw directly (may mutate original)
-          const bg = templateImage;
-          bg.scaleX = canvas.width / bg.width;
-          bg.scaleY = canvas.height / bg.height;
-          bg.set({ selectable: false, evented: false });
-          canvas.add(bg);
-          bg.sendToBack();
-          bgRef.current = bg;
-        }
-      } catch (e) {
-        console.warn("Template BG add failed:", e);
-      }
-    };
-
     // Helper for loading external images safely with CORS
     const safeLoadImage = (url, cb) => {
       if (!url) return;
@@ -1148,8 +1119,23 @@ const loadGallaryById = useCallback(
       );
     };
 
-    // 1) Background
-    addTemplateBg();
+    // ---------- background ----------
+  const addTemplateBg = () => {
+    if (!templateImage) return;
+    const add = (bg) => {
+      bg.scaleX = canvas.width / bg.width;
+      bg.scaleY = canvas.height / bg.height;
+      bg.set({ selectable: false, evented: false });
+      canvas.add(bg);
+      bg.sendToBack();
+      bgRef.current = bg;
+      canvas.requestRenderAll();
+    };
+    if (typeof templateImage.clone === "function") {
+      templateImage.clone((bg) => bg && add(bg));
+    } else add(templateImage);
+  };
+  addTemplateBg();
 
     // 2) Current student (bulk-aware)
     const currentStudent = bulkMode

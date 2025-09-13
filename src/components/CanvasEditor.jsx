@@ -1173,45 +1173,71 @@ const loadGallaryById = useCallback(
       studentObjectsRef.current.push(nameText);
     }
 
-    // 3) Student photo
-    const current = currentStudent;
-    const photoUrl = Array.isArray(current?.photo) ? current?.photo[0] : current?.photo;
-    const savedPhoto = getSavedProps("studentPhoto");
-    const photoLeft = savedPhoto?.left ?? Math.round(canvas.width * 0.5);
-    const photoTop = savedPhoto?.top ?? Math.round(canvas.height * 0.33);
-    const savedShape = savedPhoto?.shape || "circle";
+   // 3) Student photo – FIXED to avoid duplicates
+const current = currentStudent;
+const photoUrl = Array.isArray(current?.photo) ? current.photo[0] : current?.photo;
+const savedPhoto = getSavedProps("studentPhoto");
+const photoLeft  = savedPhoto?.left ?? Math.round(canvas.width * 0.5);
+const photoTop   = savedPhoto?.top  ?? Math.round(canvas.height * 0.33);
+const savedShape = savedPhoto?.shape || "circle";
 
-    if (photoUrl) {
-      safeLoadImage(photoUrl, (img) => {
-        const phWidth = Math.min(400, canvas.width * 0.6);
-        const phHeight = Math.min(400, canvas.height * 0.6);
-        const autoScale = Math.min(phWidth / img.width, phHeight / img.height, 1);
-        img.set({
-          originX: "center",
-          originY: "center",
-          left: photoLeft,
-          top: photoTop,
-          scaleX: savedPhoto?.scaleX ?? autoScale,
-          scaleY: savedPhoto?.scaleY ?? autoScale,
-        });
-        img.customId = "studentPhoto";
-        img.field = "studentPhoto";
-        applyMaskAndFrame(canvas, img, savedShape, {
-          stroke: frameBorder,
-          strokeWidth: frameWidth,
-          rx: frameCorner,
-          absolute: false,
-          followImage: true,
-        });
-        img.set({ lockMovementX: false, lockMovementY: false, lockScalingX: false, lockScalingY: false, lockRotation: false, hasControls: true, selectable: true, evented: true, });
-        img.on("selected", () => setActiveStudentPhoto(img));
-        img.on("deselected", () => setActiveStudentPhoto(null));
-        img.on("mousedblclick", () => { enterAdjustMode(img); fitImageToFrame(img, "cover"); });
-        canvas.add(img);
-        studentObjectsRef.current.push(img);
-        canvas.requestRenderAll();
-      });
-    }
+if (photoUrl) {
+  // ✅ remove or reuse existing photo
+  const existingPhoto = canvas.getObjects().find(o => o.customId === "studentPhoto");
+  if (existingPhoto) {
+    // if you prefer to *replace* the old image each time:
+    canvas.remove(existingPhoto);
+  }
+
+  safeLoadImage(photoUrl, (img) => {
+    const phWidth  = Math.min(400, canvas.width * 0.6);
+    const phHeight = Math.min(400, canvas.height * 0.6);
+    const autoScale = Math.min(phWidth / img.width, phHeight / img.height, 1);
+
+    img.set({
+      originX: "center",
+      originY: "center",
+      left:    photoLeft,
+      top:     photoTop,
+      scaleX:  savedPhoto?.scaleX ?? autoScale,
+      scaleY:  savedPhoto?.scaleY ?? autoScale,
+    });
+
+    img.customId = "studentPhoto";
+    img.field    = "studentPhoto";
+
+    applyMaskAndFrame(canvas, img, savedShape, {
+      stroke: frameBorder,
+      strokeWidth: frameWidth,
+      rx: frameCorner,
+      absolute: false,
+      followImage: true,
+    });
+
+    img.set({
+      lockMovementX: false,
+      lockMovementY: false,
+      lockScalingX: false,
+      lockScalingY: false,
+      lockRotation: false,
+      hasControls:  true,
+      selectable:   true,
+      evented:      true,
+    });
+
+    img.on("selected",   () => setActiveStudentPhoto(img));
+    img.on("deselected", () => setActiveStudentPhoto(null));
+    img.on("mousedblclick", () => {
+      enterAdjustMode(img);
+      fitImageToFrame(img, "cover");
+    });
+
+    canvas.add(img);
+    studentObjectsRef.current = [img]; // keep only the latest reference
+    canvas.requestRenderAll();
+  });
+}
+
 
     // 4) Institute logo & signature
     if (showLogo && selectedInstitute?.logo) {

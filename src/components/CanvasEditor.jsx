@@ -1173,7 +1173,15 @@ const loadGallaryById = useCallback(
       studentObjectsRef.current.push(nameText);
     }
 
-   // 3) Student photo – FIXED to avoid duplicates
+function removeExistingStudentPhotos(canvas) {
+  const objs = canvas.getObjects().filter(o => o.customId === "studentPhoto");
+  if (objs.length) {
+    objs.forEach(o => canvas.remove(o));
+    studentObjectsRef.current = [];
+  }
+}
+
+// 3) Student photo – FINAL FIX
 const current = currentStudent;
 const photoUrl = Array.isArray(current?.photo) ? current.photo[0] : current?.photo;
 const savedPhoto = getSavedProps("studentPhoto");
@@ -1182,12 +1190,8 @@ const photoTop   = savedPhoto?.top  ?? Math.round(canvas.height * 0.33);
 const savedShape = savedPhoto?.shape || "circle";
 
 if (photoUrl) {
-  // ✅ remove or reuse existing photo
-  const existingPhoto = canvas.getObjects().find(o => o.customId === "studentPhoto");
-  if (existingPhoto) {
-    // if you prefer to *replace* the old image each time:
-    canvas.remove(existingPhoto);
-  }
+  // ✅ remove ALL existing student photos first
+  removeExistingStudentPhotos(canvas);
 
   safeLoadImage(photoUrl, (img) => {
     const phWidth  = Math.min(400, canvas.width * 0.6);
@@ -1233,7 +1237,7 @@ if (photoUrl) {
     });
 
     canvas.add(img);
-    studentObjectsRef.current = [img]; // keep only the latest reference
+    studentObjectsRef.current = [img];
     canvas.requestRenderAll();
   });
 }

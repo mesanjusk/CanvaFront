@@ -28,7 +28,7 @@ const RightDrawer = ({
           {showMasterItems && (
             <div className="space-y-2 pl-2">
               {[
-                { path: '/dashboard/addTemplate', label: 'Template', icon: <EventNoteIcon fontSize="small" /> },
+                { path: '/addTemplate', label: 'Template', icon: <EventNoteIcon fontSize="small" /> },
                 { path: '/dashboard/addCategory', label: 'Category', icon: <EventNoteIcon fontSize="small" /> },
                 { path: '/dashboard/addSubcategory', label: 'Subcategory', icon: <EventNoteIcon fontSize="small" /> },
               ].map((item) => (

@@ -43,8 +43,8 @@ import ErrorBoundary from './components/ErrorBoundary';
 import TemplateGallery from './pages/TemplateGallery';
 import TemplateManager from './pages/TemplateManager';
 import AddTemplate from './Pages/addTemplate';
-import AddCategory from './Pages/addCategory';
-import AddSubcategory from './Pages/addSubcategory';
+import AddCategory from './pages/addCategory';
+import AddSubcategory from './pages/addSubcategory';
 import BulkGenerator from './Pages/BulkGenerator';
 import VideoEditor from './pages/VideoEditor';
 import PrintLayout from './pages/PrintLayout';
@@ -70,6 +70,7 @@ export default function App() {
       <Route path="/home" element={<CanvaHome />} />
       <Route path="/subcategory/:categoryId" element={<Subcategory />} />
       <Route path="/template-editor/:id" element={<TemplateEditor />} />
+      <Route path="addTemplate" element={<AddTemplate />} />
 
       {/* 🔐 Protected Routes under :username */}
       <Route path="/:username" element={<PrivateRoute><DashboardLayout /></PrivateRoute>} >

@@ -1100,7 +1100,7 @@ const loadGallaryById = useCallback(
 
 
 function attachSaveHandlers(img) {
-  img.on("modified", () => {
+  const persist = () => {
     const props = {
       left:   img.left,
       top:    img.top,
@@ -1108,10 +1108,16 @@ function attachSaveHandlers(img) {
       scaleY: img.scaleY,
       shape:  img.shape || "circle",
     };
-    // this util already exists in your project
     saveProps("studentPhoto", props);
-  });
+  };
+
+  // fires continuously while resizing/moving
+  img.on("scaling", persist);
+  img.on("moving",  persist);
+  // fires once at the end of a transform
+  img.on("modified", persist);
 }
+
 
 
   /* ==================== Render template + student objects ================== */
@@ -1192,7 +1198,7 @@ function attachSaveHandlers(img) {
    // 3) Student photo
 const current = currentStudent;
 const photoUrl = Array.isArray(current?.photo) ? current?.photo[0] : current?.photo;
-const savedPhoto = getSavedProps("studentPhoto");
+const savedPhoto = getSavedProps("studentPhoto") || {};
 const photoLeft = savedPhoto?.left ?? Math.round(canvas.width * 0.5);
 const photoTop = savedPhoto?.top ?? Math.round(canvas.height * 0.33);
 const savedShape = savedPhoto?.shape || "circle";
@@ -1203,11 +1209,11 @@ if (photoUrl) {
 
   if (existingPhoto) {
     // Just update the existing photo
-    existingPhoto.set({
-      left: photoLeft,
-      top: photoTop,
-      scaleX: savedPhoto?.scaleX ?? existingPhoto.scaleX,
-      scaleY: savedPhoto?.scaleY ?? existingPhoto.scaleY,
+   existingPhoto.set({
+      left:   savedPhoto.left   ?? existingPhoto.left,
+      top:    savedPhoto.top    ?? existingPhoto.top,
+      scaleX: savedPhoto.scaleX ?? existingPhoto.scaleX,
+      scaleY: savedPhoto.scaleY ?? existingPhoto.scaleY,
     });
     canvas.requestRenderAll();
   } else {

@@ -451,6 +451,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   const [selectedInstitute, setSelectedInstitute] = useState(null);
   const [showToolbar, setShowToolbar] = useState(false);
   const [showMobileTools, setShowMobileTools] = useState(false);
+  const [selectedFrameShape, setSelectedFrameShape] = useState(null);
 
   // Helper to close the mobile FAB after performing an action
   const withFabClose = (fn) => (...args) => {
@@ -1195,46 +1196,41 @@ function attachSaveHandlers(img) {
       studentObjectsRef.current.push(nameText);
     }
 
-   // 3) Student photo
+  // 3) Student photo
 const current = currentStudent;
 const photoUrl = Array.isArray(current?.photo) ? current?.photo[0] : current?.photo;
 const savedPhoto = getSavedProps("studentPhoto") || {};
-const photoLeft = savedPhoto?.left ?? Math.round(canvas.width * 0.5);
-const photoTop = savedPhoto?.top ?? Math.round(canvas.height * 0.33);
-const savedShape = savedPhoto?.shape || "circle";
+const photoLeft = savedPhoto.left ?? Math.round(canvas.width * 0.5);
+const photoTop  = savedPhoto.top  ?? Math.round(canvas.height * 0.33);
+
+// use the user-picked frame or fall back to a simple rectangle
+const activeFrame = selectedFrameShape || savedPhoto.shape || "rect";
 
 if (photoUrl) {
-  // Check if photo already exists
-  const existingPhoto = canvas.getObjects().find(obj => obj.customId === "studentPhoto");
+  const existingPhoto = canvas.getObjects().find(o => o.customId === "studentPhoto");
 
   if (existingPhoto) {
-    // Just update the existing photo
-   existingPhoto.set({
-      left:   savedPhoto.left   ?? existingPhoto.left,
-      top:    savedPhoto.top    ?? existingPhoto.top,
-      scaleX: savedPhoto.scaleX ?? existingPhoto.scaleX,
-      scaleY: savedPhoto.scaleY ?? existingPhoto.scaleY,
-    });
+    // keep current transform, don’t reset each time
     canvas.requestRenderAll();
   } else {
-    // Load new photo only if not already present
     safeLoadImage(photoUrl, (img) => {
-      const phWidth = Math.min(400, canvas.width * 0.6);
-      const phHeight = Math.min(400, canvas.height * 0.6);
+      const phWidth   = Math.min(400, canvas.width * 0.6);
+      const phHeight  = Math.min(400, canvas.height * 0.6);
       const autoScale = Math.min(phWidth / img.width, phHeight / img.height, 1);
 
       img.set({
         originX: "center",
         originY: "center",
-        left: photoLeft,
-        top: photoTop,
-        scaleX: savedPhoto?.scaleX ?? autoScale,
-        scaleY: savedPhoto?.scaleY ?? autoScale,
+        left:    photoLeft,
+        top:     photoTop,
+        scaleX:  savedPhoto.scaleX ?? autoScale,
+        scaleY:  savedPhoto.scaleY ?? autoScale,
       });
       img.customId = "studentPhoto";
-      img.field = "studentPhoto";
+      img.field    = "studentPhoto";
 
-      applyMaskAndFrame(canvas, img, savedShape, {
+      // ⬇️ Use selectedFrameShape for masking
+      applyMaskAndFrame(canvas, img, activeFrame, {
         stroke: frameBorder,
         strokeWidth: frameWidth,
         rx: frameCorner,
@@ -1245,15 +1241,15 @@ if (photoUrl) {
       img.set({
         lockMovementX: false,
         lockMovementY: false,
-        lockScalingX: false,
-        lockScalingY: false,
-        lockRotation: false,
-        hasControls: true,
-        selectable: true,
-        evented: true,
+        lockScalingX:  false,
+        lockScalingY:  false,
+        lockRotation:  false,
+        hasControls:   true,
+        selectable:    true,
+        evented:       true,
       });
 
-      img.on("selected", () => setActiveStudentPhoto(img));
+      img.on("selected",   () => setActiveStudentPhoto(img));
       img.on("deselected", () => setActiveStudentPhoto(null));
       img.on("mousedblclick", () => {
         enterAdjustMode(img);
@@ -2547,7 +2543,7 @@ const gotoIndex = (idx) => {
             </Fragment>
           )}
           {rightPanel === "frames" && (
-            <FrameSection addFrameSlot={addFrameSlot} />
+            <FrameSection addFrameSlot={(shape) => setSelectedFrameShape(shape)} />
           )}
           {rightPanel === "object" && (
             <Fragment>

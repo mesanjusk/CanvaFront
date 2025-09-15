@@ -1098,6 +1098,22 @@ const loadGallaryById = useCallback(
     loadTemplateById(templateId);
   }, [templateId]);
 
+
+function attachSaveHandlers(img) {
+  img.on("modified", () => {
+    const props = {
+      left:   img.left,
+      top:    img.top,
+      scaleX: img.scaleX,
+      scaleY: img.scaleY,
+      shape:  img.shape || "circle",
+    };
+    // this util already exists in your project
+    saveProps("studentPhoto", props);
+  });
+}
+
+
   /* ==================== Render template + student objects ================== */
   useEffect(() => {
     if (!canvas) return;
@@ -1238,6 +1254,7 @@ if (photoUrl) {
         fitImageToFrame(img, "cover");
       });
 
+      attachSaveHandlers(img);
       canvas.add(img);
       studentObjectsRef.current.push(img);
       canvas.requestRenderAll();
@@ -2222,6 +2239,7 @@ const gotoIndex = (idx) => {
         ref={viewportRef}
         className={`absolute bg-gray-100 top-14 left-0 right-0 ${isRightbarOpen ? "md:right-80" : "right-0"} bottom-14 md:bottom-16 overflow-auto flex items-center justify-center`}
       >
+      <div className="flex flex-col items-center">
         <div
           ref={stageRef}
           style={{
@@ -2257,7 +2275,7 @@ const gotoIndex = (idx) => {
             </button>
           </div>
         )}
-
+      </div>
         {cropSrc && (
           <ImageCropModal
             src={cropSrc}

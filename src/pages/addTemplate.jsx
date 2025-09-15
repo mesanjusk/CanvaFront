@@ -3,9 +3,11 @@ import axios from 'axios';
 import { fabric } from 'fabric';
 import imageCompression from 'browser-image-compression';
 import toast, { Toaster } from 'react-hot-toast';
+import { useNavigate } from "react-router-dom";
 
 const AddTemplate = () => {
   const canvasRef = useRef(null);
+  const navigate = useNavigate();
   const fabricCanvasRef = useRef(null);
   const [existingImageURLs, setExistingImageURLs] = useState([]);
   const [form, setForm] = useState({ title: '', category: '', subcategory: '', price: '' });
@@ -199,6 +201,12 @@ formData.append("canvasJson", JSON.stringify(json));
     setShowModal(true);
   };
 
+  const openTemplateEditor = (id) => {
+  // Example route: /template-editor/<id>
+  navigate(`/template-editor/${id}`);
+};
+
+
   const filteredTemplates = templates.filter(item => (item.title || '').toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
@@ -274,12 +282,12 @@ formData.append("canvasJson", JSON.stringify(json));
             <td className="p-2 border">
 
               <div className="flex gap-2 justify-center">
-                <img
-                  src={item.image}
-                  alt="Thumb"
-                  className="h-12 mx-auto cursor-pointer"
-                  onClick={() => openImageModal(image)}
-                />
+               <img
+  src={item.image}
+  alt="Thumb"
+  className="h-12 mx-auto cursor-pointer"
+  onClick={() => openTemplateEditor(item._id)}
+/>
 
 
               </div>

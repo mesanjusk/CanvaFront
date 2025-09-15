@@ -1,4 +1,4 @@
-// CanvasEditor.jsx — updated with Canva-like behaviors, mobile FAB, grid, snapping, filters
+// TemplateEditor.jsx — updated with Canva-like behaviors, mobile FAB, grid, snapping, filters
 import React, {
   useEffect,
   useMemo,
@@ -301,8 +301,8 @@ const LayersPanel = ({ canvas, onSelect }) => {
 /* =============================================================================
    Main Editor
 ============================================================================= */
-const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
-  const { templateId: routeId } = useParams();
+const TemplateEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
+  const { id } = useParams();
   const templateId = propTemplateId || routeId;
   const [showLogo, setShowLogo] = useState(false);
   const [showSignature, setShowSignature] = useState(false);
@@ -1073,14 +1073,16 @@ const loadGallaryById = useCallback(
     [setCanvasSize]
   );
 
-  const loadTemplateById = useCallback(
-    async (id) => {
-      if (!id) return;
+const loadTemplateById = useCallback(
+    async (templateId) => {
+      if (!templateId) return;
       setLoadingTemplate(true);
       try {
-        const res = await axios.get(`https://canvaback.onrender.com/api/template/${id}`);
+        const res = await axios.get(
+          `https://canvaback.onrender.com/api/template/${templateId}`
+        );
         await applyTemplateResponse(res.data || {});
-        setActiveTemplateId(id);
+        setActiveTemplateId(templateId);
         resetHistory();
         saveHistoryDebounced();
       } catch {
@@ -1093,10 +1095,10 @@ const loadGallaryById = useCallback(
   );
 
   // Initial template load (from route or prop)
-  useEffect(() => {
-    if (!templateId) return;
-    loadTemplateById(templateId);
-  }, [templateId]);
+useEffect(() => {
+  if (!id) return;
+  loadTemplateById(id);
+}, [id, loadTemplateById]);
 
 
 function attachSaveHandlers(img) {
@@ -2048,59 +2050,6 @@ const gotoIndex = (idx) => {
               />
             </button>
 
-            {/* Group / Ungroup */}
-            <button
-              className="hidden sm:flex items-center gap-1 px-3 py-2 rounded-full bg-white border hover:bg-gray-50 text-sm"
-              onClick={() => {
-                const sel = canvas?.getActiveObject();
-                if (!sel) return;
-                if (sel.type === "activeSelection") {
-                  const grp = sel.toGroup();
-                  canvas.setActiveObject(grp);
-                  canvas.requestRenderAll();
-                  saveHistoryDebounced();
-                } else if (sel.type === "group") {
-                  sel.toActiveSelection();
-                  canvas.requestRenderAll();
-                  saveHistoryDebounced();
-                } else {
-                  toast("Select multiple objects to group");
-                }
-              }}
-              title="Group / Ungroup (Ctrl/Cmd+G)"
-            >
-              <GroupIcon size={16} /> / <Ungroup size={16} />
-            </button>
-
-            {/* Distribute */}
-            <button
-              className="hidden sm:flex items-center gap-1 px-3 py-2 rounded-full bg-white border hover:bg-gray-50 text-sm"
-              onClick={distributeH}
-              title="Distribute Horizontally"
-            >
-              <AlignHorizontalJustifyCenter size={16} /> H
-            </button>
-            <button
-              className="hidden sm:flex items-center gap-1 px-3 py-2 rounded-full bg-white border hover:bg-gray-50 text-sm"
-              onClick={distributeV}
-              title="Distribute Vertically"
-            >
-              <AlignVerticalJustifyCenter size={16} /> V
-            </button>
-
-            {adjustMode && (
-              <button
-                title="Done"
-                onClick={() => {
-                  const obj = canvas?.getActiveObject();
-                  if (obj && obj.type === "image") exitAdjustMode(obj);
-                }}
-                className="px-3 py-2 rounded-full bg-emerald-600 text-white shadow hover:bg-emerald-700 text-sm flex items-center gap-1"
-              >
-                <Check size={16} /> Done
-              </button>
-            )}
-
             {/* Template selection */}
             <button
               title="Choose Template"
@@ -2110,53 +2059,6 @@ const gotoIndex = (idx) => {
               <Images size={16} /> Template
             </button>
 
-            {/* Download current */}
-            <button
-              title="Download PNG"
-              onClick={downloadCurrentPNG}
-              className="p-2 rounded-full bg-green-600 text-white shadow hover:bg-green-700"
-            >
-              <Download size={18} />
-            </button>
-
-            {/* Export PDF */}
-            <button
-              title="Export PDF"
-              onClick={exportSinglePDF}
-              className="p-2 rounded-full bg-purple-600 text-white shadow hover:bg-purple-700"
-            >
-              <FileDown size={18} />
-            </button>
-            <button
-              title="Export Imposed Sheet PDF"
-              onClick={exportImposedPDF}
-              className={`hidden sm:flex items-center gap-1 px-3 py-2 rounded-full ${imposeOn ? "bg-rose-600 hover:bg-rose-700" : "bg-rose-300 cursor-not-allowed"} text-white shadow text-sm`}
-              disabled={!imposeOn}
-            >
-              <BookOpen size={16} /> Imposed PDF
-            </button>
-
-            {/* Bulk download PNGs */}
-            {bulkMode && (
-              <button
-                title="Download All (PNGs)"
-                onClick={downloadBulkPNGs}
-                className="hidden sm:flex items-center gap-1 px-3 py-2 rounded-full bg-indigo-600 text-white shadow hover:bg-indigo-700 text-sm"
-              >
-                <Images size={16} /> Download All
-              </button>
-            )}
-
-            {/* Bulk multi-page PDF */}
-            {bulkMode && (
-              <button
-                title="Download PDF (All)"
-                onClick={downloadBulkPDF}
-                className="hidden sm:flex items-center gap-1 px-3 py-2 rounded-full bg-purple-600 text-white shadow hover:bg-purple-700 text-sm"
-              >
-                <FileDown size={16} /> Download PDF (All)
-              </button>
-            )}
           </div>
         </header>
       )}
@@ -2173,20 +2075,7 @@ const gotoIndex = (idx) => {
 
       {/* LEFT VERTICAL TOOLBAR */}
       <div className={`fixed top-16 left-2 z-40 flex-col gap-2 ${showMobileTools ? "flex" : "hidden"} md:flex`}>
-        <button
-          title="Choose Gallary"
-          onClick={() => { setRightPanel('gallaries'); setIsRightbarOpen(true); }}
-          className="p-2 rounded bg-white shadow hover:bg-blue-100"
-        >
-          <Images size={20} />
-        </button>
-        <button
-          title="Bulk Settings"
-          onClick={() => { setRightPanel('bulk'); setIsRightbarOpen(true); }}
-          className="p-2 rounded bg-white shadow hover:bg-blue-100"
-        >
-          <LayersIcon size={20} />
-        </button>
+       
         <button
           title="Add Frame"
           onClick={() => { setRightPanel('frames'); setIsRightbarOpen(true); }}
@@ -2201,43 +2090,6 @@ const gotoIndex = (idx) => {
         >
           <Type size={20} />
         </button>
-        <button
-          title="Add Rectangle"
-          onClick={withFabClose(addRect)}
-          className="p-2 rounded bg-white shadow hover:bg-blue-100"
-        >
-          <Square size={20} />
-        </button>
-        <button
-          title="Add Circle"
-          onClick={withFabClose(addCircle)}
-          className="p-2 rounded bg-white shadow hover:bg-blue-100"
-        >
-          <Circle size={20} />
-        </button>
-        <input
-          type="file"
-          accept="image/*"
-          id="upload-image"
-          style={{ display: "none" }}
-          onChange={handleUpload}
-        />
-        <label
-          htmlFor="upload-image"
-          onClick={withFabClose(() => { })}
-          className="p-2 rounded bg-white shadow hover:bg-blue-100 cursor-pointer"
-          title="Upload Image"
-        >
-          <ImageIcon size={20} />
-        </label>
-
-
-        <UndoRedoControls
-          undo={undo}
-          redo={redo}
-          duplicateObject={duplicateObject}
-          vertical
-        />
       </div>
 
       {/* CENTER / Canva-like viewport */}
@@ -2260,27 +2112,7 @@ const gotoIndex = (idx) => {
           )}
         </div>
 
-        {bulkMode && (
-          <div className="mt-4 flex items-center justify-center gap-2">
-            <button
-              className="p-2 rounded-full bg-white border hover:bg-gray-100"
-              title="Previous"
-              onClick={prevStudent}
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <div className="px-2 text-xs text-gray-600">
-              {bulkList.length ? `${bulkIndex + 1}/${bulkList.length}` : "0/0"}
-            </div>
-            <button
-              className="p-2 rounded-full bg-white border hover:bg-gray-100"
-              title="Next"
-              onClick={nextStudent}
-            >
-              <ChevronRight size={18} />
-            </button>
-          </div>
-        )}
+        
       </div>
         {cropSrc && (
           <ImageCropModal
@@ -2300,13 +2132,7 @@ const gotoIndex = (idx) => {
       >
         <div className="p-3 border-b flex items-center justify-between">
           <div className="text-sm font-semibold">
-            {rightPanel === "gallaries"
-              ? "Gallary"
-              : rightPanel === "templates"
-                ? "Templates"
-                : rightPanel === "bulk"
-                  ? "Bulk Settings"
-                  : rightPanel === "frames"
+            {rightPanel === "frames"
                     ? "Frames"
                     : rightPanel === "object"
                       ? "Object Settings"
@@ -2324,42 +2150,7 @@ const gotoIndex = (idx) => {
           </button>
         </div>
         <div className="p-3">
-          {rightPanel === "gallaries" && (
-            <Fragment>
-              {loadingGallary && (
-                <div className="text-xs text-gray-500 mb-2">Loading gallary…</div>
-              )}
-
-              <div className="grid grid-cols-2 gap-3">
-                {gallaries.map((g) => (
-                  <div
-                    key={g._id || g.Gallary_uuid}
-                    className="border rounded overflow-hidden hover:shadow cursor-pointer"
-                    onClick={() => loadGallaryById(g._id || g.Gallary_uuid)}
-                  >
-                    <div className="aspect-[4/5] bg-gray-100 flex flex-col items-center justify-center gap-2 p-2">
-                      {g.image ? (
-                        <img
-                          src={g.image}
-                          alt="Gallary"
-                          className="w-24 h-24 object-contain border rounded bg-white"
-                          crossOrigin="anonymous"
-                        />
-                      ) : (
-                        <span className="text-xs text-gray-400">No Image</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-4 border-t pt-3">
-                <LayersPanel canvas={canvas} onSelect={(o) => setActiveObj(o)} />
-              </div>
-            </Fragment>
-          )}
-
-
+          
           {rightPanel === "templates" && (
             <Fragment>
               {loadingTemplate && (
@@ -2410,142 +2201,7 @@ const gotoIndex = (idx) => {
               </div>
             </Fragment>
           )}
-          {rightPanel === "bulk" && (
-            <Fragment>
-              <FormControlLabel
-                sx={{ mr: 1 }}
-                control={
-                  <Switch
-                    checked={bulkMode}
-                    onChange={(e) => setBulkMode(e.target.checked)}
-                    size="small"
-                  />
-                }
-                label={<span className="text-sm">Bulk</span>}
-              />
-              {bulkMode && (
-                <div className="border-b">
-                  <button
-                    className="w-full text-left p-3 text-sm font-semibold"
-                    onClick={() => setShowFilters((v) => !v)}
-                  >
-                    Filters
-                  </button>
-                  {showFilters && (
-                    <div className="px-3 pb-3">
-
-                      <div className="mb-2">
-                        <div className="text-xs font-medium mb-1">Profile</div>
-
-                        <div className="flex items-center gap-4">
-                          <label className="inline-flex items-center gap-2">
-                            <input
-                              id="logoCheckbox"
-                              type="checkbox"
-                              checked={showLogo}
-                              onChange={(e) => setShowLogo(e.target.checked)}
-                              className="accent-[#25D366]"
-                            />
-                            <span className="text-sm">Logo</span>
-                          </label>
-
-                          <label className="inline-flex items-center gap-2">
-                            <input
-                              id="signatureCheckbox"
-                              type="checkbox"
-                              checked={showSignature}
-                              onChange={(e) => setShowSignature(e.target.checked)}
-                              className="accent-[#25D366]"
-                            />
-                            <span className="text-sm">Signature</span>
-                          </label>
-                        </div>
-                      </div>
-
-
-
-                      <label className="block text-xs mb-1">Course</label>
-                      <select
-                        className="w-full border rounded px-2 py-1 mb-2"
-                        value={selectedCourse}
-                        onChange={(e) => setSelectedCourse(e.target.value)}
-                      >
-                        <option value="">Select course</option>
-                        {courses.map((c) => (
-                          <option key={c._id} value={c.Course_uuid}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </select>
-
-                      <label className="block text-xs mb-1">Batch</label>
-                      <select
-                        className="w-full border rounded px-2 py-1 mb-2"
-                        value={selectedBatch}
-                        onChange={(e) => setSelectedBatch(e.target.value)}
-                      >
-                        <option value="">Select batch</option>
-                        {batches.map((b) => (
-                          <option key={b._id} value={b.name}>
-                            {b.name}
-                          </option>
-                        ))}
-                      </select>
-
-                      <label className="block text-xs mb-1">Student</label>
-                      <select
-                        className="w-full border rounded px-2 py-1"
-                        onChange={(e) => handleStudentSelect(e.target.value)}
-                        value={selectedStudent?.uuid || ""}
-                        disabled={bulkMode}
-                      >
-                        <option value="">Select a student</option>
-                        {(filteredStudents.length ? filteredStudents : allStudents).map((s) => (
-                          <option key={s.uuid} value={s.uuid}>
-                            {s.firstName} {s.lastName}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                </div>
-              )}
-              <PrintSettings
-                usePrintSizing={usePrintSizing}
-                setUsePrintSizing={setUsePrintSizing}
-                pagePreset={pagePreset}
-                setPagePreset={setPagePreset}
-                customPage={customPage}
-                setCustomPage={setCustomPage}
-                pageOrientation={pageOrientation}
-                setPageOrientation={setPageOrientation}
-                dpi={dpi}
-                setDpi={setDpi}
-                bleed={bleed}
-                setBleed={setBleed}
-                safe={safe}
-                setSafe={setSafe}
-                showMarks={showMarks}
-                setShowMarks={setShowMarks}
-                showReg={showReg}
-                setShowReg={setShowReg}
-                imposeOn={imposeOn}
-                setImposeOn={setImposeOn}
-                sheetPreset={sheetPreset}
-                setSheetPreset={setSheetPreset}
-                sheetCustom={sheetCustom}
-                setSheetCustom={setSheetCustom}
-                rows={rows}
-                setRows={setRows}
-                cols={cols}
-                setCols={setCols}
-                gap={gap}
-                setGap={setGap}
-                outer={outer}
-                setOuter={setOuter}
-              />
-            </Fragment>
-          )}
+         
           {rightPanel === "frames" && (
             <FrameSection addFrameSlot={addFrameSlot} />
           )}
@@ -2701,4 +2357,4 @@ const gotoIndex = (idx) => {
   );
 };
 
-export default CanvasEditor;
+export default TemplateEditor;

@@ -1,56 +1,57 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 
 import DashboardLayout from './layouts/DashboardLayout';
-import Dashboard from './pages/Dashboard';
-import User from './pages/User';
+import Dashboard from './Pages/Dashboard';
+import User from './Pages/User';
 import Login from './components/Login';
 import ImageUploader from './components/ImageUploader';
-import Enquiry from './pages/Enquiry';
-import Courses from './pages/Courses';
-import Batches from './pages/Batches';
+import Enquiry from './Pages/Enquiry';
+import Courses from './Pages/Courses';
+import Batches from './Pages/Batches';
 import Signup from './components/Signup';
-import OrgCategories from './pages/OrgCategories';
-import Education from './pages/Education';
-import Exam from './pages/Exam';
-import PaymentMode from './pages/PaymentMode';
+import OrgCategories from './Pages/OrgCategories';
+import Education from './Pages/Education';
+import Exam from './Pages/Exam';
+import PaymentMode from './Pages/PaymentMode';
 import ForgotPassword from './components/ForgotPassword';
 import ResetPassword from './components/ResetPassword';
-import InstituteProfile from './pages/instituteProfile';
-import Owner from './pages/Owner';
+import InstituteProfile from './Pages/instituteProfile';
+import Owner from './Pages/Owner';
 import PrivateRoute from './components/PrivateRoute';
-import CoursesCategory from './pages/CoursesCategory';
+import CoursesCategory from './Pages/CoursesCategory';
 import Leads from './reports/Leads';
 import AllAdmission from './reports/allAdmission';
-import AddLead from './pages/AddLead';
+import AddLead from './Pages/AddLead';
 import AddNew from './components/admissions/AddAdmission';
-import Followup from './pages/Followup';
-import WhatsAppAdminPage from './pages/WhatsAppAdminPage';
-import AddReciept from './pages/addReciept';
-import AddPayment from './pages/addPayment';
+import Followup from './Pages/Followup';
+import WhatsAppAdminPage from './Pages/WhatsAppAdminPage';
+import AddReciept from './Pages/addReciept';
+import AddPayment from './Pages/addPayment';
 import AllLeadByAdmission from './reports/allLeadByAdmission';
-import AddAttendance from './pages/AddAttendance';
+import AddAttendance from './Pages/AddAttendance';
 import AllAttendance from './reports/allAttendance';
 import AllBatches from './reports/allBatches';
 import AllBalance from './reports/allBalance';
-import AddAccount from './pages/AddAccount';
+import AddAccount from './Pages/AddAccount';
 import AllExams from './reports/allExams';
-import Institutes from './pages/Institutes';
-import Students from './pages/Students';
-import Fees from './pages/Fees';
-import ToolsPanel from './pages/ToolsPanel';
+import Institutes from './Pages/Institutes';
+import Students from './Pages/Students';
+import Fees from './Pages/Fees';
+import ToolsPanel from './Pages/ToolsPanel';
 import CanvasEditor from './components/CanvasEditor';
 import ErrorBoundary from './components/ErrorBoundary';
-import TemplateGallery from './pages/TemplateGallery';
-import TemplateManager from './pages/TemplateManager';
-import AddTemplate from './pages/addTemplate';
-import AddCategory from './pages/addCategory';
-import AddSubcategory from './pages/addSubcategory';
+import TemplateGallery from './Pages/TemplateGallery';
+import TemplateManager from './Pages/TemplateManager';
+import AddTemplate from './Pages/addTemplate';
+import AddCategory from './Pages/addCategory';
+import AddSubcategory from './Pages/addSubcategory';
 import BulkGenerator from './Pages/BulkGenerator';
-import VideoEditor from './pages/VideoEditor';
-import PrintLayout from './pages/PrintLayout';
+import VideoEditor from './Pages/VideoEditor';
+import PrintLayout from './Pages/PrintLayout';
 import CanvaHome from './Pages/canvaHome';
 import Subcategory from './Pages/Subcategory';
 import AddGallary from './Pages/addGallary';
+import TemplateEditor from './Pages/templateEditor';
 
 export default function App() {
   return (
@@ -67,6 +68,7 @@ export default function App() {
       <Route path="templates" element={<TemplateGallery />} />
       <Route path="/home" element={<CanvaHome />} />
       <Route path="/subcategory/:categoryId" element={<Subcategory />} />
+      <Route path="/template-editor/:id" element={<TemplateEditor />} />
 
       {/* 🔐 Protected Routes under :username */}
       <Route path="/:username" element={<PrivateRoute><DashboardLayout /></PrivateRoute>} >

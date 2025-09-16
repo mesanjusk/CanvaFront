@@ -42,7 +42,7 @@ import CanvasEditor from './components/CanvasEditor';
 import ErrorBoundary from './components/ErrorBoundary';
 import TemplateGallery from './pages/TemplateGallery';
 import TemplateManager from './pages/TemplateManager';
-import AddTemplate from './Pages/addTemplate';
+import AddTemplate from './pages/addTemplate';
 import AddCategory from './pages/addCategory';
 import AddSubcategory from './pages/addSubcategory';
 import BulkGenerator from './Pages/BulkGenerator';

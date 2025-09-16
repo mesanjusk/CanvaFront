@@ -1219,6 +1219,11 @@ if (currentStudent) {
 
     canvas.add(nameText);
     studentObjectsRef.current.push(nameText);
+
+    setSavedPlaceholders((prev) => [
+    ...prev.filter(p => p.field !== "studentName"),
+    { field: "studentName", left: nameText.left, top: nameText.top, fontSize: nameText.fontSize, fill: nameText.fill, fontFamily: nameText.fontFamily }
+  ]);
   }
 }
 

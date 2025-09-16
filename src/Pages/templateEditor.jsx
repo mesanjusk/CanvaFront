@@ -302,7 +302,7 @@ const LayersPanel = ({ canvas, onSelect }) => {
    Main Editor
 ============================================================================= */
 const TemplateEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
-  const { id } = useParams();
+   const { id: routeId } = useParams();
   const templateId = propTemplateId || routeId;
   const [showLogo, setShowLogo] = useState(false);
   const [showSignature, setShowSignature] = useState(false);

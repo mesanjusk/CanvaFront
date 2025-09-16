@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { fabric } from "fabric";
 import axios from "axios";
 import toast from "react-hot-toast";
-import FrameSection from "./FrameSection";
+import FrameSection from "../components/FrameSection";
 
 const TemplateEditor = ({ activeTemplateId }) => {
   const canvasRef = useRef(null);

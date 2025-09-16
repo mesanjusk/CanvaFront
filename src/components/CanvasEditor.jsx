@@ -1173,67 +1173,103 @@ function attachSaveHandlers(img) {
     // 1) Background
     addTemplateBg();
 
-    // 2) Current student (bulk-aware)
-    const currentStudent = bulkMode
-      ? filteredStudents.find((s) => s?.uuid === bulkList[bulkIndex]) || null
-      : selectedStudent;
+   // === 2) Current student (bulk-aware) ===
+const currentStudent = bulkMode
+  ? filteredStudents.find(s => s?.uuid === bulkList[bulkIndex]) || null
+  : selectedStudent;
 
-    if (currentStudent) {
-      const savedName = getSavedProps("studentName");
-      const nameText = new fabric.IText(
-        `${currentStudent.firstName || ""} ${currentStudent.lastName || ""}`.trim(),
-        {
-          left: savedName?.left ?? Math.round(canvas.width * 0.33),
-          top: savedName?.top ?? Math.round(canvas.height * 0.55),
-          fontSize: savedName?.fontSize ?? 22,
-          fill: "#000",
-        }
-      );
-      nameText.customId = "studentName";
-      nameText.field = "studentName";
-      canvas.add(nameText);
-      studentObjectsRef.current.push(nameText);
-    }
+if (currentStudent) {
+  const savedName = getSavedProps("studentName") || {};
 
-   // 3) Student photo
+  // Build the display name once, trim any extra space
+  const displayName =
+    `${currentStudent.firstName || ""} ${currentStudent.lastName || ""}`.trim();
+
+  // Create or update the text object
+  const existingName = canvas
+    .getObjects()
+    .find(o => o.customId === "studentName");
+
+  if (existingName) {
+    // Update text and style if already present
+    existingName.set({
+      text: displayName,
+      left:     savedName.left     ?? existingName.left,
+      top:      savedName.top      ?? existingName.top,
+      fontSize: savedName.fontSize ?? existingName.fontSize,
+      fill:     savedName.fill     ?? existingName.fill ?? "#000",
+    });
+    canvas.requestRenderAll();
+  } else {
+    // Add a new text object at the saved position, size and color
+    const nameText = new fabric.IText(displayName, {
+      left:     savedName.left     ?? Math.round(canvas.width  * 0.33),
+      top:      savedName.top      ?? Math.round(canvas.height * 0.55),
+      fontSize: savedName.fontSize ?? 22,
+      fill:     savedName.fill     ?? "#000",   // <- use saved color if available
+      fontFamily: savedName.fontFamily || "Arial",
+      fontWeight: savedName.fontWeight || "normal",
+      textAlign:  savedName.textAlign  || "left",
+      originX:    savedName.originX    || "left",
+      originY:    savedName.originY    || "top",
+    });
+
+    nameText.customId = "studentName";
+    nameText.field    = "studentName";
+
+    canvas.add(nameText);
+    studentObjectsRef.current.push(nameText);
+  }
+}
+
+
+// === 3) Student photo ===
 const current = currentStudent;
-const photoUrl = Array.isArray(current?.photo) ? current?.photo[0] : current?.photo;
+const photoUrl = Array.isArray(current?.photo) ? current.photo[0] : current?.photo;
 const savedPhoto = getSavedProps("studentPhoto") || {};
-const photoLeft = savedPhoto?.left ?? Math.round(canvas.width * 0.5);
-const photoTop = savedPhoto?.top ?? Math.round(canvas.height * 0.33);
-const savedShape = savedPhoto?.shape || "circle";
+const photoLeft  = savedPhoto.left ?? Math.round(canvas.width * 0.5);
+const photoTop   = savedPhoto.top  ?? Math.round(canvas.height * 0.33);
+
+// ⚠️  Only use a shape if it was actually saved – no default circle.
+const savedShape = savedPhoto.shape || null;
 
 if (photoUrl) {
-  // Check if photo already exists
-  const existingPhoto = canvas.getObjects().find(obj => obj.customId === "studentPhoto");
+  // Look for an existing student photo on the canvas (from DB or a previous run)
+  const existingPhoto = canvas
+    .getObjects()
+    .find(obj => obj.customId === "studentPhoto");
 
   if (existingPhoto) {
-    // Just update the existing photo
-   existingPhoto.set({
+    // Just update position/scale if the user changed them
+    existingPhoto.set({
       left:   savedPhoto.left   ?? existingPhoto.left,
       top:    savedPhoto.top    ?? existingPhoto.top,
       scaleX: savedPhoto.scaleX ?? existingPhoto.scaleX,
       scaleY: savedPhoto.scaleY ?? existingPhoto.scaleY,
     });
     canvas.requestRenderAll();
-  } else {
-    // Load new photo only if not already present
-    safeLoadImage(photoUrl, (img) => {
-      const phWidth = Math.min(400, canvas.width * 0.6);
-      const phHeight = Math.min(400, canvas.height * 0.6);
-      const autoScale = Math.min(phWidth / img.width, phHeight / img.height, 1);
+    return; // ✅ Done – no new image, no new mask
+  }
 
-      img.set({
-        originX: "center",
-        originY: "center",
-        left: photoLeft,
-        top: photoTop,
-        scaleX: savedPhoto?.scaleX ?? autoScale,
-        scaleY: savedPhoto?.scaleY ?? autoScale,
-      });
-      img.customId = "studentPhoto";
-      img.field = "studentPhoto";
+  // Add the photo only if it isn’t already present
+  safeLoadImage(photoUrl, img => {
+    const phWidth  = Math.min(400, canvas.width  * 0.6);
+    const phHeight = Math.min(400, canvas.height * 0.6);
+    const autoScale = Math.min(phWidth / img.width, phHeight / img.height, 1);
 
+    img.set({
+      originX: "center",
+      originY: "center",
+      left: photoLeft,
+      top: photoTop,
+      scaleX: savedPhoto.scaleX ?? autoScale,
+      scaleY: savedPhoto.scaleY ?? autoScale,
+    });
+    img.customId = "studentPhoto";
+    img.field    = "studentPhoto";
+
+    // ✅ Only apply mask/frame if a shape was actually saved
+    if (savedShape) {
       applyMaskAndFrame(canvas, img, savedShape, {
         stroke: frameBorder,
         strokeWidth: frameWidth,
@@ -1241,32 +1277,33 @@ if (photoUrl) {
         absolute: false,
         followImage: true,
       });
+    }
 
-      img.set({
-        lockMovementX: false,
-        lockMovementY: false,
-        lockScalingX: false,
-        lockScalingY: false,
-        lockRotation: false,
-        hasControls: true,
-        selectable: true,
-        evented: true,
-      });
-
-      img.on("selected", () => setActiveStudentPhoto(img));
-      img.on("deselected", () => setActiveStudentPhoto(null));
-      img.on("mousedblclick", () => {
-        enterAdjustMode(img);
-        fitImageToFrame(img, "cover");
-      });
-
-      attachSaveHandlers(img);
-      canvas.add(img);
-      studentObjectsRef.current.push(img);
-      canvas.requestRenderAll();
+    img.set({
+      lockMovementX: false,
+      lockMovementY: false,
+      lockScalingX:  false,
+      lockScalingY:  false,
+      lockRotation:  false,
+      hasControls:   true,
+      selectable:    true,
+      evented:       true,
     });
-  }
+
+    img.on("selected",   () => setActiveStudentPhoto(img));
+    img.on("deselected", () => setActiveStudentPhoto(null));
+    img.on("mousedblclick", () => {
+      enterAdjustMode(img);
+      fitImageToFrame(img, "cover");
+    });
+
+    attachSaveHandlers(img);
+    canvas.add(img);
+    studentObjectsRef.current.push(img);
+    canvas.requestRenderAll();
+  });
 }
+
 
 
     // 4) Institute logo & signature

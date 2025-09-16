@@ -899,11 +899,6 @@ const TemplateEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     fetchAdmissions();
   }, [selectedCourse, selectedBatch]);
 
-  const handleStudentSelect = (uuid) => {
-    const student = filteredStudents.find((s) => s.uuid === uuid);
-    setSelectedStudent(student || null);
-  };
-
   useEffect(() => {
     const fetchInstitute = async () => {
       try {
@@ -926,92 +921,6 @@ const TemplateEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     };
     fetchInstitute();
   }, []);
-
-  // Gallary list (for right sidebar)
-useEffect(() => {
-  const loadGallaries = async () => {
-    try {
-      const user = getStoredUser();
-      const institute_uuid =
-        user?.institute_uuid || getStoredInstituteUUID();
-
-      const { data } = await axios.get(
-        `https://canvaback.onrender.com/api/gallary/GetGallaryList/${institute_uuid}`
-      );
-
-      // Ensure we always pass an array to state
-      const list = Array.isArray(data?.result)
-        ? data.result
-        : Array.isArray(data)
-        ? data
-        : [];
-
-      setGallaries(list);
-    } catch (err) {
-      console.error("Error fetching gallaries:", err);
-      setGallaries([]); // fallback to empty array on error
-    }
-  };
-
-  loadGallaries();
-}, []);
-
-
-/// helper to load/apply a gallary
-const applyGallaryResponse = useCallback(
-  async (data) => {
-    if (!canvas || !data?.image) return;
-
-    // Remove any previously added gallery image
-    canvas.getObjects().forEach((obj) => {
-      if (obj.customId === "gallaryImage") {
-        canvas.remove(obj);
-      }
-    });
-
-    // Add the new gallery image
-    fabric.Image.fromURL(
-      data.image,
-      (img) => {
-        img.set({
-          left: 20,
-          top: 20,
-          scaleX: 0.5,
-          scaleY: 0.5,
-        });
-        img.customId = "gallaryImage";
-        canvas.add(img);
-        canvas.requestRenderAll();
-      },
-      { crossOrigin: "anonymous" }
-    );
-  },
-  [canvas]
-);
-
-const loadGallaryById = useCallback(
-  async (id) => {
-    if (!id) return;
-    setLoadingGallary(true);
-    try {
-      const res = await axios.get(
-        `https://canvaback.onrender.com/api/gallary/${id}`
-      );
-      const gallary = res.data?.result || res.data;
-
-      await applyGallaryResponse(gallary);
-      setActiveGallaryId(id);
-      resetHistory();
-      saveHistoryDebounced();
-    } catch (err) {
-      console.error("Failed to load gallary:", err);
-      toast.error("Failed to load gallary");
-    } finally {
-      setLoadingGallary(false);
-    }
-  },
-  [applyGallaryResponse, resetHistory, saveHistory]
-);
 
   // Templates list (for right sidebar)
   useEffect(() => {
@@ -1096,9 +1005,9 @@ const loadTemplateById = useCallback(
 
   // Initial template load (from route or prop)
 useEffect(() => {
-  if (!id) return;
-  loadTemplateById(id);
-}, [id, loadTemplateById]);
+  if (!templateId) return;
+  loadTemplateById(templateId);
+}, [templateId, loadTemplateById]);
 
 
 function attachSaveHandlers(img) {

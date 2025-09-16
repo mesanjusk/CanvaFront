@@ -2061,55 +2061,17 @@ const gotoIndex = (idx) => {
         <div className="p-3">
           
           {rightPanel === "templates" && (
-            <Fragment>
-              {loadingTemplate && (
-                <div className="text-xs text-gray-500 mb-2">Loading template…</div>
-              )}
-              <div className="grid grid-cols-2 gap-3">
-                {templates.map((t) => (
-                  <button
-                    key={t._id || t.id}
-                    onClick={() => {
-                      loadTemplateById(t._id || t.id);
-                    }}
-                    className={`border rounded overflow-hidden text-left hover:shadow focus:ring-2 focus:ring-indigo-500 ${(t._id || t.id) === activeTemplateId ? "ring-2 ring-indigo-500" : ""}`}
-                    title={t.title || "Template"}
-                  >
-                    <div className="aspect-[4/5] bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
-                      {t.image ? (
-                        <img
-                          src={t.image}
-                          alt={t.title || "template thumbnail"}
-                          className="w-full h-full object-cover"
-                          crossOrigin="anonymous"
-                        />
-                      ) : (
-                        <span>Preview</span>
-                      )}
-                    </div>
-                    <div className="px-2 py-1">
-                      <div className="text-xs font-medium truncate">
-                        {t.title || "Untitled"}
-                      </div>
-                      <div className="text-[10px] text-gray-500">
-                        {t.width || t.w || 400}×{t.height || t.h || 550}
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-              <TemplateLayout
-                canvas={canvas}
-                activeTemplateId={activeTemplateId}
-                tplSize={tplSize}
-                setSavedPlaceholders={setSavedPlaceholders}
-                frameCorner={frameCorner}
-              />
-              <div className="mt-4 border-t pt-3">
-                <LayersPanel canvas={canvas} onSelect={(o) => setActiveObj(o)} />
-              </div>
-            </Fragment>
-          )}
+  <Fragment>
+    <TemplateLayout
+      canvas={canvas}
+      activeTemplateId={activeTemplateId}
+    />
+    <div className="mt-4 border-t pt-3">
+      <LayersPanel canvas={canvas} onSelect={(o) => setActiveObj(o)} />
+    </div>
+  </Fragment>
+)}
+
          
           {rightPanel === "frames" && (
             <FrameSection addFrameSlot={addFrameSlot} />

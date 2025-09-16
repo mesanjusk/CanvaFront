@@ -1,20 +1,47 @@
 import React, { useEffect, useRef } from "react";
 import { fabric } from "fabric";
 import axios from "axios";
+import { useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import FrameSection from "../components/FrameSection";
 
 const TemplateEditor = ({ activeTemplateId }) => {
+  const { id } = useParams();
   const canvasRef = useRef(null);
   const fabricCanvas = useRef(null);
 
-  useEffect(() => {
-    fabricCanvas.current = new fabric.Canvas(canvasRef.current, {
+   useEffect(() => {
+    const canvas = new fabric.Canvas(canvasRef.current, {
       width: 800,
       height: 600,
-      backgroundColor: "#f9f9f9",
+      backgroundColor: "#fff",
     });
-  }, []);
+    fabricCanvas.current = canvas;
+
+    // === Fetch template by ID ===
+    const fetchTemplate = async () => {
+      try {
+        const res = await axios.get(`https://canvaback.onrender.com/api/template/${id}`);
+        const template = res.data;
+
+        if (template?.canvasJson) {
+          canvas.loadFromJSON(template.canvasJson, () => {
+            canvas.renderAll();
+          });
+        }
+      } catch (err) {
+        console.error("Failed to fetch template", err);
+        toast.error("Failed to load template");
+      }
+    };
+
+    fetchTemplate();
+
+    return () => {
+      canvas.dispose();
+    };
+  }, [id]);
+
 
   // === Add Frame Shapes ===
   const addFrameSlot = (shape) => {

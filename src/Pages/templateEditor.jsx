@@ -4,7 +4,7 @@ import axios from "axios";
 import { useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import FrameSection from "../components/FrameSection";
-import TemplateLayout from "../components/TemplateLayout";
+import TemplateLayout from "../Pages/addTemplateLayout";
 
 const TemplateEditor = ({ activeTemplateId }) => {
   const { id } = useParams();

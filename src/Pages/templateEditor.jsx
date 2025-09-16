@@ -341,18 +341,6 @@ const TemplateEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     setCanvasSize,
   } = useCanvasTools({ width: tplSize.w, height: tplSize.h });
 
-  const handleUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        setCropSrc(reader.result);
-        cropCallbackRef.current = (croppedUrl) => addImage(croppedUrl);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const {
     activeObj,
     setActiveObj,
@@ -457,11 +445,6 @@ const TemplateEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     fn(...args);
     if (isMobile) setShowMobileTools(false);
   };
-
-  // gallaries (right sidebar)
-  const [gallaries, setGallaries] = useState([]);
-  const [activeGallaryId, setActiveGallaryId] = useState(null);
-  const [loadingGallary, setLoadingGallary] = useState(false);
 
   // templates (right sidebar)
   const [templates, setTemplates] = useState([]);
@@ -779,6 +762,7 @@ const TemplateEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     canvas.requestRenderAll();
     saveHistoryDebounced();
   };
+
 
   const intersects = (a, b) => {
     const r1 = a.getBoundingRect(true, true);
@@ -1508,26 +1492,6 @@ if (photoUrl) {
     saveHistoryDebounced();
   };
 
-  /* ============================= Align & Distribute ============================ */
-  const distributeH = () => {
-    const sel = canvas?.getActiveObject();
-    if (!sel || sel.type !== "activeSelection") { toast.error("Select multiple objects"); return; }
-    const objs = sel._objects.slice().sort((a, b) => a.left - b.left);
-    const left = objs[0].left; const right = objs[objs.length - 1].left;
-    const step = (right - left) / (objs.length - 1 || 1);
-    objs.forEach((o, i) => { o.set({ left: left + i * step }); o.setCoords(); });
-    canvas.discardActiveObject(); const as = new fabric.ActiveSelection(objs, { canvas }); canvas.setActiveObject(as); canvas.requestRenderAll(); saveHistoryDebounced();
-  };
-  const distributeV = () => {
-    const sel = canvas?.getActiveObject();
-    if (!sel || sel.type !== "activeSelection") { toast.error("Select multiple objects"); return; }
-    const objs = sel._objects.slice().sort((a, b) => a.top - b.top);
-    const top = objs[0].top; const bottom = objs[objs.length - 1].top;
-    const step = (bottom - top) / (objs.length - 1 || 1);
-    objs.forEach((o, i) => { o.set({ top: top + i * step }); o.setCoords(); });
-    canvas.discardActiveObject(); const as = new fabric.ActiveSelection(objs, { canvas }); canvas.setActiveObject(as); canvas.requestRenderAll(); saveHistoryDebounced();
-  };
-
   /* ============================= Carousel (bulk) =========================== */
   const rebuildBulkFromFiltered = () => {
     const ids = (filteredStudents.length ? filteredStudents : allStudents).map((s) => s.uuid);
@@ -1544,235 +1508,6 @@ if (photoUrl) {
     if (bulkMode) rebuildBulkFromFiltered();
   }, [bulkMode, filteredStudents]); // eslint-disable-line
 
-const gotoIndex = (idx) => {
-  if (!bulkList.length) return;
-
-  // Save current canvas state for current student
-  if (canvasRef.current && bulkList[bulkIndex]) {
-    // Before saving, remove student photo so it’s not serialized into JSON
-    const objs = canvasRef.current.getObjects();
-    objs
-      .filter((o) => o.customId === "studentPhoto")
-      .forEach((p) => canvasRef.current.remove(p));
-
-    studentLayoutsRef.current[bulkList[bulkIndex]] = canvasRef.current.toJSON();
-  }
-
-  // Calculate new index
-  const n = ((idx % bulkList.length) + bulkList.length) % bulkList.length;
-  setBulkIndex(n);
-
-  const uuid = bulkList[n];
-  const st =
-    (filteredStudents.length ? filteredStudents : allStudents).find(
-      (s) => s.uuid === uuid
-    ) || null;
-  setSelectedStudent(st);
-
-  if (canvasRef.current) {
-    const saved = studentLayoutsRef.current[uuid];
-
-    if (saved) {
-      // Remove any photos from JSON before loading
-      if (saved.objects) {
-        saved.objects = saved.objects.filter(
-          (obj) => obj.customId !== "studentPhoto"
-        );
-      }
-
-      canvasRef.current.loadFromJSON(saved, () => {
-        canvasRef.current.renderAll();
-      });
-    } else {
-      canvasRef.current.requestRenderAll();
-    }
-  }
-};
-
-
-  const prevStudent = () => gotoIndex(bulkIndex - 1);
-  const nextStudent = () => gotoIndex(bulkIndex + 1);
-
-  /* ============================== Downloads =============================== */
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-  const downloadCurrentPNG = () => {
-    const current = bulkMode
-      ? filteredStudents.find((s) => s?.uuid === bulkList[bulkIndex]) || selectedStudent
-      : selectedStudent;
-    const name =
-      current?.firstName || current?.lastName
-        ? `${(current?.firstName || "").trim()}_${(current?.lastName || "").trim()}`
-        : "canvas";
-    downloadHighRes?.(tplSize.w, tplSize.h, `${name || "canvas"}.png`);
-  };
-
-  const downloadBulkPNGs = async () => {
-    if (!bulkMode || !bulkList.length) {
-      toast.error("Enable Bulk mode with students filtered");
-      return;
-    }
-    toast("Starting bulk export…");
-    for (let i = 0; i < bulkList.length; i++) {
-      gotoIndex(i);
-      await sleep(350);
-      const st = filteredStudents.find((s) => s.uuid === bulkList[i]);
-      const name =
-        st?.firstName || st?.lastName
-          ? `${(st?.firstName || "").trim()}_${(st?.lastName || "").trim()}`
-          : `canvas_${i + 1}`;
-      downloadHighRes?.(tplSize.w, tplSize.h, `${name}.png`);
-      await sleep(300);
-    }
-    toast.success("Bulk export complete.");
-  };
-
-  // NEW: Bulk multi-page PDF
-  const downloadBulkPDF = async () => {
-    if (!bulkMode || !bulkList.length) {
-      toast.error("Enable Bulk mode with students filtered");
-      return;
-    }
-    try {
-      const { jsPDF } = await import("jspdf");
-      const pdf = new jsPDF({
-        orientation: "p",
-        unit: "px",
-        format: [tplSize.w, tplSize.h],
-        compress: true,
-      });
-
-      toast("Creating PDF…");
-      canvas.discardActiveObject();
-      canvas.requestRenderAll();
-
-      for (let i = 0; i < bulkList.length; i++) {
-        gotoIndex(i);
-        await sleep(350);
-        canvas.discardActiveObject();
-        canvas.requestRenderAll();
-
-        const dataUrl = canvas.toDataURL({
-          format: "png",
-          enableRetinaScaling: true,
-          multiplier: 1,
-        });
-
-        if (i > 0) pdf.addPage([tplSize.w, tplSize.h], "p");
-        pdf.addImage(dataUrl, "PNG", 0, 0, tplSize.w, tplSize.h);
-      }
-
-      const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-      pdf.save(`Bulk_${tplSize.w}x${tplSize.h}_${ts}.pdf`);
-      toast.success("PDF ready.");
-    } catch (err) {
-      console.error(err);
-      toast.error("PDF export failed.");
-    }
-  };
-
-  /* ============================ PRINT EXPORTS ============================ */
-  const getTrimBoundsPx = useCallback(() => {
-    const W = contentPx.W;
-    const H = contentPx.H;
-    return {
-      x: bleedPx.left,
-      y: bleedPx.top,
-      w: W - bleedPx.left - bleedPx.right,
-      h: H - bleedPx.top - bleedPx.bottom,
-    };
-  }, [contentPx, bleedPx]);
-
-  const exportSinglePDF = () => {
-    const { w_mm, h_mm } = pageMM;
-    const doc = new jsPDF({ orientation: w_mm > h_mm ? "l" : "p", unit: "mm", format: [w_mm, h_mm] });
-    canvas.discardActiveObject();
-    canvas.requestRenderAll();
-    const png = canvas.toDataURL({ format: "png", quality: 1 });
-    doc.addImage(png, "PNG", 0, 0, w_mm, h_mm);
-
-    if (showMarks) {
-      const trim = getTrimBoundsPx();
-      const toMM = (px) => pxToMm(px, dpi);
-      const markLen = 4, off = 1.5;
-      doc.setLineWidth(0.2);
-      const line = (x1, y1, x2, y2) => doc.line(x1, y1, x2, y2);
-      const tx = toMM(trim.x), ty = toMM(trim.y), tw = toMM(trim.w), th = toMM(trim.h);
-      // TL
-      line(tx - off, ty, tx - off, ty + markLen); line(tx, ty - off, tx + markLen, ty - off);
-      // TR
-      line(tx + tw + off, ty, tx + tw + off, ty + markLen); line(tx + tw - markLen, ty - off, tx + tw, ty - off);
-      // BL
-      line(tx - off, ty + th - markLen, tx - off, ty + th); line(tx, ty + th + off, tx + markLen, ty + th + off);
-      // BR
-      line(tx + tw + off, ty + th - markLen, tx + tw + off, ty + th); line(tx + tw - markLen, ty + th + off, tx + tw, ty + th + off);
-      if (showReg) {
-        const cx = w_mm / 2, cy = h_mm / 2;
-        doc.circle(cx, cy, 2);
-        doc.line(cx - 3, cy, cx + 3, cy);
-        doc.line(cx, cy - 3, cx, cy + 3);
-      }
-    }
-
-    const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-    doc.save(`design_${pagePreset}_${pageOrientation}_${dpi}dpi_${ts}.pdf`);
-  };
-
-  const exportImposedPDF = async () => {
-    if (!imposeOn) {
-      toast.error("Enable Imposition in the left sidebar.");
-      return;
-    }
-    const SHEET = sheetPreset === "Custom" ? sheetCustom : PRESET_SIZES[sheetPreset] || PRESET_SIZES.A4;
-    const sheetW = SHEET.w_mm, sheetH = SHEET.h_mm;
-    const doc = new jsPDF({ orientation: sheetW > sheetH ? "l" : "p", unit: "mm", format: [sheetW, sheetH] });
-
-    // Determine list of records to tile
-    const baseList = (bulkMode && bulkList.length) ? bulkList : [null];
-
-    // Trim size in mm
-    const trim = getTrimBoundsPx();
-    const trimWmm = pxToMm(trim.w, dpi);
-    const trimHmm = pxToMm(trim.h, dpi);
-
-    const gapX = gap.x_mm, gapY = gap.y_mm;
-    const m = outer;
-
-    let tileIndex = 0;
-    for (let i = 0; i < baseList.length; i++) {
-      if (bulkMode && baseList[i]) {
-        // Jump canvas to that student page
-        const idx = bulkList.indexOf(baseList[i]);
-        if (idx >= 0) gotoIndex(idx);
-        await new Promise(r => setTimeout(r, 250));
-        canvas.discardActiveObject();
-        canvas.requestRenderAll();
-      }
-      const img = canvas.toDataURL({ format: "png", quality: 1 });
-
-      const r = Math.floor(tileIndex / cols);
-      const c = tileIndex % cols;
-      const x = m.left + c * (trimWmm + gapX);
-      const y = m.top + r * (trimHmm + gapY);
-
-      doc.addImage(
-        img, "PNG",
-        x - pxToMm(bleedPx.left, dpi),
-        y - pxToMm(bleedPx.top, dpi),
-        trimWmm + pxToMm(bleedPx.left + bleedPx.right, dpi),
-        trimHmm + pxToMm(bleedPx.top + bleedPx.bottom, dpi)
-      );
-
-      tileIndex++;
-      if (tileIndex >= rows * cols && (i < baseList.length - 1)) {
-        doc.addPage([sheetW, sheetH], sheetW > sheetH ? "l" : "p");
-        tileIndex = 0;
-      }
-    }
-
-    const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-    doc.save(`imposed_${rows}x${cols}_${sheetPreset}_${ts}.pdf`);
-  };
 
   /* ================================= UI =================================== */
   return (
@@ -1967,7 +1702,6 @@ const gotoIndex = (idx) => {
             >
               <Images size={16} /> Template
             </button>
-
           </div>
         </header>
       )}
@@ -1992,13 +1726,13 @@ const gotoIndex = (idx) => {
         >
           <LayoutIcon size={20} />
         </button>
-        <button
-          title="Add Text"
-          onClick={withFabClose(addText)}
-          className="p-2 rounded bg-white shadow hover:bg-blue-100"
-        >
-          <Type size={20} />
-        </button>
+       <button
+  title="Add Student Name"
+  onClick={withFabClose(() => addText({ markStudentName: true, left: 100, top: 100 }))}
+  className="p-2 rounded bg-white shadow hover:bg-blue-100"
+>
+  <Type size={20} />
+</button>
       </div>
 
       {/* CENTER / Canva-like viewport */}

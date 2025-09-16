@@ -12,17 +12,26 @@ export function useCanvasTools({ width, height }) {
   const [cropSrc, setCropSrc] = useState(null);
   const cropCallbackRef = useRef(null);
 
-  const addText = () => {
+  const addText = (options = {}) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const text = new fabric.IText("Text", {
-      left: 50,
-      top: 50,
-      fill: fillColor,
-      stroke: strokeColor,
-      strokeWidth,
-      fontSize,
+
+    const text = new fabric.IText(options.text || "Double-click to edit", {
+      left: options.left ?? 50,
+      top: options.top ?? 50,
+      fill: options.fill || fillColor,
+      stroke: options.stroke || strokeColor,
+      strokeWidth: options.strokeWidth ?? strokeWidth,
+      fontSize: options.fontSize ?? fontSize,
+      fontFamily: options.fontFamily || "Arial",
     });
+
+    // Mark as student name field if requested
+    if (options.markStudentName) {
+      text.customId = "studentName";
+      text.field = "studentName";
+    }
+
     canvas.add(text).setActiveObject(text);
     canvas.requestRenderAll();
   };

@@ -1237,111 +1237,97 @@ function attachSaveHandlers(img) {
     // 1) Background
     addTemplateBg();
 
-  // === 2) Current student (bulk-aware) ===
-const currentStudent = bulkMode
-  ? filteredStudents.find(s => s?.uuid === bulkList[bulkIndex]) || null
-  : selectedStudent;
+ /* ---------- Student Name ---------- */
+const studentName = canvas
+  .getObjects()
+  .find((o) => o.customId === "studentName");
 
-if (currentStudent) {
-  const displayName =
-    `${currentStudent.firstName || ""} ${currentStudent.lastName || ""}`.trim();
-
-  /* ---------- Student Name ---------- */
-  const namePlaceholder = getSavedProps("studentName") || {};
-
-  // Try to find a tagged name object; if none, fallback to first i-text
-  let nameObj = canvas.getObjects().find(o => o.customId === "studentName");
-  if (!nameObj) {
-    nameObj = canvas.getObjects().find(o => o.type === "i-text");
-    if (nameObj) nameObj.customId = "studentName"; // tag it for future
-  }
-
-  if (nameObj) {
-    // Update existing text (no flicker)
-    nameObj.set({
-      text:     displayName,
-      left:     namePlaceholder.left     ?? nameObj.left,
-      top:      namePlaceholder.top      ?? nameObj.top,
-      fontSize: namePlaceholder.fontSize ?? nameObj.fontSize,
-      fill:     namePlaceholder.fill     ?? nameObj.fill ?? "#000",
-      originX: namePlaceholder.originX || "center",
-    originY: namePlaceholder.originY || "center",
-      fontFamily: namePlaceholder.fontFamily || nameObj.fontFamily,
-      fontWeight: namePlaceholder.fontWeight || nameObj.fontWeight,
-      textAlign:  namePlaceholder.textAlign  || nameObj.textAlign,
-    });
-  } else {
-    // Add new if nothing found
-    const newName = new fabric.IText(displayName, {
-      left:     namePlaceholder.left     ?? canvas.width * 0.33,
-      top:      namePlaceholder.top      ?? canvas.height * 0.55,
-      fontSize: namePlaceholder.fontSize ?? 22,
-      fill:     namePlaceholder.fill     ?? "#000",
-      fontFamily: namePlaceholder.fontFamily || "Arial",
-      fontWeight: namePlaceholder.fontWeight || "normal",
-      textAlign:  namePlaceholder.textAlign  || "left",
-      originX:    namePlaceholder.originX    || "left",
-      originY:    namePlaceholder.originY    || "top",
-    });
-    newName.customId = "studentName";
-    canvas.add(newName);
-    studentObjectsRef.current.push(newName);
-  }
-
-  /* ---------- Student Photo ---------- */
-  const photoUrl = Array.isArray(currentStudent.photo)
-    ? currentStudent.photo[0]
-    : currentStudent.photo;
-
-  if (photoUrl) {
-    // Find the saved frameSlot (purple outline in template)
-    const frame = canvas.getObjects().find(o => o.customId === "frameSlot");
-    if (frame) {
-      // Remove any existing student photo object
-      const existingPhoto = canvas.getObjects().find(o => o.customId === "studentPhoto");
-      if (existingPhoto) {
-        canvas.remove(existingPhoto);
-      }
-
-      const placeImage = (img) => {
-  // Clone path as clip
-  const clip = fabric.util.object.clone(frame);
-  clip.set({
-    absolutePositioned: true,
-    evented: false,
-    selectable: false
-  });
-
-  // Scale to fit bounding box, not raw width/height
-  const bounds = frame.getBoundingRect();
-  const scaleX = bounds.width / img.width;
-  const scaleY = bounds.height / img.height;
-  const scale = Math.min(scaleX, scaleY);
-
-  img.set({
-    left: bounds.left + bounds.width / 2,
-    top:  bounds.top + bounds.height / 2,
-    originX: "center",
-    originY: "center",
-    scaleX: scale,
-    scaleY: scale,
-    clipPath: clip
-  });
-  img.customId = "studentPhoto";
-
-  canvas.add(img);
-  canvas.bringToFront(img);
-  canvas.renderAll();
-
-  studentObjectsRef.current.push(img);
-};
-
-
-      safeLoadImage(photoUrl, placeImage);
-    }
-  }
+if (studentName) {
+  // Remove old name
+  canvas.remove(studentName);
+  studentObjectsRef.current =
+    studentObjectsRef.current.filter((o) => o.customId !== "studentName");
 }
 
+const namePlaceholder = studentLayoutsRef.current.studentName;
+
+if (namePlaceholder) {
+  const displayName = student.name || "Unnamed";
+
+  const nameObj = new fabric.Textbox(displayName, {
+    left: namePlaceholder.left ?? 100,
+    top: namePlaceholder.top ?? 100,
+    fontSize: namePlaceholder.fontSize ?? 20,
+    fill: namePlaceholder.fill ?? "#000",
+    fontFamily: namePlaceholder.fontFamily || "Arial",
+    fontWeight: namePlaceholder.fontWeight || "normal",
+    textAlign: namePlaceholder.textAlign || "center",
+    originX: namePlaceholder.originX ?? "center",
+    originY: namePlaceholder.originY ?? "center",
+  });
+
+  nameObj.customId = "studentName";
+  canvas.add(nameObj);
+  nameObj.bringToFront();
+  canvas.renderAll();
+
+  studentObjectsRef.current.push(nameObj);
+}
+
+  
+
+  /* ---------- Student Photo ---------- */
+const studentPhoto = canvas
+  .getObjects()
+  .find((o) => o.id === "studentPhoto");
+
+if (studentPhoto) {
+  // Remove old photo
+  canvas.remove(studentPhoto);
+  studentObjectsRef.current = studentObjectsRef.current.filter(
+    (o) => o.customId !== "studentPhoto"
+  );
+}
+
+const frame = canvas.getObjects().find((o) => o.id === "studentPhotoFrame");
+
+if (frame && student.photoUrl) {
+  fabric.Image.fromURL(student.photoUrl, (img) => {
+    const bounds = frame.getBoundingRect();
+
+    // Clone frame for clipping
+    const clip = fabric.util.object.clone(frame);
+    clip.set({
+      absolutePositioned: true,
+      evented: false,
+      selectable: false,
+      left: bounds.left,
+      top: bounds.top,
+    });
+
+    // Scale image to fit inside bounding box
+    const scaleX = bounds.width / img.width;
+    const scaleY = bounds.height / img.height;
+    const scale = Math.min(scaleX, scaleY);
+
+    img.set({
+      left: bounds.left + bounds.width / 2,
+      top: bounds.top + bounds.height / 2,
+      originX: "center",
+      originY: "center",
+      scaleX: scale,
+      scaleY: scale,
+      clipPath: clip,
+    });
+
+    img.customId = "studentPhoto";
+    canvas.add(img);
+    img.bringToFront();
+    canvas.renderAll();
+
+    studentObjectsRef.current.push(img);
+  });
+}
 
 
     // 4) Institute logo & signature

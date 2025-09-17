@@ -1237,7 +1237,7 @@ function attachSaveHandlers(img) {
     // 1) Background
     addTemplateBg();
 
- /* ---------- Student Name ---------- */
+/* ---------- Student Name ---------- */
 const studentName = canvas
   .getObjects()
   .find((o) => o.customId === "studentName");
@@ -1251,30 +1251,30 @@ if (studentName) {
 
 const namePlaceholder = studentLayoutsRef.current.studentName;
 
-const displayName = student.name || "Unnamed";
+const displayName = `${selectedStudent?.firstName || ""} ${selectedStudent?.lastName || ""}`.trim() || "Unnamed";
 
-  const nameObj = new fabric.Textbox(displayName, {
-    left: namePlaceholder.left ?? 100,
-    top: namePlaceholder.top ?? 100,
-    fontSize: namePlaceholder.fontSize ?? 20,
-    fill: namePlaceholder.fill ?? "#000",
-    fontFamily: namePlaceholder.fontFamily || "Arial",
-    fontWeight: namePlaceholder.fontWeight || "normal",
-    textAlign: namePlaceholder.textAlign || "center",
-    originX: namePlaceholder.originX ?? "center",
-    originY: namePlaceholder.originY ?? "center",
-    width: namePlaceholder?.width ?? (canvas.width - 40),
-  });
+const nameObj = new fabric.Textbox(displayName, {
+  left: namePlaceholder?.left ?? canvas.width / 2,
+  top: namePlaceholder?.top ?? (canvas.height - 80),
+  fontSize: namePlaceholder?.fontSize ?? 28,
+  fill: namePlaceholder?.fill ?? "#000",
+  fontFamily: namePlaceholder?.fontFamily || "Arial",
+  fontWeight: namePlaceholder?.fontWeight || "bold",
+  textAlign: namePlaceholder?.textAlign || "center",
+  originX: namePlaceholder?.originX ?? "center",
+  originY: namePlaceholder?.originY ?? "top",
+  width: namePlaceholder?.width ?? (canvas.width - 40),
+});
 
-  nameObj.customId = "studentName";
-  canvas.add(nameObj);
-  nameObj.bringToFront();
-  canvas.renderAll();
+nameObj.customId = "studentName";
+canvas.add(nameObj);
+nameObj.bringToFront();
+canvas.renderAll();
 
-  studentObjectsRef.current.push(nameObj);
+studentObjectsRef.current.push(nameObj);
 
 
-  
+
 
   /* ---------- Student Photo ---------- */
 const studentPhoto = canvas
@@ -1284,17 +1284,16 @@ const studentPhoto = canvas
 if (studentPhoto) {
   // Remove old photo
   canvas.remove(studentPhoto);
-  studentObjectsRef.current = studentObjectsRef.current.filter(
-    (o) => o.customId !== "studentPhoto"
-  );
+  studentObjectsRef.current =
+    studentObjectsRef.current.filter((o) => o.customId !== "studentPhoto");
 }
 
 const frame = canvas.getObjects().find((o) => o.id === "studentPhotoFrame");
 
-if (student.photoUrl) {
-  fabric.Image.fromURL(student.photoUrl, (img) => {
+if (selectedStudent?.photo) {
+  fabric.Image.fromURL(selectedStudent.photo, (img) => {
     if (frame) {
-      // ✅ Place inside heart frame
+      // Place inside heart frame
       const bounds = frame.getBoundingRect();
 
       const clip = fabric.util.object.clone(frame);
@@ -1320,7 +1319,7 @@ if (student.photoUrl) {
         clipPath: clip,
       });
     } else {
-      // ✅ Fallback: center on canvas if no frame
+      // Fallback: center if no frame found
       img.set({
         left: canvas.width / 2,
         top: canvas.height / 2,

@@ -1173,255 +1173,167 @@ function attachSaveHandlers(img) {
 
 
   /* ==================== Render template + student objects ================== */
-  useEffect(() => {
-    if (!canvas) return;
+useEffect(() => {
+  if (!canvas) return;
 
-    // Clear previous scene
-    if (bgRef.current) { canvas.remove(bgRef.current); bgRef.current = null; }
-    if (logoRef.current) { canvas.remove(logoRef.current); logoRef.current = null; }
-    if (signatureRef.current) { canvas.remove(signatureRef.current); signatureRef.current = null; }
-    studentObjectsRef.current.forEach((o) => canvas.remove(o));
-    studentObjectsRef.current = [];
+  // -------- Helpers --------
+  const safeLoadImage = (url, cb) => {
+    if (!url) return;
+    fabric.Image.fromURL(
+      url,
+      (img) => { try { cb && cb(img); } catch (e) { console.error(e); } },
+      { crossOrigin: "anonymous" }
+    );
+  };
 
-    const addTemplateBg = () => {
-      if (!templateImage) return;
-      try {
-        if (typeof templateImage.clone === "function") {
-          templateImage.clone((bg) => {
-            if (!bg) return;
-            bg.scaleX = canvas.width / bg.width;
-            bg.scaleY = canvas.height / bg.height;
-            bg.set({ selectable: false, evented: false });
-            canvas.add(bg);
-            bg.sendToBack();
-            bgRef.current = bg;
-            canvas.requestRenderAll();
-          });
-        } else {
-          // Fallback: draw directly (may mutate original)
-          const bg = templateImage;
-          bg.scaleX = canvas.width / bg.width;
-          bg.scaleY = canvas.height / bg.height;
-          bg.set({ selectable: false, evented: false });
-          canvas.add(bg);
-          bg.sendToBack();
-          bgRef.current = bg;
-        }
-      } catch (e) {
-        console.warn("Template BG add failed:", e);
-      }
-    };
+  const currentStudent = bulkMode
+    ? filteredStudents.find(s => s?.uuid === bulkList[bulkIndex]) || null
+    : selectedStudent;
 
-    // Helper for loading external images safely with CORS
-    const safeLoadImage = (url, cb) => {
-      if (!url) return;
-      fabric.Image.fromURL(
-        url,
-        (img) => { try { cb && cb(img); } catch (e) { console.error(e); } },
-        { crossOrigin: "anonymous" }
-      );
-    };
+  /* === 1) Background image === */
+  if (templateImage) {
+    if (!bgRef.current) {
+      templateImage.clone(bg => {
+        bg.scaleX = canvas.width / bg.width;
+        bg.scaleY = canvas.height / bg.height;
+        bg.set({ selectable: false, evented: false });
+        canvas.add(bg);
+        bg.sendToBack();
+        bgRef.current = bg;
+        canvas.requestRenderAll();
+      });
+    }
+  }
 
-    // 1) Background
-    addTemplateBg();
-
-   // === 2) Current student (bulk-aware) ===
-const currentStudent = bulkMode
-  ? filteredStudents.find(s => s?.uuid === bulkList[bulkIndex]) || null
-  : selectedStudent;
-
-if (currentStudent) {
+  /* === 2) Student name === */
   const savedName = getSavedProps("studentName") || {};
-
-  // Build the display name once, trim any extra space
   const displayName =
-    `${currentStudent.firstName || ""} ${currentStudent.lastName || ""}`.trim();
+    currentStudent
+      ? `${currentStudent.firstName || ""} ${currentStudent.lastName || ""}`.trim()
+      : "";
 
-  // Create or update the text object
-  const existingName = canvas
-    .getObjects()
-    .find(o => o.customId === "studentName");
-
-  if (existingName) {
-    // Update text and style if already present
-    existingName.set({
-      text: displayName,
-      left:     savedName.left     ?? existingName.left,
-      top:      savedName.top      ?? existingName.top,
-      fontSize: savedName.fontSize ?? existingName.fontSize,
-      fill:     savedName.fill     ?? existingName.fill ?? "#000",
-    });
-    canvas.requestRenderAll();
-  } else {
-    // Add a new text object at the saved position, size and color
-    const nameText = new fabric.IText(displayName, {
-      left:     savedName.left     ?? Math.round(canvas.width  * 0.33),
-      top:      savedName.top      ?? Math.round(canvas.height * 0.55),
+  let nameObj = canvas.getObjects().find(o => o.customId === "studentName");
+  if (nameObj) {
+    // Update only text (avoid flicker)
+    nameObj.set({ text: displayName });
+  } else if (displayName) {
+    nameObj = new fabric.IText(displayName, {
+      left: savedName.left ?? canvas.width * 0.33,
+      top:  savedName.top  ?? canvas.height * 0.55,
       fontSize: savedName.fontSize ?? 22,
-      fill:     savedName.fill     ?? "#000",   // <- use saved color if available
+      fill: savedName.fill ?? "#000",
       fontFamily: savedName.fontFamily || "Arial",
       fontWeight: savedName.fontWeight || "normal",
       textAlign:  savedName.textAlign  || "left",
       originX:    savedName.originX    || "left",
       originY:    savedName.originY    || "top",
     });
-
-    nameText.customId = "studentName";
-    nameText.field    = "studentName";
-
-    canvas.add(nameText);
-    studentObjectsRef.current.push(nameText);
-
-    setSavedPlaceholders((prev) => [
-    ...prev.filter(p => p.field !== "studentName"),
-    { field: "studentName", left: nameText.left, top: nameText.top, fontSize: nameText.fontSize, fill: nameText.fill, fontFamily: nameText.fontFamily }
-  ]);
+    nameObj.customId = "studentName";
+    canvas.add(nameObj);
   }
-}
 
+  /* === 3) Student photo inside frame === */
+  const savedPhoto = getSavedProps("studentPhoto") || {};
+  const frameShape = savedPhoto.shape || "rect";
+  const photoUrl = currentStudent
+    ? (Array.isArray(currentStudent.photo)
+        ? currentStudent.photo[0]
+        : currentStudent.photo)
+    : null;
 
-// === 3) Student photo inside saved frame ===
-const current = currentStudent;
-const savedPhoto = getSavedProps("studentPhoto") || {};
-const frameShape = savedPhoto.shape || "rect";    
-const photoUrl  = Array.isArray(current?.photo) ? current.photo[0] : current?.photo;
-
-if (photoUrl && frameShape) {
-  // remove old photo only
-  canvas.getObjects().forEach(o => {
-    if (o.customId === "studentPhoto") canvas.remove(o);
-  });
-
-   safeLoadImage(photoUrl, img => {
-    // Scale to match the saved frame size
-    const scaleX =
-      savedPhoto.scaleX ??
-      (savedPhoto.width  ? savedPhoto.width  / img.width  : 1);
-    const scaleY =
-      savedPhoto.scaleY ??
-      (savedPhoto.height ? savedPhoto.height / img.height : 1);
-
-    img.set({
-      left:   savedPhoto.left ?? 0,
-      top:    savedPhoto.top  ?? 0,
-      originX: "center",
-      originY: "center",
-      scaleX,
-      scaleY,
-    });
-    img.customId = "studentPhoto";
-
-    // Clip/mask to the saved shape
-    applyMaskAndFrame(canvas, img, frameShape, {
-      stroke: frameBorder,
-      strokeWidth: frameWidth,
-      rx: frameCorner,
-      absolute: false,
-      followImage: true,
-    });
-
-    canvas.add(img);
-    studentObjectsRef.current.push(img);
-    canvas.requestRenderAll();
-  });
-}
-
-
-    // 4) Institute logo & signature
-    if (showLogo && selectedInstitute?.logo) {
-      // check if logo already exists
-      let existingLogo = canvas.getObjects().find(obj => obj.customId === "logo");
-      if (!existingLogo) {
-        const savedLogo = getSavedProps("logo");
-        safeLoadImage(selectedInstitute.logo, (img) => {
-          if (savedLogo) {
-            const scaleX = savedLogo.width && img.width ? savedLogo.width / img.width : savedLogo.scaleX ?? 1;
-            const scaleY = savedLogo.height && img.height ? savedLogo.height / img.height : savedLogo.scaleY ?? 1;
-            img.set({
-              left: savedLogo.left ?? 20,
-              top: savedLogo.top ?? 20,
-              scaleX,
-              scaleY,
-              angle: savedLogo.angle ?? 0
-            });
-          } else {
-            img.scaleToWidth(Math.round(canvas.width * 0.2));
-            img.set({ left: 20, top: 20 });
-          }
-          img.customId = "logo";
-          img.field = "logo";
-          logoRef.current = img;
-          canvas.add(img);
-          img.setCoords();
+  if (photoUrl) {
+    let imgObj = canvas.getObjects().find(o => o.customId === "studentPhoto");
+    if (imgObj) {
+      // Replace image source only
+      fabric.Image.fromURL(
+        photoUrl,
+        (img) => {
+          imgObj.setElement(img.getElement());
           canvas.requestRenderAll();
-        });
-      }
+        },
+        { crossOrigin: "anonymous" }
+      );
     } else {
-      // if user unchecks showLogo, remove from canvas
-      const existingLogo = canvas.getObjects().find(obj => obj.customId === "logo");
-      if (existingLogo) {
-        canvas.remove(existingLogo);
-        logoRef.current = null;
-        canvas.requestRenderAll();
-      }
-    }
+      safeLoadImage(photoUrl, (img) => {
+        const scaleX =
+          savedPhoto.scaleX ??
+          (savedPhoto.width ? savedPhoto.width / img.width : 1);
+        const scaleY =
+          savedPhoto.scaleY ??
+          (savedPhoto.height ? savedPhoto.height / img.height : 1);
 
-    if (showSignature && selectedInstitute?.signature) {
-      // check if signature already exists
-      let existingSignature = canvas.getObjects().find(obj => obj.customId === "signature");
-      if (!existingSignature) {
-        const savedSign = getSavedProps("signature");
-        safeLoadImage(selectedInstitute.signature, (img) => {
-          if (savedSign) {
-            const scaleX = savedSign.width && img.width ? savedSign.width / img.width : savedSign.scaleX ?? 1;
-            const scaleY = savedSign.height && img.height ? savedSign.height / img.height : savedSign.scaleY ?? 1;
-            img.set({
-              left: savedSign.left ?? canvas.width - 150,
-              top: savedSign.top ?? canvas.height - 80,
-              scaleX,
-              scaleY,
-              angle: savedSign.angle ?? 0
-            });
-          } else {
-            img.scaleToWidth(Math.round(canvas.width * 0.3));
-            img.set({ left: canvas.width - 150, top: canvas.height - 80 });
-          }
-          img.customId = "signature";
-          img.field = "signature";
-          signatureRef.current = img;
-          canvas.add(img);
-          img.setCoords();
-          canvas.requestRenderAll();
+        img.set({
+          left: savedPhoto.left ?? 0,
+          top:  savedPhoto.top  ?? 0,
+          originX: "center",
+          originY: "center",
+          scaleX,
+          scaleY,
         });
-      }
-    } else {
-      // if user unchecks showSignature, remove from canvas
-      const existingSignature = canvas.getObjects().find(obj => obj.customId === "signature");
-      if (existingSignature) {
-        canvas.remove(existingSignature);
-        signatureRef.current = null;
-        canvas.requestRenderAll();
-      }
+        img.customId = "studentPhoto";
+
+        // Clip/mask to saved frame
+        applyMaskAndFrame(canvas, img, frameShape, {
+          stroke: frameBorder,
+          strokeWidth: frameWidth,
+          rx: frameCorner,
+          absolute: false,
+          followImage: true,
+        });
+
+        canvas.add(img);
+      });
     }
+  }
 
+  /* === 4) Logo & signature === */
+  const toggleImage = (key, src, ref, propsKey) => {
+    if (!src) {
+      if (ref.current) {
+        canvas.remove(ref.current);
+        ref.current = null;
+      }
+      return;
+    }
+    if (ref.current) return; // already added
+    const saved = getSavedProps(propsKey);
+    safeLoadImage(src, (img) => {
+      if (saved) {
+        const scaleX = saved.width && img.width ? saved.width / img.width : saved.scaleX ?? 1;
+        const scaleY = saved.height && img.height ? saved.height / img.height : saved.scaleY ?? 1;
+        img.set({ left: saved.left ?? 20, top: saved.top ?? 20, scaleX, scaleY, angle: saved.angle ?? 0 });
+      } else {
+        img.scaleToWidth(Math.round(canvas.width * 0.2));
+        img.set({ left: 20, top: 20 });
+      }
+      img.customId = key;
+      ref.current = img;
+      canvas.add(img);
+      img.setCoords();
+      canvas.requestRenderAll();
+    });
+  };
 
-    canvas.requestRenderAll();
-  }, [
-    canvas,
-    selectedInstitute,
-    templateImage,
-    selectedStudent,
-    getSavedProps,
-    frameBorder,
-    frameWidth,
-    frameCorner,
-    bulkMode,
-    bulkList,
-    bulkIndex,
-    filteredStudents,
-    showLogo,
-    showSignature
-  ]);
+  if (showLogo)       toggleImage("logo",       selectedInstitute?.logo,       logoRef,       "logo");
+  if (showSignature)  toggleImage("signature",  selectedInstitute?.signature,  signatureRef,  "signature");
+
+  canvas.requestRenderAll();
+}, [
+  canvas,
+  templateImage,
+  selectedStudent,
+  bulkMode,
+  bulkList,
+  bulkIndex,
+  filteredStudents,
+  frameBorder,
+  frameWidth,
+  frameCorner,
+  showLogo,
+  showSignature,
+  getSavedProps,
+  selectedInstitute
+]);
 
   /* ============================= Canvas events ============================ */
   useEffect(() => {

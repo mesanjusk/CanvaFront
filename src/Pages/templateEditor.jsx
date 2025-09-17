@@ -972,20 +972,12 @@ const loadTemplateById = useCallback(
     if (!templateId || lastLoadedId.current === templateId) return;
     lastLoadedId.current = templateId;
 
-     // make sure Fabric canvas exists
-    if (!canvas) {
-      console.error("Fabric canvas not ready");
-      return;
-    }
-
     setLoadingTemplate(true);
     try {
       const { data } = await axios.get(
         `https://canvaback.onrender.com/api/template/${templateId}`
       );
 
-      // applyTemplateResponse should NOT re-create the canvas,
-      // just call canvas.loadFromJSON
       await new Promise((resolve, reject) => {
         canvas.loadFromJSON(
           data.canvasJson,
@@ -1003,7 +995,7 @@ const loadTemplateById = useCallback(
     } catch (err) {
       console.error(err);
       toast.error("Failed to load template");
-      lastLoadedId.current = null; // allow retry
+      lastLoadedId.current = null; 
     } finally {
       setLoadingTemplate(false);
     }
@@ -1011,10 +1003,12 @@ const loadTemplateById = useCallback(
   [canvas, resetHistory, saveHistoryDebounced, setActiveTemplateId]
 );
 
-// Initial load
+
 useEffect(() => {
-  if (templateId) loadTemplateById(templateId);
-}, [templateId, loadTemplateById]);
+  if (!templateId) return;
+  if (!canvas) return; 
+  loadTemplateById(templateId);
+}, [templateId, canvas, loadTemplateById]);
 
 
 

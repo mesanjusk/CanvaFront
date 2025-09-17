@@ -2737,7 +2737,7 @@ const gotoIndex = (idx) => {
         }}
       />
 
-      <BottomNavBar />
+       {isMobile && <BottomNavBar />}
 
     </div>
   );

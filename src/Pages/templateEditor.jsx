@@ -57,20 +57,20 @@ import {
   Ruler
 } from "lucide-react";
 import { Layout as LayoutIcon, BookOpen, Scissors } from "lucide-react";
-import IconButton from "./IconButton";
-import CanvasArea from "./CanvasArea";
-import ImageCropModal from "./ImageCropModal";
-import UndoRedoControls from "./UndoRedoControls";
+import IconButton from "../components/IconButton";
+import CanvasArea from "../components/CanvasArea";
+import ImageCropModal from "../components/ImageCropModal";
+import UndoRedoControls from "../components/UndoRedoControls";
 import { jsPDF } from "jspdf";
-import TemplateLayout from "../Pages/addTemplateLayout";
-import PrintSettings from "./PrintSettings";
-import FrameSection from "./FrameSection";
-import ShapeStylePanel from "./ShapeStylePanel";
+import TemplateLayout from "./addTemplateLayout";
+import PrintSettings from "../components/PrintSettings";
+import FrameSection from "../components/FrameSection";
+import ShapeStylePanel from "../components/ShapeStylePanel";
 import { buildClipShape, buildOverlayShape, moveOverlayAboveImage, applyMaskAndFrame, removeMaskAndFrame } from "../utils/shapeUtils";
 import { PRESET_SIZES, mmToPx, pxToMm, drawCropMarks, drawRegistrationMark } from "../utils/printUtils";
 import { removeBackground } from "../utils/backgroundUtils";
-import SelectionToolbar from "./SelectionToolbar";
-import BottomNavBar from "./BottomNavBar";
+import SelectionToolbar from "../components/SelectionToolbar";
+import BottomNavBar from "../components/BottomNavBar";
 
 let __CLIPBOARD = null;
 /* ===================== Helpers ===================== */
@@ -2737,7 +2737,7 @@ const gotoIndex = (idx) => {
         }}
       />
 
-      <BottomNavBar />
+       {isMobile && <BottomNavBar />}
 
     </div>
   );

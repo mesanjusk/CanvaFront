@@ -304,6 +304,7 @@ const LayersPanel = ({ canvas, onSelect }) => {
 const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   const { templateId: routeId } = useParams();
   const templateId = propTemplateId || routeId;
+   const isMobile = useMediaQuery("(max-width: 768px)");
   const [showLogo, setShowLogo] = useState(false);
   const [showSignature, setShowSignature] = useState(false);
 

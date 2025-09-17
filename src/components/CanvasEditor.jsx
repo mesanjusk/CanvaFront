@@ -1264,6 +1264,8 @@ if (currentStudent) {
       top:      namePlaceholder.top      ?? nameObj.top,
       fontSize: namePlaceholder.fontSize ?? nameObj.fontSize,
       fill:     namePlaceholder.fill     ?? nameObj.fill ?? "#000",
+      originX: namePlaceholder.originX || "center",
+    originY: namePlaceholder.originY || "center",
       fontFamily: namePlaceholder.fontFamily || nameObj.fontFamily,
       fontWeight: namePlaceholder.fontWeight || nameObj.fontWeight,
       textAlign:  namePlaceholder.textAlign  || nameObj.textAlign,
@@ -1302,36 +1304,38 @@ if (currentStudent) {
       }
 
       const placeImage = (img) => {
-        // Create a fresh Path to use as clipPath (clone, don’t reuse the same object)
-        const clip = new fabric.Path(frame.path, {
-          left: frame.left,
-          top: frame.top,
-          originX: "center",
-          originY: "center",
-          scaleX: frame.scaleX,
-          scaleY: frame.scaleY,
-           absolutePositioned: true
-        });
+  // Clone path as clip
+  const clip = fabric.util.object.clone(frame);
+  clip.set({
+    absolutePositioned: true,
+    evented: false,
+    selectable: false
+  });
 
-        // Scale the image to fit the frame bounds
-        const scaleX = (frame.width * frame.scaleX) / img.width;
-        const scaleY = (frame.height * frame.scaleY) / img.height;
+  // Scale to fit bounding box, not raw width/height
+  const bounds = frame.getBoundingRect();
+  const scaleX = bounds.width / img.width;
+  const scaleY = bounds.height / img.height;
+  const scale = Math.min(scaleX, scaleY);
 
-        img.set({
-          left: frame.left,
-          top:  frame.top,
-          originX: "center",
-          originY: "center",
-          scaleX,
-          scaleY,
-          clipPath: clip
-        });
-        img.customId = "studentPhoto";
-        canvas.add(img);
-        canvas.bringToFront(img);
-canvas.renderAll(); 
-        studentObjectsRef.current.push(img);
-      };
+  img.set({
+    left: bounds.left + bounds.width / 2,
+    top:  bounds.top + bounds.height / 2,
+    originX: "center",
+    originY: "center",
+    scaleX: scale,
+    scaleY: scale,
+    clipPath: clip
+  });
+  img.customId = "studentPhoto";
+
+  canvas.add(img);
+  canvas.bringToFront(img);
+  canvas.renderAll();
+
+  studentObjectsRef.current.push(img);
+};
+
 
       safeLoadImage(photoUrl, placeImage);
     }

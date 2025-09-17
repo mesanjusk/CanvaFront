@@ -12,6 +12,7 @@ const TemplateLayout = ({
     if (!canvas || !activeTemplateId) return;
 
     try {
+      canvas.renderAll();
        const canvasJson = canvas.toJSON([
         "customId",
         "clipPath",

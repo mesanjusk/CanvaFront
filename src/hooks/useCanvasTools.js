@@ -25,7 +25,7 @@ export function useCanvasTools({ width, height }) {
       fontSize: options.fontSize ?? fontSize,
       fontFamily: options.fontFamily || "Arial",
     });
-
+text.customId = "templateText";
     // Mark as student name field if requested
     if (options.markStudentName) {
       text.customId = "studentName";

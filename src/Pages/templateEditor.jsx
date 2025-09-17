@@ -773,6 +773,7 @@ const TemplateEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
       selectable: true,
       evented: true,
       hoverCursor: "move",
+      customId: "frameSlot", 
     });
     overlay.shapeType = shapeType;
     overlay.isFrameSlot = true;

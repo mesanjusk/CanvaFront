@@ -303,6 +303,7 @@ const LayersPanel = ({ canvas, onSelect }) => {
 ============================================================================= */
 const TemplateEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
    const { id: routeId } = useParams();
+   const lastLoadedId = useRef(null);
   const templateId = propTemplateId || routeId;
   const [showLogo, setShowLogo] = useState(false);
   const [showSignature, setShowSignature] = useState(false);
@@ -967,31 +968,48 @@ const TemplateEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   );
 
 const loadTemplateById = useCallback(
-    async (templateId) => {
-      if (!templateId) return;
-      setLoadingTemplate(true);
-      try {
-        const res = await axios.get(
-          `https://canvaback.onrender.com/api/template/${templateId}`
-        );
-        await applyTemplateResponse(res.data || {});
-        setActiveTemplateId(templateId);
-        resetHistory();
-        saveHistoryDebounced();
-      } catch {
-        toast.error("Failed to load template");
-      } finally {
-        setLoadingTemplate(false);
-      }
-    },
-    [applyTemplateResponse, resetHistory, saveHistory]
-  );
+  async (templateId) => {
+    if (!templateId || lastLoadedId.current === templateId) return;
+    lastLoadedId.current = templateId;
 
-  // Initial template load (from route or prop)
+    setLoadingTemplate(true);
+    try {
+      const { data } = await axios.get(
+        `https://canvaback.onrender.com/api/template/${templateId}`
+      );
+
+      // applyTemplateResponse should NOT re-create the canvas,
+      // just call canvas.loadFromJSON
+      await new Promise((resolve, reject) => {
+        fabricCanvasRef.current.loadFromJSON(
+          data.canvasJson,
+          () => {
+            fabricCanvasRef.current.renderAll();
+            resolve();
+          },
+          (err) => reject(err)
+        );
+      });
+
+      setActiveTemplateId(templateId);
+      resetHistory();
+      saveHistoryDebounced();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load template");
+      lastLoadedId.current = null; // allow retry
+    } finally {
+      setLoadingTemplate(false);
+    }
+  },
+  [resetHistory, saveHistoryDebounced]
+);
+
+// Initial load
 useEffect(() => {
-  if (!templateId) return;
-  loadTemplateById(templateId);
+  if (templateId) loadTemplateById(templateId);
 }, [templateId, loadTemplateById]);
+
 
 
 function attachSaveHandlers(img) {

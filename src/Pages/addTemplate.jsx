@@ -49,6 +49,11 @@ const AddTemplate = () => {
   newCanvas.add(rect); 
 
   fabricCanvasRef.current = newCanvas;
+
+  return () => {
+    // dispose when component unmounts, not on every render
+    newCanvas.dispose();
+  };
 }, []);
 
 

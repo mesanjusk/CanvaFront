@@ -10,6 +10,7 @@ import React, {
 import toast, { Toaster } from "react-hot-toast";
 import { useCanvasEditor } from "../hooks/useCanvasEditor";
 import { useCanvasTools } from "../hooks/useCanvasTools";
+import useMediaQuery from "../hooks/useMediaQuery";
 import { getStoredUser, getStoredInstituteUUID } from "../utils/storageUtils";
 import { Button, Stack, Slider, Switch, FormControlLabel } from "@mui/material";
 import axios from "axios";

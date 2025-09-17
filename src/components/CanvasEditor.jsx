@@ -1230,81 +1230,41 @@ if (currentStudent) {
 }
 
 
-// === 3) Student photo ===
+// === 3) Student photo inside saved frame ===
 const current = currentStudent;
-const photoUrl = Array.isArray(current?.photo) ? current.photo[0] : current?.photo;
 const savedPhoto = getSavedProps("studentPhoto") || {};
-const photoLeft  = savedPhoto.left ?? Math.round(canvas.width * 0.5);
-const photoTop   = savedPhoto.top  ?? Math.round(canvas.height * 0.33);
+const frameShape = savedPhoto.shape;    
+const photoUrl  = Array.isArray(current?.photo) ? current.photo[0] : current?.photo;
 
-// ⚠️  Only use a shape if it was actually saved – no default circle.
-const savedShape = savedPhoto.shape || null;
+if (photoUrl && frameShape) {
+  // remove old photo only
+  canvas.getObjects().forEach(o => {
+    if (o.customId === "studentPhoto") canvas.remove(o);
+  });
 
-if (photoUrl) {
-  // Look for an existing student photo on the canvas (from DB or a previous run)
-  const existingPhoto = canvas
-    .getObjects()
-    .find(obj => obj.customId === "studentPhoto");
-
-  if (existingPhoto) {
-    // Just update position/scale if the user changed them
-    existingPhoto.set({
-      left:   savedPhoto.left   ?? existingPhoto.left,
-      top:    savedPhoto.top    ?? existingPhoto.top,
-      scaleX: savedPhoto.scaleX ?? existingPhoto.scaleX,
-      scaleY: savedPhoto.scaleY ?? existingPhoto.scaleY,
-    });
-    canvas.requestRenderAll();
-    return; // ✅ Done – no new image, no new mask
-  }
-
-  // Add the photo only if it isn’t already present
   safeLoadImage(photoUrl, img => {
-    const phWidth  = Math.min(400, canvas.width  * 0.6);
-    const phHeight = Math.min(400, canvas.height * 0.6);
-    const autoScale = Math.min(phWidth / img.width, phHeight / img.height, 1);
+    const scaleX = savedPhoto.scaleX ?? 1;
+    const scaleY = savedPhoto.scaleY ?? 1;
 
     img.set({
       originX: "center",
       originY: "center",
-      left: photoLeft,
-      top: photoTop,
-      scaleX: savedPhoto.scaleX ?? autoScale,
-      scaleY: savedPhoto.scaleY ?? autoScale,
+      left: savedPhoto.left,
+      top: savedPhoto.top,
+      scaleX,
+      scaleY,
     });
     img.customId = "studentPhoto";
-    img.field    = "studentPhoto";
 
-    // ✅ Only apply mask/frame if a shape was actually saved
-    if (savedShape) {
-      applyMaskAndFrame(canvas, img, savedShape, {
-        stroke: frameBorder,
-        strokeWidth: frameWidth,
-        rx: frameCorner,
-        absolute: false,
-        followImage: true,
-      });
-    }
-
-    img.set({
-      lockMovementX: false,
-      lockMovementY: false,
-      lockScalingX:  false,
-      lockScalingY:  false,
-      lockRotation:  false,
-      hasControls:   true,
-      selectable:    true,
-      evented:       true,
+    // Clip/mask to the saved frame
+    applyMaskAndFrame(canvas, img, frameShape, {
+      stroke: frameBorder,
+      strokeWidth: frameWidth,
+      rx: frameCorner,
+      absolute: false,
+      followImage: true,
     });
 
-    img.on("selected",   () => setActiveStudentPhoto(img));
-    img.on("deselected", () => setActiveStudentPhoto(null));
-    img.on("mousedblclick", () => {
-      enterAdjustMode(img);
-      fitImageToFrame(img, "cover");
-    });
-
-    attachSaveHandlers(img);
     canvas.add(img);
     studentObjectsRef.current.push(img);
     canvas.requestRenderAll();

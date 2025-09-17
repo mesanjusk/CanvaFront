@@ -1109,11 +1109,22 @@ const applyTemplateResponse = useCallback(
       setTemplateImage(null);
     }
 
-    // ----------------- load saved canvas JSON -----------------
+    // -------- load saved canvas JSON & tag placeholders --------
     if (data?.canvasJson) {
       canvas.loadFromJSON(data.canvasJson, () => {
-        // once JSON is on the canvas, cache frame & text placeholders
+        // Tag the text and frame objects so later code can find them
+        canvas.getObjects().forEach(o => {
+          if (o.type === "i-text" && !o.customId) {
+            o.customId = "studentName";
+          }
+          if (o.type === "path" && o.stroke === "#7c3aed" && !o.customId) {
+            o.customId = "frameSlot";
+          }
+        });
+
+        // cache their positions for future updates
         cacheTemplatePlaceholders(canvas);
+
         canvas.renderAll();
       });
     }
@@ -1123,6 +1134,7 @@ const applyTemplateResponse = useCallback(
   },
   [setCanvasSize]
 );
+
 
 
   const loadTemplateById = useCallback(
@@ -1297,7 +1309,8 @@ if (currentStudent) {
           originX: "center",
           originY: "center",
           scaleX: frame.scaleX,
-          scaleY: frame.scaleY
+          scaleY: frame.scaleY,
+           absolutePositioned: true
         });
 
         // Scale the image to fit the frame bounds
@@ -1315,6 +1328,8 @@ if (currentStudent) {
         });
         img.customId = "studentPhoto";
         canvas.add(img);
+        canvas.bringToFront(img);
+canvas.renderAll(); 
         studentObjectsRef.current.push(img);
       };
 

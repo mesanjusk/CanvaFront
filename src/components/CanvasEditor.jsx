@@ -1067,6 +1067,12 @@ const loadGallaryById = useCallback(
       } else {
         setTemplateImage(null);
       }
+
+      if (data?.canvasJson) {
+      canvas.loadFromJSON(data.canvasJson, () => {
+        canvas.renderAll();
+      });
+    }
       // after applying template response (inside applyTemplateResponse or after loadTemplateById finishes)
       setShowLogo(false);
       setShowSignature(false);

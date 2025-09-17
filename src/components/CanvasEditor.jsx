@@ -1234,12 +1234,18 @@ if (currentStudent) {
   const displayName =
     `${currentStudent.firstName || ""} ${currentStudent.lastName || ""}`.trim();
 
-  // ---- Student name ----
+  /* ---------- Student Name ---------- */
   const namePlaceholder = getSavedProps("studentName") || {};
-  const nameObj = canvas.getObjects().find(o => o.customId === "studentName");
+
+  // Try to find a tagged name object; if none, fallback to first i-text
+  let nameObj = canvas.getObjects().find(o => o.customId === "studentName");
+  if (!nameObj) {
+    nameObj = canvas.getObjects().find(o => o.type === "i-text");
+    if (nameObj) nameObj.customId = "studentName"; // tag it for future
+  }
 
   if (nameObj) {
-    // update in place (no flicker)
+    // Update existing text (no flicker)
     nameObj.set({
       text:     displayName,
       left:     namePlaceholder.left     ?? nameObj.left,
@@ -1251,7 +1257,7 @@ if (currentStudent) {
       textAlign:  namePlaceholder.textAlign  || nameObj.textAlign,
     });
   } else {
-    // add once if missing
+    // Add new if nothing found
     const newName = new fabric.IText(displayName, {
       left:     namePlaceholder.left     ?? canvas.width * 0.33,
       top:      namePlaceholder.top      ?? canvas.height * 0.55,
@@ -1268,21 +1274,36 @@ if (currentStudent) {
     studentObjectsRef.current.push(newName);
   }
 
-  // ---- Student photo inside frameSlot ----
+  /* ---------- Student Photo ---------- */
   const photoUrl = Array.isArray(currentStudent.photo)
     ? currentStudent.photo[0]
     : currentStudent.photo;
 
   if (photoUrl) {
-    // find saved frame path (the purple outline in your template)
+    // Find the saved frameSlot (purple outline in template)
     const frame = canvas.getObjects().find(o => o.customId === "frameSlot");
     if (frame) {
-      const photoObj = canvas.getObjects().find(o => o.customId === "studentPhoto");
+      // Remove any existing student photo object
+      const existingPhoto = canvas.getObjects().find(o => o.customId === "studentPhoto");
+      if (existingPhoto) {
+        canvas.remove(existingPhoto);
+      }
 
       const placeImage = (img) => {
-        // scale image to fit frame bounds
+        // Create a fresh Path to use as clipPath (clone, don’t reuse the same object)
+        const clip = new fabric.Path(frame.path, {
+          left: frame.left,
+          top: frame.top,
+          originX: "center",
+          originY: "center",
+          scaleX: frame.scaleX,
+          scaleY: frame.scaleY
+        });
+
+        // Scale the image to fit the frame bounds
         const scaleX = (frame.width * frame.scaleX) / img.width;
         const scaleY = (frame.height * frame.scaleY) / img.height;
+
         img.set({
           left: frame.left,
           top:  frame.top,
@@ -1290,28 +1311,18 @@ if (currentStudent) {
           originY: "center",
           scaleX,
           scaleY,
-          clipPath: frame      // mask to the frame shape
+          clipPath: clip
         });
         img.customId = "studentPhoto";
         canvas.add(img);
         studentObjectsRef.current.push(img);
       };
 
-      if (photoObj) {
-        // just update image source/scale, keep same object to avoid flicker
-        photoObj.set({
-          clipPath: frame,
-          left: frame.left,
-          top:  frame.top,
-          scaleX: (frame.width * frame.scaleX) / photoObj.width,
-          scaleY: (frame.height * frame.scaleY) / photoObj.height,
-        });
-      } else {
-        safeLoadImage(photoUrl, placeImage);
-      }
+      safeLoadImage(photoUrl, placeImage);
     }
   }
 }
+
 
 
     // 4) Institute logo & signature

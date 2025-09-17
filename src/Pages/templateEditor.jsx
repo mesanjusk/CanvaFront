@@ -972,6 +972,12 @@ const loadTemplateById = useCallback(
     if (!templateId || lastLoadedId.current === templateId) return;
     lastLoadedId.current = templateId;
 
+     // make sure Fabric canvas exists
+    if (!canvas) {
+      console.error("Fabric canvas not ready");
+      return;
+    }
+
     setLoadingTemplate(true);
     try {
       const { data } = await axios.get(
@@ -981,10 +987,10 @@ const loadTemplateById = useCallback(
       // applyTemplateResponse should NOT re-create the canvas,
       // just call canvas.loadFromJSON
       await new Promise((resolve, reject) => {
-        fabricCanvasRef.current.loadFromJSON(
+        canvas.loadFromJSON(
           data.canvasJson,
           () => {
-            fabricCanvasRef.current.renderAll();
+            canvas.renderAll();
             resolve();
           },
           (err) => reject(err)
@@ -1002,7 +1008,7 @@ const loadTemplateById = useCallback(
       setLoadingTemplate(false);
     }
   },
-  [resetHistory, saveHistoryDebounced]
+  [canvas, resetHistory, saveHistoryDebounced, setActiveTemplateId]
 );
 
 // Initial load

@@ -1,4 +1,4 @@
-// TemplateEditor.jsx — updated with Canva-like behaviors, mobile FAB, grid, snapping, filters
+// CanvasEditor.jsx — updated with Canva-like behaviors, mobile FAB, grid, snapping, filters
 import React, {
   useEffect,
   useMemo,
@@ -57,20 +57,20 @@ import {
   Ruler
 } from "lucide-react";
 import { Layout as LayoutIcon, BookOpen, Scissors } from "lucide-react";
-import IconButton from "../components/IconButton";
-import CanvasArea from "../components/CanvasArea";
-import ImageCropModal from "../components/ImageCropModal";
-import UndoRedoControls from "../components/UndoRedoControls";
+import IconButton from "./IconButton";
+import CanvasArea from "./CanvasArea";
+import ImageCropModal from "./ImageCropModal";
+import UndoRedoControls from "./UndoRedoControls";
 import { jsPDF } from "jspdf";
 import TemplateLayout from "../Pages/addTemplateLayout";
-import PrintSettings from "../components/PrintSettings";
-import FrameSection from "../components/FrameSection";
-import ShapeStylePanel from "../components/ShapeStylePanel";
+import PrintSettings from "./PrintSettings";
+import FrameSection from "./FrameSection";
+import ShapeStylePanel from "./ShapeStylePanel";
 import { buildClipShape, buildOverlayShape, moveOverlayAboveImage, applyMaskAndFrame, removeMaskAndFrame } from "../utils/shapeUtils";
 import { PRESET_SIZES, mmToPx, pxToMm, drawCropMarks, drawRegistrationMark } from "../utils/printUtils";
 import { removeBackground } from "../utils/backgroundUtils";
-import SelectionToolbar from "../components/SelectionToolbar";
-import BottomNavBar from "../components/BottomNavBar";
+import SelectionToolbar from "./SelectionToolbar";
+import BottomNavBar from "./BottomNavBar";
 
 let __CLIPBOARD = null;
 /* ===================== Helpers ===================== */
@@ -302,8 +302,7 @@ const LayersPanel = ({ canvas, onSelect }) => {
    Main Editor
 ============================================================================= */
 const TemplateEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
-   const { id: routeId } = useParams();
-   const lastLoadedId = useRef(null);
+  const { templateId: routeId } = useParams();
   const templateId = propTemplateId || routeId;
   const [showLogo, setShowLogo] = useState(false);
   const [showSignature, setShowSignature] = useState(false);
@@ -341,6 +340,18 @@ const TemplateEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     cropImage,
     setCanvasSize,
   } = useCanvasTools({ width: tplSize.w, height: tplSize.h });
+
+  const handleUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setCropSrc(reader.result);
+        cropCallbackRef.current = (croppedUrl) => addImage(croppedUrl);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const {
     activeObj,
@@ -446,6 +457,11 @@ const TemplateEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     fn(...args);
     if (isMobile) setShowMobileTools(false);
   };
+
+  // gallaries (right sidebar)
+  const [gallaries, setGallaries] = useState([]);
+  const [activeGallaryId, setActiveGallaryId] = useState(null);
+  const [loadingGallary, setLoadingGallary] = useState(false);
 
   // templates (right sidebar)
   const [templates, setTemplates] = useState([]);
@@ -764,7 +780,6 @@ const TemplateEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     saveHistoryDebounced();
   };
 
-
   const intersects = (a, b) => {
     const r1 = a.getBoundingRect(true, true);
     const r2 = b.getBoundingRect(true, true);
@@ -884,6 +899,11 @@ const TemplateEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     fetchAdmissions();
   }, [selectedCourse, selectedBatch]);
 
+  const handleStudentSelect = (uuid) => {
+    const student = filteredStudents.find((s) => s.uuid === uuid);
+    setSelectedStudent(student || null);
+  };
+
   useEffect(() => {
     const fetchInstitute = async () => {
       try {
@@ -906,6 +926,92 @@ const TemplateEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     };
     fetchInstitute();
   }, []);
+
+  // Gallary list (for right sidebar)
+useEffect(() => {
+  const loadGallaries = async () => {
+    try {
+      const user = getStoredUser();
+      const institute_uuid =
+        user?.institute_uuid || getStoredInstituteUUID();
+
+      const { data } = await axios.get(
+        `https://canvaback.onrender.com/api/gallary/GetGallaryList/${institute_uuid}`
+      );
+
+      // Ensure we always pass an array to state
+      const list = Array.isArray(data?.result)
+        ? data.result
+        : Array.isArray(data)
+        ? data
+        : [];
+
+      setGallaries(list);
+    } catch (err) {
+      console.error("Error fetching gallaries:", err);
+      setGallaries([]); // fallback to empty array on error
+    }
+  };
+
+  loadGallaries();
+}, []);
+
+
+/// helper to load/apply a gallary
+const applyGallaryResponse = useCallback(
+  async (data) => {
+    if (!canvas || !data?.image) return;
+
+    // Remove any previously added gallery image
+    canvas.getObjects().forEach((obj) => {
+      if (obj.customId === "gallaryImage") {
+        canvas.remove(obj);
+      }
+    });
+
+    // Add the new gallery image
+    fabric.Image.fromURL(
+      data.image,
+      (img) => {
+        img.set({
+          left: 20,
+          top: 20,
+          scaleX: 0.5,
+          scaleY: 0.5,
+        });
+        img.customId = "gallaryImage";
+        canvas.add(img);
+        canvas.requestRenderAll();
+      },
+      { crossOrigin: "anonymous" }
+    );
+  },
+  [canvas]
+);
+
+const loadGallaryById = useCallback(
+  async (id) => {
+    if (!id) return;
+    setLoadingGallary(true);
+    try {
+      const res = await axios.get(
+        `https://canvaback.onrender.com/api/gallary/${id}`
+      );
+      const gallary = res.data?.result || res.data;
+
+      await applyGallaryResponse(gallary);
+      setActiveGallaryId(id);
+      resetHistory();
+      saveHistoryDebounced();
+    } catch (err) {
+      console.error("Failed to load gallary:", err);
+      toast.error("Failed to load gallary");
+    } finally {
+      setLoadingGallary(false);
+    }
+  },
+  [applyGallaryResponse, resetHistory, saveHistory]
+);
 
   // Templates list (for right sidebar)
   useEffect(() => {
@@ -967,49 +1073,30 @@ const TemplateEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     [setCanvasSize]
   );
 
-const loadTemplateById = useCallback(
-  async (templateId) => {
-    if (!templateId || lastLoadedId.current === templateId) return;
-    lastLoadedId.current = templateId;
+  const loadTemplateById = useCallback(
+    async (id) => {
+      if (!id) return;
+      setLoadingTemplate(true);
+      try {
+        const res = await axios.get(`https://canvaback.onrender.com/api/template/${id}`);
+        await applyTemplateResponse(res.data || {});
+        setActiveTemplateId(id);
+        resetHistory();
+        saveHistoryDebounced();
+      } catch {
+        toast.error("Failed to load template");
+      } finally {
+        setLoadingTemplate(false);
+      }
+    },
+    [applyTemplateResponse, resetHistory, saveHistory]
+  );
 
-    setLoadingTemplate(true);
-    try {
-      const { data } = await axios.get(
-        `https://canvaback.onrender.com/api/template/${templateId}`
-      );
-
-      await new Promise((resolve, reject) => {
-        canvas.loadFromJSON(
-          data.canvasJson,
-          () => {
-            canvas.renderAll();
-            resolve();
-          },
-          (err) => reject(err)
-        );
-      });
-
-      setActiveTemplateId(templateId);
-      resetHistory();
-      saveHistoryDebounced();
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to load template");
-      lastLoadedId.current = null; 
-    } finally {
-      setLoadingTemplate(false);
-    }
-  },
-  [canvas, resetHistory, saveHistoryDebounced, setActiveTemplateId]
-);
-
-
-useEffect(() => {
-  if (!templateId) return;
-  if (!canvas) return; 
-  loadTemplateById(templateId);
-}, [templateId, canvas, loadTemplateById]);
-
+  // Initial template load (from route or prop)
+  useEffect(() => {
+    if (!templateId) return;
+    loadTemplateById(templateId);
+  }, [templateId]);
 
 
 function attachSaveHandlers(img) {
@@ -1086,67 +1173,108 @@ function attachSaveHandlers(img) {
     // 1) Background
     addTemplateBg();
 
-    // 2) Current student (bulk-aware)
-    const currentStudent = bulkMode
-      ? filteredStudents.find((s) => s?.uuid === bulkList[bulkIndex]) || null
-      : selectedStudent;
+   // === 2) Current student (bulk-aware) ===
+const currentStudent = bulkMode
+  ? filteredStudents.find(s => s?.uuid === bulkList[bulkIndex]) || null
+  : selectedStudent;
 
-    if (currentStudent) {
-      const savedName = getSavedProps("studentName");
-      const nameText = new fabric.IText(
-        `${currentStudent.firstName || ""} ${currentStudent.lastName || ""}`.trim(),
-        {
-          left: savedName?.left ?? Math.round(canvas.width * 0.33),
-          top: savedName?.top ?? Math.round(canvas.height * 0.55),
-          fontSize: savedName?.fontSize ?? 22,
-          fill: "#000",
-        }
-      );
-      nameText.customId = "studentName";
-      nameText.field = "studentName";
-      canvas.add(nameText);
-      studentObjectsRef.current.push(nameText);
-    }
+if (currentStudent) {
+  const savedName = getSavedProps("studentName") || {};
 
-   // 3) Student photo
+  // Build the display name once, trim any extra space
+  const displayName =
+    `${currentStudent.firstName || ""} ${currentStudent.lastName || ""}`.trim();
+
+  // Create or update the text object
+  const existingName = canvas
+    .getObjects()
+    .find(o => o.customId === "studentName");
+
+  if (existingName) {
+    // Update text and style if already present
+    existingName.set({
+      text: displayName,
+      left:     savedName.left     ?? existingName.left,
+      top:      savedName.top      ?? existingName.top,
+      fontSize: savedName.fontSize ?? existingName.fontSize,
+      fill:     savedName.fill     ?? existingName.fill ?? "#000",
+    });
+    canvas.requestRenderAll();
+  } else {
+    // Add a new text object at the saved position, size and color
+    const nameText = new fabric.IText(displayName, {
+      left:     savedName.left     ?? Math.round(canvas.width  * 0.33),
+      top:      savedName.top      ?? Math.round(canvas.height * 0.55),
+      fontSize: savedName.fontSize ?? 22,
+      fill:     savedName.fill     ?? "#000",   // <- use saved color if available
+      fontFamily: savedName.fontFamily || "Arial",
+      fontWeight: savedName.fontWeight || "normal",
+      textAlign:  savedName.textAlign  || "left",
+      originX:    savedName.originX    || "left",
+      originY:    savedName.originY    || "top",
+    });
+
+    nameText.customId = "studentName";
+    nameText.field    = "studentName";
+
+    canvas.add(nameText);
+    studentObjectsRef.current.push(nameText);
+
+    setSavedPlaceholders((prev) => [
+    ...prev.filter(p => p.field !== "studentName"),
+    { field: "studentName", left: nameText.left, top: nameText.top, fontSize: nameText.fontSize, fill: nameText.fill, fontFamily: nameText.fontFamily }
+  ]);
+  }
+}
+
+
+// === 3) Student photo ===
 const current = currentStudent;
-const photoUrl = Array.isArray(current?.photo) ? current?.photo[0] : current?.photo;
+const photoUrl = Array.isArray(current?.photo) ? current.photo[0] : current?.photo;
 const savedPhoto = getSavedProps("studentPhoto") || {};
-const photoLeft = savedPhoto?.left ?? Math.round(canvas.width * 0.5);
-const photoTop = savedPhoto?.top ?? Math.round(canvas.height * 0.33);
-const savedShape = savedPhoto?.shape || "circle";
+const photoLeft  = savedPhoto.left ?? Math.round(canvas.width * 0.5);
+const photoTop   = savedPhoto.top  ?? Math.round(canvas.height * 0.33);
+
+// ⚠️  Only use a shape if it was actually saved – no default circle.
+const savedShape = savedPhoto.shape || null;
 
 if (photoUrl) {
-  // Check if photo already exists
-  const existingPhoto = canvas.getObjects().find(obj => obj.customId === "studentPhoto");
+  // Look for an existing student photo on the canvas (from DB or a previous run)
+  const existingPhoto = canvas
+    .getObjects()
+    .find(obj => obj.customId === "studentPhoto");
 
   if (existingPhoto) {
-    // Just update the existing photo
-   existingPhoto.set({
+    // Just update position/scale if the user changed them
+    existingPhoto.set({
       left:   savedPhoto.left   ?? existingPhoto.left,
       top:    savedPhoto.top    ?? existingPhoto.top,
       scaleX: savedPhoto.scaleX ?? existingPhoto.scaleX,
       scaleY: savedPhoto.scaleY ?? existingPhoto.scaleY,
     });
     canvas.requestRenderAll();
-  } else {
-    // Load new photo only if not already present
-    safeLoadImage(photoUrl, (img) => {
-      const phWidth = Math.min(400, canvas.width * 0.6);
-      const phHeight = Math.min(400, canvas.height * 0.6);
-      const autoScale = Math.min(phWidth / img.width, phHeight / img.height, 1);
+    return; // ✅ Done – no new image, no new mask
+  }
 
-      img.set({
-        originX: "center",
-        originY: "center",
-        left: photoLeft,
-        top: photoTop,
-        scaleX: savedPhoto?.scaleX ?? autoScale,
-        scaleY: savedPhoto?.scaleY ?? autoScale,
-      });
-      img.customId = "studentPhoto";
-      img.field = "studentPhoto";
+  // Add the photo only if it isn’t already present
+  safeLoadImage(photoUrl, img => {
+    const phWidth  = Math.min(400, canvas.width  * 0.6);
+    const phHeight = Math.min(400, canvas.height * 0.6);
+    const autoScale = Math.min(phWidth / img.width, phHeight / img.height, 1);
 
+    img.set({
+      originX: "center",
+      originY: "center",
+      left: photoLeft,
+      top: photoTop,
+      scaleX: savedPhoto.scaleX ?? autoScale,
+      scaleY: savedPhoto.scaleY ?? autoScale,
+    });
+    img.customId = "studentPhoto";
+    img.field    = "studentPhoto";
+
+    // ✅ Only apply mask/frame if a shape was actually saved
+    if (savedShape) {
       applyMaskAndFrame(canvas, img, savedShape, {
         stroke: frameBorder,
         strokeWidth: frameWidth,
@@ -1154,32 +1282,33 @@ if (photoUrl) {
         absolute: false,
         followImage: true,
       });
+    }
 
-      img.set({
-        lockMovementX: false,
-        lockMovementY: false,
-        lockScalingX: false,
-        lockScalingY: false,
-        lockRotation: false,
-        hasControls: true,
-        selectable: true,
-        evented: true,
-      });
-
-      img.on("selected", () => setActiveStudentPhoto(img));
-      img.on("deselected", () => setActiveStudentPhoto(null));
-      img.on("mousedblclick", () => {
-        enterAdjustMode(img);
-        fitImageToFrame(img, "cover");
-      });
-
-      attachSaveHandlers(img);
-      canvas.add(img);
-      studentObjectsRef.current.push(img);
-      canvas.requestRenderAll();
+    img.set({
+      lockMovementX: false,
+      lockMovementY: false,
+      lockScalingX:  false,
+      lockScalingY:  false,
+      lockRotation:  false,
+      hasControls:   true,
+      selectable:    true,
+      evented:       true,
     });
-  }
+
+    img.on("selected",   () => setActiveStudentPhoto(img));
+    img.on("deselected", () => setActiveStudentPhoto(null));
+    img.on("mousedblclick", () => {
+      enterAdjustMode(img);
+      fitImageToFrame(img, "cover");
+    });
+
+    attachSaveHandlers(img);
+    canvas.add(img);
+    studentObjectsRef.current.push(img);
+    canvas.requestRenderAll();
+  });
 }
+
 
 
     // 4) Institute logo & signature
@@ -1510,6 +1639,26 @@ if (photoUrl) {
     saveHistoryDebounced();
   };
 
+  /* ============================= Align & Distribute ============================ */
+  const distributeH = () => {
+    const sel = canvas?.getActiveObject();
+    if (!sel || sel.type !== "activeSelection") { toast.error("Select multiple objects"); return; }
+    const objs = sel._objects.slice().sort((a, b) => a.left - b.left);
+    const left = objs[0].left; const right = objs[objs.length - 1].left;
+    const step = (right - left) / (objs.length - 1 || 1);
+    objs.forEach((o, i) => { o.set({ left: left + i * step }); o.setCoords(); });
+    canvas.discardActiveObject(); const as = new fabric.ActiveSelection(objs, { canvas }); canvas.setActiveObject(as); canvas.requestRenderAll(); saveHistoryDebounced();
+  };
+  const distributeV = () => {
+    const sel = canvas?.getActiveObject();
+    if (!sel || sel.type !== "activeSelection") { toast.error("Select multiple objects"); return; }
+    const objs = sel._objects.slice().sort((a, b) => a.top - b.top);
+    const top = objs[0].top; const bottom = objs[objs.length - 1].top;
+    const step = (bottom - top) / (objs.length - 1 || 1);
+    objs.forEach((o, i) => { o.set({ top: top + i * step }); o.setCoords(); });
+    canvas.discardActiveObject(); const as = new fabric.ActiveSelection(objs, { canvas }); canvas.setActiveObject(as); canvas.requestRenderAll(); saveHistoryDebounced();
+  };
+
   /* ============================= Carousel (bulk) =========================== */
   const rebuildBulkFromFiltered = () => {
     const ids = (filteredStudents.length ? filteredStudents : allStudents).map((s) => s.uuid);
@@ -1526,6 +1675,235 @@ if (photoUrl) {
     if (bulkMode) rebuildBulkFromFiltered();
   }, [bulkMode, filteredStudents]); // eslint-disable-line
 
+const gotoIndex = (idx) => {
+  if (!bulkList.length) return;
+
+  // Save current canvas state for current student
+  if (canvasRef.current && bulkList[bulkIndex]) {
+    // Before saving, remove student photo so it’s not serialized into JSON
+    const objs = canvasRef.current.getObjects();
+    objs
+      .filter((o) => o.customId === "studentPhoto")
+      .forEach((p) => canvasRef.current.remove(p));
+
+    studentLayoutsRef.current[bulkList[bulkIndex]] = canvasRef.current.toJSON();
+  }
+
+  // Calculate new index
+  const n = ((idx % bulkList.length) + bulkList.length) % bulkList.length;
+  setBulkIndex(n);
+
+  const uuid = bulkList[n];
+  const st =
+    (filteredStudents.length ? filteredStudents : allStudents).find(
+      (s) => s.uuid === uuid
+    ) || null;
+  setSelectedStudent(st);
+
+  if (canvasRef.current) {
+    const saved = studentLayoutsRef.current[uuid];
+
+    if (saved) {
+      // Remove any photos from JSON before loading
+      if (saved.objects) {
+        saved.objects = saved.objects.filter(
+          (obj) => obj.customId !== "studentPhoto"
+        );
+      }
+
+      canvasRef.current.loadFromJSON(saved, () => {
+        canvasRef.current.renderAll();
+      });
+    } else {
+      canvasRef.current.requestRenderAll();
+    }
+  }
+};
+
+
+  const prevStudent = () => gotoIndex(bulkIndex - 1);
+  const nextStudent = () => gotoIndex(bulkIndex + 1);
+
+  /* ============================== Downloads =============================== */
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  const downloadCurrentPNG = () => {
+    const current = bulkMode
+      ? filteredStudents.find((s) => s?.uuid === bulkList[bulkIndex]) || selectedStudent
+      : selectedStudent;
+    const name =
+      current?.firstName || current?.lastName
+        ? `${(current?.firstName || "").trim()}_${(current?.lastName || "").trim()}`
+        : "canvas";
+    downloadHighRes?.(tplSize.w, tplSize.h, `${name || "canvas"}.png`);
+  };
+
+  const downloadBulkPNGs = async () => {
+    if (!bulkMode || !bulkList.length) {
+      toast.error("Enable Bulk mode with students filtered");
+      return;
+    }
+    toast("Starting bulk export…");
+    for (let i = 0; i < bulkList.length; i++) {
+      gotoIndex(i);
+      await sleep(350);
+      const st = filteredStudents.find((s) => s.uuid === bulkList[i]);
+      const name =
+        st?.firstName || st?.lastName
+          ? `${(st?.firstName || "").trim()}_${(st?.lastName || "").trim()}`
+          : `canvas_${i + 1}`;
+      downloadHighRes?.(tplSize.w, tplSize.h, `${name}.png`);
+      await sleep(300);
+    }
+    toast.success("Bulk export complete.");
+  };
+
+  // NEW: Bulk multi-page PDF
+  const downloadBulkPDF = async () => {
+    if (!bulkMode || !bulkList.length) {
+      toast.error("Enable Bulk mode with students filtered");
+      return;
+    }
+    try {
+      const { jsPDF } = await import("jspdf");
+      const pdf = new jsPDF({
+        orientation: "p",
+        unit: "px",
+        format: [tplSize.w, tplSize.h],
+        compress: true,
+      });
+
+      toast("Creating PDF…");
+      canvas.discardActiveObject();
+      canvas.requestRenderAll();
+
+      for (let i = 0; i < bulkList.length; i++) {
+        gotoIndex(i);
+        await sleep(350);
+        canvas.discardActiveObject();
+        canvas.requestRenderAll();
+
+        const dataUrl = canvas.toDataURL({
+          format: "png",
+          enableRetinaScaling: true,
+          multiplier: 1,
+        });
+
+        if (i > 0) pdf.addPage([tplSize.w, tplSize.h], "p");
+        pdf.addImage(dataUrl, "PNG", 0, 0, tplSize.w, tplSize.h);
+      }
+
+      const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+      pdf.save(`Bulk_${tplSize.w}x${tplSize.h}_${ts}.pdf`);
+      toast.success("PDF ready.");
+    } catch (err) {
+      console.error(err);
+      toast.error("PDF export failed.");
+    }
+  };
+
+  /* ============================ PRINT EXPORTS ============================ */
+  const getTrimBoundsPx = useCallback(() => {
+    const W = contentPx.W;
+    const H = contentPx.H;
+    return {
+      x: bleedPx.left,
+      y: bleedPx.top,
+      w: W - bleedPx.left - bleedPx.right,
+      h: H - bleedPx.top - bleedPx.bottom,
+    };
+  }, [contentPx, bleedPx]);
+
+  const exportSinglePDF = () => {
+    const { w_mm, h_mm } = pageMM;
+    const doc = new jsPDF({ orientation: w_mm > h_mm ? "l" : "p", unit: "mm", format: [w_mm, h_mm] });
+    canvas.discardActiveObject();
+    canvas.requestRenderAll();
+    const png = canvas.toDataURL({ format: "png", quality: 1 });
+    doc.addImage(png, "PNG", 0, 0, w_mm, h_mm);
+
+    if (showMarks) {
+      const trim = getTrimBoundsPx();
+      const toMM = (px) => pxToMm(px, dpi);
+      const markLen = 4, off = 1.5;
+      doc.setLineWidth(0.2);
+      const line = (x1, y1, x2, y2) => doc.line(x1, y1, x2, y2);
+      const tx = toMM(trim.x), ty = toMM(trim.y), tw = toMM(trim.w), th = toMM(trim.h);
+      // TL
+      line(tx - off, ty, tx - off, ty + markLen); line(tx, ty - off, tx + markLen, ty - off);
+      // TR
+      line(tx + tw + off, ty, tx + tw + off, ty + markLen); line(tx + tw - markLen, ty - off, tx + tw, ty - off);
+      // BL
+      line(tx - off, ty + th - markLen, tx - off, ty + th); line(tx, ty + th + off, tx + markLen, ty + th + off);
+      // BR
+      line(tx + tw + off, ty + th - markLen, tx + tw + off, ty + th); line(tx + tw - markLen, ty + th + off, tx + tw, ty + th + off);
+      if (showReg) {
+        const cx = w_mm / 2, cy = h_mm / 2;
+        doc.circle(cx, cy, 2);
+        doc.line(cx - 3, cy, cx + 3, cy);
+        doc.line(cx, cy - 3, cx, cy + 3);
+      }
+    }
+
+    const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    doc.save(`design_${pagePreset}_${pageOrientation}_${dpi}dpi_${ts}.pdf`);
+  };
+
+  const exportImposedPDF = async () => {
+    if (!imposeOn) {
+      toast.error("Enable Imposition in the left sidebar.");
+      return;
+    }
+    const SHEET = sheetPreset === "Custom" ? sheetCustom : PRESET_SIZES[sheetPreset] || PRESET_SIZES.A4;
+    const sheetW = SHEET.w_mm, sheetH = SHEET.h_mm;
+    const doc = new jsPDF({ orientation: sheetW > sheetH ? "l" : "p", unit: "mm", format: [sheetW, sheetH] });
+
+    // Determine list of records to tile
+    const baseList = (bulkMode && bulkList.length) ? bulkList : [null];
+
+    // Trim size in mm
+    const trim = getTrimBoundsPx();
+    const trimWmm = pxToMm(trim.w, dpi);
+    const trimHmm = pxToMm(trim.h, dpi);
+
+    const gapX = gap.x_mm, gapY = gap.y_mm;
+    const m = outer;
+
+    let tileIndex = 0;
+    for (let i = 0; i < baseList.length; i++) {
+      if (bulkMode && baseList[i]) {
+        // Jump canvas to that student page
+        const idx = bulkList.indexOf(baseList[i]);
+        if (idx >= 0) gotoIndex(idx);
+        await new Promise(r => setTimeout(r, 250));
+        canvas.discardActiveObject();
+        canvas.requestRenderAll();
+      }
+      const img = canvas.toDataURL({ format: "png", quality: 1 });
+
+      const r = Math.floor(tileIndex / cols);
+      const c = tileIndex % cols;
+      const x = m.left + c * (trimWmm + gapX);
+      const y = m.top + r * (trimHmm + gapY);
+
+      doc.addImage(
+        img, "PNG",
+        x - pxToMm(bleedPx.left, dpi),
+        y - pxToMm(bleedPx.top, dpi),
+        trimWmm + pxToMm(bleedPx.left + bleedPx.right, dpi),
+        trimHmm + pxToMm(bleedPx.top + bleedPx.bottom, dpi)
+      );
+
+      tileIndex++;
+      if (tileIndex >= rows * cols && (i < baseList.length - 1)) {
+        doc.addPage([sheetW, sheetH], sheetW > sheetH ? "l" : "p");
+        tileIndex = 0;
+      }
+    }
+
+    const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    doc.save(`imposed_${rows}x${cols}_${sheetPreset}_${ts}.pdf`);
+  };
 
   /* ================================= UI =================================== */
   return (
@@ -1712,6 +2090,59 @@ if (photoUrl) {
               />
             </button>
 
+            {/* Group / Ungroup */}
+            <button
+              className="hidden sm:flex items-center gap-1 px-3 py-2 rounded-full bg-white border hover:bg-gray-50 text-sm"
+              onClick={() => {
+                const sel = canvas?.getActiveObject();
+                if (!sel) return;
+                if (sel.type === "activeSelection") {
+                  const grp = sel.toGroup();
+                  canvas.setActiveObject(grp);
+                  canvas.requestRenderAll();
+                  saveHistoryDebounced();
+                } else if (sel.type === "group") {
+                  sel.toActiveSelection();
+                  canvas.requestRenderAll();
+                  saveHistoryDebounced();
+                } else {
+                  toast("Select multiple objects to group");
+                }
+              }}
+              title="Group / Ungroup (Ctrl/Cmd+G)"
+            >
+              <GroupIcon size={16} /> / <Ungroup size={16} />
+            </button>
+
+            {/* Distribute */}
+            <button
+              className="hidden sm:flex items-center gap-1 px-3 py-2 rounded-full bg-white border hover:bg-gray-50 text-sm"
+              onClick={distributeH}
+              title="Distribute Horizontally"
+            >
+              <AlignHorizontalJustifyCenter size={16} /> H
+            </button>
+            <button
+              className="hidden sm:flex items-center gap-1 px-3 py-2 rounded-full bg-white border hover:bg-gray-50 text-sm"
+              onClick={distributeV}
+              title="Distribute Vertically"
+            >
+              <AlignVerticalJustifyCenter size={16} /> V
+            </button>
+
+            {adjustMode && (
+              <button
+                title="Done"
+                onClick={() => {
+                  const obj = canvas?.getActiveObject();
+                  if (obj && obj.type === "image") exitAdjustMode(obj);
+                }}
+                className="px-3 py-2 rounded-full bg-emerald-600 text-white shadow hover:bg-emerald-700 text-sm flex items-center gap-1"
+              >
+                <Check size={16} /> Done
+              </button>
+            )}
+
             {/* Template selection */}
             <button
               title="Choose Template"
@@ -1720,6 +2151,54 @@ if (photoUrl) {
             >
               <Images size={16} /> Template
             </button>
+
+            {/* Download current */}
+            <button
+              title="Download PNG"
+              onClick={downloadCurrentPNG}
+              className="p-2 rounded-full bg-green-600 text-white shadow hover:bg-green-700"
+            >
+              <Download size={18} />
+            </button>
+
+            {/* Export PDF */}
+            <button
+              title="Export PDF"
+              onClick={exportSinglePDF}
+              className="p-2 rounded-full bg-purple-600 text-white shadow hover:bg-purple-700"
+            >
+              <FileDown size={18} />
+            </button>
+            <button
+              title="Export Imposed Sheet PDF"
+              onClick={exportImposedPDF}
+              className={`hidden sm:flex items-center gap-1 px-3 py-2 rounded-full ${imposeOn ? "bg-rose-600 hover:bg-rose-700" : "bg-rose-300 cursor-not-allowed"} text-white shadow text-sm`}
+              disabled={!imposeOn}
+            >
+              <BookOpen size={16} /> Imposed PDF
+            </button>
+
+            {/* Bulk download PNGs */}
+            {bulkMode && (
+              <button
+                title="Download All (PNGs)"
+                onClick={downloadBulkPNGs}
+                className="hidden sm:flex items-center gap-1 px-3 py-2 rounded-full bg-indigo-600 text-white shadow hover:bg-indigo-700 text-sm"
+              >
+                <Images size={16} /> Download All
+              </button>
+            )}
+
+            {/* Bulk multi-page PDF */}
+            {bulkMode && (
+              <button
+                title="Download PDF (All)"
+                onClick={downloadBulkPDF}
+                className="hidden sm:flex items-center gap-1 px-3 py-2 rounded-full bg-purple-600 text-white shadow hover:bg-purple-700 text-sm"
+              >
+                <FileDown size={16} /> Download PDF (All)
+              </button>
+            )}
           </div>
         </header>
       )}
@@ -1736,7 +2215,20 @@ if (photoUrl) {
 
       {/* LEFT VERTICAL TOOLBAR */}
       <div className={`fixed top-16 left-2 z-40 flex-col gap-2 ${showMobileTools ? "flex" : "hidden"} md:flex`}>
-       
+        <button
+          title="Choose Gallary"
+          onClick={() => { setRightPanel('gallaries'); setIsRightbarOpen(true); }}
+          className="p-2 rounded bg-white shadow hover:bg-blue-100"
+        >
+          <Images size={20} />
+        </button>
+        <button
+          title="Bulk Settings"
+          onClick={() => { setRightPanel('bulk'); setIsRightbarOpen(true); }}
+          className="p-2 rounded bg-white shadow hover:bg-blue-100"
+        >
+          <LayersIcon size={20} />
+        </button>
         <button
           title="Add Frame"
           onClick={() => { setRightPanel('frames'); setIsRightbarOpen(true); }}
@@ -1744,13 +2236,50 @@ if (photoUrl) {
         >
           <LayoutIcon size={20} />
         </button>
-       <button
-  title="Add Student Name"
-  onClick={withFabClose(() => addText({ markStudentName: true, left: 100, top: 100 }))}
-  className="p-2 rounded bg-white shadow hover:bg-blue-100"
->
-  <Type size={20} />
-</button>
+        <button
+          title="Add Text"
+          onClick={withFabClose(addText)}
+          className="p-2 rounded bg-white shadow hover:bg-blue-100"
+        >
+          <Type size={20} />
+        </button>
+        <button
+          title="Add Rectangle"
+          onClick={withFabClose(addRect)}
+          className="p-2 rounded bg-white shadow hover:bg-blue-100"
+        >
+          <Square size={20} />
+        </button>
+        <button
+          title="Add Circle"
+          onClick={withFabClose(addCircle)}
+          className="p-2 rounded bg-white shadow hover:bg-blue-100"
+        >
+          <Circle size={20} />
+        </button>
+        <input
+          type="file"
+          accept="image/*"
+          id="upload-image"
+          style={{ display: "none" }}
+          onChange={handleUpload}
+        />
+        <label
+          htmlFor="upload-image"
+          onClick={withFabClose(() => { })}
+          className="p-2 rounded bg-white shadow hover:bg-blue-100 cursor-pointer"
+          title="Upload Image"
+        >
+          <ImageIcon size={20} />
+        </label>
+
+
+        <UndoRedoControls
+          undo={undo}
+          redo={redo}
+          duplicateObject={duplicateObject}
+          vertical
+        />
       </div>
 
       {/* CENTER / Canva-like viewport */}
@@ -1773,7 +2302,27 @@ if (photoUrl) {
           )}
         </div>
 
-        
+        {bulkMode && (
+          <div className="mt-4 flex items-center justify-center gap-2">
+            <button
+              className="p-2 rounded-full bg-white border hover:bg-gray-100"
+              title="Previous"
+              onClick={prevStudent}
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <div className="px-2 text-xs text-gray-600">
+              {bulkList.length ? `${bulkIndex + 1}/${bulkList.length}` : "0/0"}
+            </div>
+            <button
+              className="p-2 rounded-full bg-white border hover:bg-gray-100"
+              title="Next"
+              onClick={nextStudent}
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        )}
       </div>
         {cropSrc && (
           <ImageCropModal
@@ -1793,7 +2342,13 @@ if (photoUrl) {
       >
         <div className="p-3 border-b flex items-center justify-between">
           <div className="text-sm font-semibold">
-            {rightPanel === "frames"
+            {rightPanel === "gallaries"
+              ? "Gallary"
+              : rightPanel === "templates"
+                ? "Templates"
+                : rightPanel === "bulk"
+                  ? "Bulk Settings"
+                  : rightPanel === "frames"
                     ? "Frames"
                     : rightPanel === "object"
                       ? "Object Settings"
@@ -1811,20 +2366,228 @@ if (photoUrl) {
           </button>
         </div>
         <div className="p-3">
-          
-          {rightPanel === "templates" && (
-  <Fragment>
-    <TemplateLayout
-      canvas={canvas}
-      activeTemplateId={activeTemplateId}
-    />
-    <div className="mt-4 border-t pt-3">
-      <LayersPanel canvas={canvas} onSelect={(o) => setActiveObj(o)} />
-    </div>
-  </Fragment>
-)}
+          {rightPanel === "gallaries" && (
+            <Fragment>
+              {loadingGallary && (
+                <div className="text-xs text-gray-500 mb-2">Loading gallary…</div>
+              )}
 
-         
+              <div className="grid grid-cols-2 gap-3">
+                {gallaries.map((g) => (
+                  <div
+                    key={g._id || g.Gallary_uuid}
+                    className="border rounded overflow-hidden hover:shadow cursor-pointer"
+                    onClick={() => loadGallaryById(g._id || g.Gallary_uuid)}
+                  >
+                    <div className="aspect-[4/5] bg-gray-100 flex flex-col items-center justify-center gap-2 p-2">
+                      {g.image ? (
+                        <img
+                          src={g.image}
+                          alt="Gallary"
+                          className="w-24 h-24 object-contain border rounded bg-white"
+                          crossOrigin="anonymous"
+                        />
+                      ) : (
+                        <span className="text-xs text-gray-400">No Image</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-4 border-t pt-3">
+                <LayersPanel canvas={canvas} onSelect={(o) => setActiveObj(o)} />
+              </div>
+            </Fragment>
+          )}
+
+
+          {rightPanel === "templates" && (
+            <Fragment>
+              {loadingTemplate && (
+                <div className="text-xs text-gray-500 mb-2">Loading template…</div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                {templates.map((t) => (
+                  <button
+                    key={t._id || t.id}
+                    onClick={() => {
+                      loadTemplateById(t._id || t.id);
+                    }}
+                    className={`border rounded overflow-hidden text-left hover:shadow focus:ring-2 focus:ring-indigo-500 ${(t._id || t.id) === activeTemplateId ? "ring-2 ring-indigo-500" : ""}`}
+                    title={t.title || "Template"}
+                  >
+                    <div className="aspect-[4/5] bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
+                      {t.image ? (
+                        <img
+                          src={t.image}
+                          alt={t.title || "template thumbnail"}
+                          className="w-full h-full object-cover"
+                          crossOrigin="anonymous"
+                        />
+                      ) : (
+                        <span>Preview</span>
+                      )}
+                    </div>
+                    <div className="px-2 py-1">
+                      <div className="text-xs font-medium truncate">
+                        {t.title || "Untitled"}
+                      </div>
+                      <div className="text-[10px] text-gray-500">
+                        {t.width || t.w || 400}×{t.height || t.h || 550}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <TemplateLayout
+                canvas={canvas}
+                activeTemplateId={activeTemplateId}
+                tplSize={tplSize}
+                setSavedPlaceholders={setSavedPlaceholders}
+                frameCorner={frameCorner}
+              />
+              <div className="mt-4 border-t pt-3">
+                <LayersPanel canvas={canvas} onSelect={(o) => setActiveObj(o)} />
+              </div>
+            </Fragment>
+          )}
+          {rightPanel === "bulk" && (
+            <Fragment>
+              <FormControlLabel
+                sx={{ mr: 1 }}
+                control={
+                  <Switch
+                    checked={bulkMode}
+                    onChange={(e) => setBulkMode(e.target.checked)}
+                    size="small"
+                  />
+                }
+                label={<span className="text-sm">Bulk</span>}
+              />
+              {bulkMode && (
+                <div className="border-b">
+                  <button
+                    className="w-full text-left p-3 text-sm font-semibold"
+                    onClick={() => setShowFilters((v) => !v)}
+                  >
+                    Filters
+                  </button>
+                  {showFilters && (
+                    <div className="px-3 pb-3">
+
+                      <div className="mb-2">
+                        <div className="text-xs font-medium mb-1">Profile</div>
+
+                        <div className="flex items-center gap-4">
+                          <label className="inline-flex items-center gap-2">
+                            <input
+                              id="logoCheckbox"
+                              type="checkbox"
+                              checked={showLogo}
+                              onChange={(e) => setShowLogo(e.target.checked)}
+                              className="accent-[#25D366]"
+                            />
+                            <span className="text-sm">Logo</span>
+                          </label>
+
+                          <label className="inline-flex items-center gap-2">
+                            <input
+                              id="signatureCheckbox"
+                              type="checkbox"
+                              checked={showSignature}
+                              onChange={(e) => setShowSignature(e.target.checked)}
+                              className="accent-[#25D366]"
+                            />
+                            <span className="text-sm">Signature</span>
+                          </label>
+                        </div>
+                      </div>
+
+
+
+                      <label className="block text-xs mb-1">Course</label>
+                      <select
+                        className="w-full border rounded px-2 py-1 mb-2"
+                        value={selectedCourse}
+                        onChange={(e) => setSelectedCourse(e.target.value)}
+                      >
+                        <option value="">Select course</option>
+                        {courses.map((c) => (
+                          <option key={c._id} value={c.Course_uuid}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+
+                      <label className="block text-xs mb-1">Batch</label>
+                      <select
+                        className="w-full border rounded px-2 py-1 mb-2"
+                        value={selectedBatch}
+                        onChange={(e) => setSelectedBatch(e.target.value)}
+                      >
+                        <option value="">Select batch</option>
+                        {batches.map((b) => (
+                          <option key={b._id} value={b.name}>
+                            {b.name}
+                          </option>
+                        ))}
+                      </select>
+
+                      <label className="block text-xs mb-1">Student</label>
+                      <select
+                        className="w-full border rounded px-2 py-1"
+                        onChange={(e) => handleStudentSelect(e.target.value)}
+                        value={selectedStudent?.uuid || ""}
+                        disabled={bulkMode}
+                      >
+                        <option value="">Select a student</option>
+                        {(filteredStudents.length ? filteredStudents : allStudents).map((s) => (
+                          <option key={s.uuid} value={s.uuid}>
+                            {s.firstName} {s.lastName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              )}
+              <PrintSettings
+                usePrintSizing={usePrintSizing}
+                setUsePrintSizing={setUsePrintSizing}
+                pagePreset={pagePreset}
+                setPagePreset={setPagePreset}
+                customPage={customPage}
+                setCustomPage={setCustomPage}
+                pageOrientation={pageOrientation}
+                setPageOrientation={setPageOrientation}
+                dpi={dpi}
+                setDpi={setDpi}
+                bleed={bleed}
+                setBleed={setBleed}
+                safe={safe}
+                setSafe={setSafe}
+                showMarks={showMarks}
+                setShowMarks={setShowMarks}
+                showReg={showReg}
+                setShowReg={setShowReg}
+                imposeOn={imposeOn}
+                setImposeOn={setImposeOn}
+                sheetPreset={sheetPreset}
+                setSheetPreset={setSheetPreset}
+                sheetCustom={sheetCustom}
+                setSheetCustom={setSheetCustom}
+                rows={rows}
+                setRows={setRows}
+                cols={cols}
+                setCols={setCols}
+                gap={gap}
+                setGap={setGap}
+                outer={outer}
+                setOuter={setOuter}
+              />
+            </Fragment>
+          )}
           {rightPanel === "frames" && (
             <FrameSection addFrameSlot={addFrameSlot} />
           )}

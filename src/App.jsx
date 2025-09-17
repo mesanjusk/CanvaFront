@@ -69,7 +69,7 @@ export default function App() {
       <Route path="templates" element={<TemplateGallery />} />
       <Route path="/home" element={<CanvaHome />} />
       <Route path="/subcategory/:categoryId" element={<Subcategory />} />
-      <Route path="/template-editor/:id" element={<TemplateEditor />} />
+      <Route path="/template-editor/:templateId" element={<TemplateEditor />} />
       <Route path="addTemplate" element={<AddTemplate />} />
 
       {/* 🔐 Protected Routes under :username */}

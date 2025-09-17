@@ -1028,58 +1028,94 @@ const loadGallaryById = useCallback(
     loadTemplates();
   }, []);
 
-  // helper to load/apply a template by ID
-  const applyTemplateResponse = useCallback(
-    async (data) => {
-      setSavedPlaceholders(data?.placeholders || []);
-      const w = Number(data?.width);
-      const h = Number(data?.height);
-      let newW = w;
-      let newH = h;
-      if (!w || !h) {
-        const defH = Math.round(window.innerHeight * 0.75);
-        const aspect = w && h ? w / h : 0.75;
-        newH = defH;
-        newW = Math.round(defH * aspect);
-      }
-      setTplSize({ w: newW, h: newH });
-      setCanvasSize?.(newW, newH);
+  // ================= helper ===================
+function cacheTemplatePlaceholders(canvas) {
+  // find the frame slot
+  const frameObj = canvas.getObjects().find(o => o.customId === "frameSlot");
+  if (frameObj) {
+    saveProps("studentPhoto", {
+      left:   frameObj.left,
+      top:    frameObj.top,
+      scaleX: frameObj.scaleX,
+      scaleY: frameObj.scaleY,
+      // store shape/path info if you need masking
+      shape:  frameObj.shape || (frameObj.type === "path" ? "path" : "rect")
+    });
+  }
 
-      if (data?.image) {
-        return new Promise((resolve) => {
-          fabric.Image.fromURL(
-            data.image,
-            (img) => {
-              img.set({
-                selectable: false,
-                evented: false,
-                hasControls: false,
-                left: 0,
-                top: 0,
-              });
-              img.customId = "templateBg";
-              setTemplateImage(img);
-              resolve();
-            },
-            { crossOrigin: "anonymous" }
-          );
-        });
-      } else {
-        setTemplateImage(null);
-      }
+  // find the text placeholder for student name
+  const textObj = canvas.getObjects().find(o => o.customId === "studentName");
+  if (textObj) {
+    saveProps("studentName", {
+      left:       textObj.left,
+      top:        textObj.top,
+      fontSize:   textObj.fontSize,
+      fill:       textObj.fill,
+      fontFamily: textObj.fontFamily,
+      fontWeight: textObj.fontWeight,
+      textAlign:  textObj.textAlign,
+      originX:    textObj.originX,
+      originY:    textObj.originY
+    });
+  }
+}
 
-      if (data?.canvasJson) {
+// ================= applyTemplateResponse ===================
+const applyTemplateResponse = useCallback(
+  async (data) => {
+    setSavedPlaceholders(data?.placeholders || []);
+    const w = Number(data?.width);
+    const h = Number(data?.height);
+    let newW = w;
+    let newH = h;
+    if (!w || !h) {
+      const defH = Math.round(window.innerHeight * 0.75);
+      const aspect = w && h ? w / h : 0.75;
+      newH = defH;
+      newW = Math.round(defH * aspect);
+    }
+    setTplSize({ w: newW, h: newH });
+    setCanvasSize?.(newW, newH);
+
+    // background image
+    if (data?.image) {
+      await new Promise((resolve) => {
+        fabric.Image.fromURL(
+          data.image,
+          (img) => {
+            img.set({
+              selectable: false,
+              evented: false,
+              hasControls: false,
+              left: 0,
+              top: 0,
+            });
+            img.customId = "templateBg";
+            setTemplateImage(img);
+            resolve();
+          },
+          { crossOrigin: "anonymous" }
+        );
+      });
+    } else {
+      setTemplateImage(null);
+    }
+
+    // ----------------- load saved canvas JSON -----------------
+    if (data?.canvasJson) {
       canvas.loadFromJSON(data.canvasJson, () => {
+        // once JSON is on the canvas, cache frame & text placeholders
+        cacheTemplatePlaceholders(canvas);
         canvas.renderAll();
       });
     }
-      // after applying template response (inside applyTemplateResponse or after loadTemplateById finishes)
-      setShowLogo(false);
-      setShowSignature(false);
 
-    },
-    [setCanvasSize]
-  );
+    setShowLogo(false);
+    setShowSignature(false);
+  },
+  [setCanvasSize]
+);
+
 
   const loadTemplateById = useCallback(
     async (id) => {

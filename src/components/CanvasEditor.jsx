@@ -1251,8 +1251,7 @@ if (studentName) {
 
 const namePlaceholder = studentLayoutsRef.current.studentName;
 
-if (namePlaceholder) {
-  const displayName = student.name || "Unnamed";
+const displayName = student.name || "Unnamed";
 
   const nameObj = new fabric.Textbox(displayName, {
     left: namePlaceholder.left ?? 100,
@@ -1264,6 +1263,7 @@ if (namePlaceholder) {
     textAlign: namePlaceholder.textAlign || "center",
     originX: namePlaceholder.originX ?? "center",
     originY: namePlaceholder.originY ?? "center",
+    width: namePlaceholder?.width ?? (canvas.width - 40),
   });
 
   nameObj.customId = "studentName";
@@ -1272,14 +1272,14 @@ if (namePlaceholder) {
   canvas.renderAll();
 
   studentObjectsRef.current.push(nameObj);
-}
+
 
   
 
   /* ---------- Student Photo ---------- */
 const studentPhoto = canvas
   .getObjects()
-  .find((o) => o.id === "studentPhoto");
+  .find((o) => o.customId === "studentPhoto");
 
 if (studentPhoto) {
   // Remove old photo
@@ -1291,34 +1291,45 @@ if (studentPhoto) {
 
 const frame = canvas.getObjects().find((o) => o.id === "studentPhotoFrame");
 
-if (frame && student.photoUrl) {
+if (student.photoUrl) {
   fabric.Image.fromURL(student.photoUrl, (img) => {
-    const bounds = frame.getBoundingRect();
+    if (frame) {
+      // ✅ Place inside heart frame
+      const bounds = frame.getBoundingRect();
 
-    // Clone frame for clipping
-    const clip = fabric.util.object.clone(frame);
-    clip.set({
-      absolutePositioned: true,
-      evented: false,
-      selectable: false,
-      left: bounds.left,
-      top: bounds.top,
-    });
+      const clip = fabric.util.object.clone(frame);
+      clip.set({
+        absolutePositioned: true,
+        evented: false,
+        selectable: false,
+        left: bounds.left,
+        top: bounds.top,
+      });
 
-    // Scale image to fit inside bounding box
-    const scaleX = bounds.width / img.width;
-    const scaleY = bounds.height / img.height;
-    const scale = Math.min(scaleX, scaleY);
+      const scaleX = bounds.width / img.width;
+      const scaleY = bounds.height / img.height;
+      const scale = Math.min(scaleX, scaleY);
 
-    img.set({
-      left: bounds.left + bounds.width / 2,
-      top: bounds.top + bounds.height / 2,
-      originX: "center",
-      originY: "center",
-      scaleX: scale,
-      scaleY: scale,
-      clipPath: clip,
-    });
+      img.set({
+        left: bounds.left + bounds.width / 2,
+        top: bounds.top + bounds.height / 2,
+        originX: "center",
+        originY: "center",
+        scaleX: scale,
+        scaleY: scale,
+        clipPath: clip,
+      });
+    } else {
+      // ✅ Fallback: center on canvas if no frame
+      img.set({
+        left: canvas.width / 2,
+        top: canvas.height / 2,
+        originX: "center",
+        originY: "center",
+        scaleX: 0.5,
+        scaleY: 0.5,
+      });
+    }
 
     img.customId = "studentPhoto";
     canvas.add(img);
@@ -1328,7 +1339,6 @@ if (frame && student.photoUrl) {
     studentObjectsRef.current.push(img);
   });
 }
-
 
     // 4) Institute logo & signature
     if (showLogo && selectedInstitute?.logo) {

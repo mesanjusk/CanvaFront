@@ -1034,12 +1034,20 @@ function cacheTemplatePlaceholders(canvas) {
   const frameObj = canvas.getObjects().find(o => o.customId === "frameSlot");
   if (frameObj) {
     saveProps("studentPhoto", {
-      left:   frameObj.left,
-      top:    frameObj.top,
-      scaleX: frameObj.scaleX,
-      scaleY: frameObj.scaleY,
-      // store shape/path info if you need masking
-      shape:  frameObj.shape || (frameObj.type === "path" ? "path" : "rect")
+      left: frameObj.left,
+      top: frameObj.top,
+      // these are critical
+      scaleX: frameObj.scaleX ?? 1,
+      scaleY: frameObj.scaleY ?? 1,
+      width:  frameObj.width  ?? frameObj.getScaledWidth(),
+      height: frameObj.height ?? frameObj.getScaledHeight(),
+      // identify the shape so you can clip later
+      shape:
+        frameObj.type === "circle"
+          ? "circle"
+          : frameObj.type === "rect"
+          ? "rect"
+          : "path",
     });
   }
 
@@ -1275,7 +1283,7 @@ if (currentStudent) {
 // === 3) Student photo inside saved frame ===
 const current = currentStudent;
 const savedPhoto = getSavedProps("studentPhoto") || {};
-const frameShape = savedPhoto.shape;    
+const frameShape = savedPhoto.shape || "rect";    
 const photoUrl  = Array.isArray(current?.photo) ? current.photo[0] : current?.photo;
 
 if (photoUrl && frameShape) {
@@ -1284,21 +1292,26 @@ if (photoUrl && frameShape) {
     if (o.customId === "studentPhoto") canvas.remove(o);
   });
 
-  safeLoadImage(photoUrl, img => {
-    const scaleX = savedPhoto.scaleX ?? 1;
-    const scaleY = savedPhoto.scaleY ?? 1;
+   safeLoadImage(photoUrl, img => {
+    // Scale to match the saved frame size
+    const scaleX =
+      savedPhoto.scaleX ??
+      (savedPhoto.width  ? savedPhoto.width  / img.width  : 1);
+    const scaleY =
+      savedPhoto.scaleY ??
+      (savedPhoto.height ? savedPhoto.height / img.height : 1);
 
     img.set({
+      left:   savedPhoto.left ?? 0,
+      top:    savedPhoto.top  ?? 0,
       originX: "center",
       originY: "center",
-      left: savedPhoto.left,
-      top: savedPhoto.top,
       scaleX,
       scaleY,
     });
     img.customId = "studentPhoto";
 
-    // Clip/mask to the saved frame
+    // Clip/mask to the saved shape
     applyMaskAndFrame(canvas, img, frameShape, {
       stroke: frameBorder,
       strokeWidth: frameWidth,
@@ -1312,7 +1325,6 @@ if (photoUrl && frameShape) {
     canvas.requestRenderAll();
   });
 }
-
 
 
     // 4) Institute logo & signature

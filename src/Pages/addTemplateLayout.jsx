@@ -19,6 +19,7 @@ const TemplateLayout = ({
             "field",
             "shape",
             "frameOverlay",
+            "frameSlot",   // 👈 persist frameSlot flag
           ]));
         };
       })(fabric.Object.prototype.toObject);
@@ -41,6 +42,7 @@ const TemplateLayout = ({
         "frameOverlay",
         "field",
         "shape",
+        "frameSlot",  // 👈 make sure this is saved
       ]);
 
       console.log("[save-debug] Saving canvas JSON:", canvasJson);

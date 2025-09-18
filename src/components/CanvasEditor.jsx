@@ -1284,27 +1284,20 @@ if (existingPhoto) {
     studentObjectsRef.current.filter((o) => o.customId !== "studentPhoto");
 }
 
-// ✅ 1. Try to find "frameSlot"
-let frameSlot = canvas.getObjects().find((o) => o.customId === "frameSlot");
+// ✅ Find frame by flag (preferred) or fallback to customId
+const frameSlot = canvas
+  .getObjects()
+  .find((o) => o.frameSlot === true || o.customId === "frameSlot");
 
-// ✅ 2. Fallback: if no frameSlot, pick the first rect / circle / path
-if (!frameSlot) {
-  frameSlot = canvas.getObjects().find(
-    (o) => o.type === "rect" || o.type === "circle" || o.type === "path"
-  );
-}
-
-const photoUrl = Array.isArray(selectedStudent?.photo)
-  ? selectedStudent.photo[0]
-  : selectedStudent?.photo;
+const photoUrl = selectedStudent?.photo?.trim();
 
 console.log("[photo-debug] frameSlot:", frameSlot, "photoUrl:", photoUrl);
 
 if (frameSlot && photoUrl) {
-  fabric.Image.fromURL(photoUrl.trim(), (img) => {
+  fabric.Image.fromURL(photoUrl, (img) => {
     const bounds = frameSlot.getBoundingRect();
 
-    // --- Clip shape based on frame type ---
+    // --- Prepare clip shape ---
     let clipShape;
     if (frameSlot.type === "path") {
       clipShape = new fabric.Path(frameSlot.path, {
@@ -1343,15 +1336,14 @@ if (frameSlot && photoUrl) {
     img.customId = "studentPhoto";
     canvas.add(img);
 
-    // ✅ Ensure frame stays on top of photo
     frameSlot.bringToFront();
     canvas.renderAll();
-
     studentObjectsRef.current.push(img);
-    console.log("[photo-debug] photo added and clipped inside frame ✅");
+
+    console.log("[photo-debug] Photo added ✅ inside frame");
   });
 } else {
-  console.warn("[photo-debug] No frame or photo URL found — skipping photo layer");
+  console.log("[photo-debug] No frameSlot or photoUrl found — skipping photo");
 }
 
     // 4) Institute logo & signature

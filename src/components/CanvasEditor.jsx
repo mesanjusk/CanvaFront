@@ -1119,72 +1119,89 @@ useEffect(() => {
 
   // 4️⃣ Add student photo
   const photoUrl = Array.isArray(selectedStudent.photo) ? selectedStudent.photo[0] : selectedStudent.photo;
+
   if (!photoUrl) {
-    console.warn("No photo URL available for student:", selectedStudent);
+    console.warn("No photo URL for student:", selectedStudent);
     return;
   }
 
-  try {
-    fabric.Image.fromURL(photoUrl, img => {
-      const bounds = frameSlot.getBoundingRect();
-      if (!bounds.width || !bounds.height) {
-        console.warn("Invalid frameSlot bounds:", bounds);
-        return;
-      }
+  // Preload image to check if it loads
+  const imgCheck = new Image();
+  imgCheck.crossOrigin = "anonymous";
+  imgCheck.src = photoUrl;
+  imgCheck.onload = () => {
+    try {
+      fabric.Image.fromURL(photoUrl, img => {
+        if (!img) {
+          console.error("Fabric returned null image");
+          return;
+        }
 
-      // Clip to frame safely
-      let clipShape;
-      switch (frameSlot.type) {
-        case "circle":
-          clipShape = new fabric.Circle({
-            radius: (frameSlot.radius || frameSlot.width / 2) * (frameSlot.scaleX ?? 1),
-            originX: "center",
-            originY: "center",
-          });
-          break;
-        case "path":
-          if (frameSlot.path) {
-            clipShape = new fabric.Path(frameSlot.path, { originX: "center", originY: "center" });
-            clipShape.scaleX = frameSlot.scaleX ?? 1;
-            clipShape.scaleY = frameSlot.scaleY ?? 1;
-          }
-          break;
-        default:
-          clipShape = new fabric.Rect({
-            width: bounds.width,
-            height: bounds.height,
-            originX: "center",
-            originY: "center",
-          });
-      }
+        const bounds = frameSlot.getBoundingRect();
+        if (!bounds.width || !bounds.height) {
+          console.warn("Invalid frameSlot bounds:", bounds);
+          return;
+        }
 
-      // Scale image to fit frame
-      const scale = Math.min(bounds.width / img.width, bounds.height / img.height);
-      img.set({
-        left: bounds.left + bounds.width / 2,
-        top: bounds.top + bounds.height / 2,
-        originX: "center",
-        originY: "center",
-        scaleX: scale,
-        scaleY: scale,
-        clipPath: clipShape,
-        selectable: false,
-        evented: false,
-        customId: "studentPhoto",
-      });
+        // Clip shape
+        let clipShape;
+        switch (frameSlot.type) {
+          case "circle":
+            clipShape = new fabric.Circle({
+              radius: (frameSlot.radius || frameSlot.width / 2) * (frameSlot.scaleX ?? 1),
+              originX: "center",
+              originY: "center",
+            });
+            break;
+          case "path":
+            if (frameSlot.path) {
+              clipShape = new fabric.Path(frameSlot.path, { originX: "center", originY: "center" });
+              clipShape.scaleX = frameSlot.scaleX ?? 1;
+              clipShape.scaleY = frameSlot.scaleY ?? 1;
+            }
+            break;
+          default:
+            clipShape = new fabric.Rect({
+              width: bounds.width,
+              height: bounds.height,
+              originX: "center",
+              originY: "center",
+            });
+        }
 
-      canvas.add(img);
-      frameSlot.bringToFront();
-      studentObjectsRef.current.push(img);
-      attachSaveHandlers(img);
-      canvas.requestRenderAll();
-    }, { crossOrigin: "anonymous" });
-  } catch (err) {
-    console.error("Error loading student photo:", err);
-  }
+        // Scale to fit frame
+        const scale = Math.min(bounds.width / img.width, bounds.height / img.height);
+        img.set({
+          left: bounds.left + bounds.width / 2,
+          top: bounds.top + bounds.height / 2,
+          originX: "center",
+          originY: "center",
+          scaleX: scale,
+          scaleY: scale,
+          clipPath: clipShape,
+          selectable: false,
+          evented: false,
+          customId: "studentPhoto",
+        });
+
+        canvas.add(img);
+        frameSlot.bringToFront();
+        studentObjectsRef.current.push(img);
+        attachSaveHandlers(img);
+        canvas.requestRenderAll();
+      }, { crossOrigin: "anonymous" });
+    } catch (err) {
+      console.error("Fabric image error:", err);
+    }
+  };
+
+  imgCheck.onerror = e => {
+    console.error("Image failed to load:", photoUrl, e);
+  };
 
   canvas.requestRenderAll();
 }, [canvas, selectedStudent]);
+
 
 
 

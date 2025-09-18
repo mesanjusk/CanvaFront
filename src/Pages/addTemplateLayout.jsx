@@ -1,19 +1,41 @@
-import React from "react";
+import React, { useEffect } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
+import { fabric } from "fabric";
 
 const TemplateLayout = ({
   canvas,
   activeTemplateId,
   onSaved,
-  children, 
+  children,
 }) => {
+  // ✅ Patch Fabric once to include custom properties in serialization
+  useEffect(() => {
+    if (!fabric.Object.prototype._customPatched) {
+      fabric.Object.prototype.toObject = (function (toObject) {
+        return function (propertiesToInclude) {
+          return toObject.call(this, (propertiesToInclude || []).concat([
+            "customId",
+            "field",
+            "shape",
+            "frameOverlay",
+          ]));
+        };
+      })(fabric.Object.prototype.toObject);
+
+      fabric.Object.prototype._customPatched = true; // prevent double patch
+      console.log("[fabric-debug] Custom props patch applied ✅");
+    }
+  }, []);
+
   const handleSave = async () => {
     if (!canvas || !activeTemplateId) return;
 
     try {
       canvas.renderAll();
-       const canvasJson = canvas.toJSON([
+
+      // ✅ Ensure custom props included in JSON
+      const canvasJson = canvas.toJSON([
         "customId",
         "clipPath",
         "frameOverlay",
@@ -21,10 +43,13 @@ const TemplateLayout = ({
         "shape",
       ]);
 
+      console.log("[save-debug] Saving canvas JSON:", canvasJson);
+
       await axios.put(
         `https://canvaback.onrender.com/api/template/update-canvas/${activeTemplateId}`,
         { canvasJson }
       );
+
       toast.success("Template layout saved!");
       onSaved?.();
     } catch (err) {

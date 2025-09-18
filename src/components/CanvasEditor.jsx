@@ -1273,169 +1273,86 @@ canvas.renderAll();
 
 studentObjectsRef.current.push(nameObj);
 
-/* ---------- Student Photo (robust, works with any saved frame) ---------- */
-(async () => {
-  if (!canvas) return;
+// ---------- Student Photo with Any Frame ----------
+const existingPhoto = canvas
+  .getObjects()
+  .find((o) => o.customId === "studentPhoto");
 
-  // remove previous photo
-  const existingPhoto = canvas.getObjects().find((o) => o.customId === "studentPhoto");
-  if (existingPhoto) {
-    canvas.remove(existingPhoto);
-    studentObjectsRef.current = studentObjectsRef.current.filter((o) => o.customId !== "studentPhoto");
-  }
+if (existingPhoto) {
+  canvas.remove(existingPhoto);
+  studentObjectsRef.current =
+    studentObjectsRef.current.filter((o) => o.customId !== "studentPhoto");
+}
 
-  // find the saved frame placeholder
-  const frameSlot = canvas.getObjects().find((o) => o.customId === "frameSlot");
+// ✅ 1. Try to find "frameSlot"
+let frameSlot = canvas.getObjects().find((o) => o.customId === "frameSlot");
 
-  // normalize the photo value (array or string)
-  const rawPhoto = selectedStudent?.photo;
-  let photoUrl = null;
-  if (Array.isArray(rawPhoto)) {
-    photoUrl = rawPhoto.find(p => typeof p === "string" && p.trim()) || null;
-  } else if (typeof rawPhoto === "string" && rawPhoto.trim()) {
-    photoUrl = rawPhoto.trim();
-  }
+// ✅ 2. Fallback: if no frameSlot, pick the first rect / circle / path
+if (!frameSlot) {
+  frameSlot = canvas.getObjects().find(
+    (o) => o.type === "rect" || o.type === "circle" || o.type === "path"
+  );
+}
 
-  console.log("[photo-debug] frameSlot:", frameSlot, "photoUrl:", photoUrl);
+const photoUrl = Array.isArray(selectedStudent?.photo)
+  ? selectedStudent.photo[0]
+  : selectedStudent?.photo;
 
-  if (!photoUrl) {
-    console.warn("[photo-debug] no photo URL for selected student — skipping photo layer");
-    return;
-  }
+console.log("[photo-debug] frameSlot:", frameSlot, "photoUrl:", photoUrl);
 
-  // helper: preload image using native Image (lets us catch CORS/network errors)
-  const loadImgElement = (src) => new Promise((resolve, reject) => {
-    const imgEl = new Image();
-    imgEl.crossOrigin = "anonymous";
-    imgEl.onload = () => resolve(imgEl);
-    imgEl.onerror = (err) => reject(err);
-    imgEl.src = src;
-  });
+if (frameSlot && photoUrl) {
+  fabric.Image.fromURL(photoUrl.trim(), (img) => {
+    const bounds = frameSlot.getBoundingRect();
 
-  try {
-    const imgEl = await loadImgElement(photoUrl);
-    if (!imgEl) throw new Error("Image element not returned");
-
-    // create fabric image from element
-    const fImg = new fabric.Image(imgEl, { crossOrigin: "anonymous" });
-
-    // If a frame exists, create clipPath from it and align everything
-    if (frameSlot) {
-      const bounds = frameSlot.getBoundingRect(true); // the target area in canvas coords
-      console.log("[photo-debug] frame bounds:", bounds);
-
-      // Try to construct a clip shape that will align with the image's local space.
-      // Use saved path data if available (frameSlot.path) else clone the object.
-      let clipShape;
-      try {
-        if (frameSlot.type === "path" && (frameSlot.path || frameSlot.toObject)) {
-          // prefer raw path array when possible
-          const pathData = frameSlot.path || (frameSlot.toObject && frameSlot.toObject().path);
-          if (pathData) {
-            clipShape = new fabric.Path(pathData, {
-              originX: "center",
-              originY: "center",
-            });
-          } else {
-            clipShape = fabric.util.object.clone(frameSlot);
-            clipShape.set({ originX: "center", originY: "center" });
-          }
-        } else {
-          // rect/circle/ellipse/other - clone
-          clipShape = fabric.util.object.clone(frameSlot);
-          clipShape.set({ originX: "center", originY: "center" });
-        }
-      } catch (e) {
-        console.warn("[photo-debug] clipShape build failed, falling back to clone:", e);
-        clipShape = fabric.util.object.clone(frameSlot);
-        clipShape.set({ originX: "center", originY: "center" });
-      }
-
-      // Make clip relative to the image (so coordinates inside clipPath are local to image)
+    // --- Clip shape based on frame type ---
+    let clipShape;
+    if (frameSlot.type === "path") {
+      clipShape = new fabric.Path(frameSlot.path, {
+        left: 0,
+        top: 0,
+        scaleX: frameSlot.scaleX,
+        scaleY: frameSlot.scaleY,
+        originX: "center",
+        originY: "center",
+      });
+    } else {
+      clipShape = fabric.util.object.clone(frameSlot);
       clipShape.set({
         left: 0,
         top: 0,
-        absolutePositioned: false, // clip coordinates will be relative to the image
-        evented: false,
-        selectable: false,
-      });
-
-      // Choose scaling strategy:
-      // - use COVER so the frame area is fully filled (may crop image),
-      // - if you prefer fit-within use Math.min
-      const scaleCover = Math.max(bounds.width / fImg.width, bounds.height / fImg.height);
-
-      // Position and scale image so its center matches frameSlot center
-      fImg.set({
-        left: bounds.left + bounds.width / 2,
-        top: bounds.top + bounds.height / 2,
         originX: "center",
         originY: "center",
-        scaleX: scaleCover,
-        scaleY: scaleCover,
-        clipPath: clipShape,
-        selectable: false,
-        evented: false,
       });
-
-      fImg.customId = "studentPhoto";
-      canvas.add(fImg);
-      // ensure frame outline is visible above the photo
-      frameSlot.bringToFront();
-      fImg.setCoords();
-      canvas.requestRenderAll();
-      studentObjectsRef.current.push(fImg);
-
-      console.log("[photo-debug] photo added and clipped to frame");
-      return;
     }
 
-    // If no frameSlot, just center the photo and scale reasonably
-    fImg.scaleToWidth(Math.round(canvas.width * 0.3));
-    fImg.set({
-      left: canvas.width / 2,
-      top: canvas.height / 2,
+    // --- Scale photo to fit inside frame ---
+    const scaleX = bounds.width / img.width;
+    const scaleY = bounds.height / img.height;
+    const scale = Math.min(scaleX, scaleY);
+
+    img.set({
+      left: bounds.left + bounds.width / 2,
+      top: bounds.top + bounds.height / 2,
       originX: "center",
       originY: "center",
-      selectable: false,
-      evented: false,
+      scaleX: scale,
+      scaleY: scale,
+      clipPath: clipShape,
     });
-    fImg.customId = "studentPhoto";
-    canvas.add(fImg);
-    fImg.setCoords();
-    canvas.requestRenderAll();
-    studentObjectsRef.current.push(fImg);
-    console.log("[photo-debug] photo added (no frame present)");
-  } catch (err) {
-    console.error("[photo-debug] image load/clip failed:", err);
 
-    // fallback: try fabric.Image.fromURL (last resort) without clip so at least image is visible
-    fabric.Image.fromURL(photoUrl, (fallbackImg) => {
-      if (!fallbackImg) {
-        console.error("[photo-debug] fallback fabric.Image.fromURL also failed");
-        return;
-      }
-      fallbackImg.scaleToWidth(Math.round(canvas.width * 0.25));
-      fallbackImg.set({
-        left: canvas.width / 2,
-        top: canvas.height / 2,
-        originX: "center",
-        originY: "center",
-        selectable: false,
-        evented: false,
-      });
-      fallbackImg.customId = "studentPhoto";
-      canvas.add(fallbackImg);
-      fallbackImg.setCoords();
-      canvas.requestRenderAll();
-      studentObjectsRef.current.push(fallbackImg);
-      console.log("[photo-debug] fallback photo added without clip");
-    }, { crossOrigin: "anonymous" });
-  }
-})();
+    img.customId = "studentPhoto";
+    canvas.add(img);
 
+    // ✅ Ensure frame stays on top of photo
+    frameSlot.bringToFront();
+    canvas.renderAll();
 
-
+    studentObjectsRef.current.push(img);
+    console.log("[photo-debug] photo added and clipped inside frame ✅");
+  });
+} else {
+  console.warn("[photo-debug] No frame or photo URL found — skipping photo layer");
+}
 
     // 4) Institute logo & signature
     if (showLogo && selectedInstitute?.logo) {

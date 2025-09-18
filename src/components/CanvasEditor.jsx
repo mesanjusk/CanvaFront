@@ -1395,38 +1395,50 @@ useEffect(() => {
   nameObj.bringToFront();
   studentObjectsRef.current.push(nameObj);
 
-  // --------- 4. Add student photo ---------
-  const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
-  const photoUrl = selectedStudent?.photo || "";
-  if (frameSlot && photoUrl) {
-    fabric.Image.fromURL(
-      photoUrl,
-      img => {
-        const bounds = frameSlot.getBoundingRect();
+ // --------- 4. Add student photo ---------
+const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
+const photoUrl = Array.isArray(selectedStudent?.photo) ? selectedStudent.photo[0] : selectedStudent?.photo;
 
+if (frameSlot && photoUrl) {
+  // Ensure frame has valid size
+  const bounds = frameSlot.getBoundingRect();
+  if (!bounds.width || !bounds.height) {
+    console.warn("Invalid frameSlot bounds", bounds);
+  } else {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.src = photoUrl;
+    img.onload = () => {
+      fabric.Image.fromURL(photoUrl, fabricImg => {
+        if (!fabricImg) {
+          console.error("Failed to create fabric image");
+          return;
+        }
+
+        // Determine clip path
         let clipShape;
-        if (frameSlot.type === "path" && frameSlot.path) {
-          clipShape = new fabric.Path(frameSlot.path, { originX: "center", originY: "center" });
-          clipShape.scaleX = frameSlot.scaleX ?? 1;
-          clipShape.scaleY = frameSlot.scaleY ?? 1;
-        } else if (frameSlot.type === "circle") {
+        if (frameSlot.type === "circle") {
           clipShape = new fabric.Circle({
             radius: (frameSlot.radius || frameSlot.width / 2) * (frameSlot.scaleX ?? 1),
             originX: "center",
             originY: "center",
           });
+        } else if (frameSlot.type === "path" && frameSlot.path) {
+          clipShape = new fabric.Path(frameSlot.path, { originX: "center", originY: "center" });
+          clipShape.scaleX = frameSlot.scaleX ?? 1;
+          clipShape.scaleY = frameSlot.scaleY ?? 1;
         } else {
           clipShape = new fabric.Rect({
-            width: (frameSlot.width || bounds.width) * (frameSlot.scaleX ?? 1),
-            height: (frameSlot.height || bounds.height) * (frameSlot.scaleY ?? 1),
+            width: bounds.width,
+            height: bounds.height,
             originX: "center",
             originY: "center",
           });
         }
 
-        const scale = Math.min(bounds.width / img.width, bounds.height / img.height);
-
-        img.set({
+        // Scale image to fit frame
+        const scale = Math.min(bounds.width / fabricImg.width, bounds.height / fabricImg.height);
+        fabricImg.set({
           left: bounds.left + bounds.width / 2,
           top: bounds.top + bounds.height / 2,
           originX: "center",
@@ -1436,18 +1448,22 @@ useEffect(() => {
           clipPath: clipShape,
           selectable: false,
           evented: false,
+          customId: "studentPhoto",
         });
 
-        img.customId = "studentPhoto";
-        canvas.add(img);
+        canvas.add(fabricImg);
         frameSlot.bringToFront();
-        studentObjectsRef.current.push(img);
-        attachSaveHandlers(img);
+        studentObjectsRef.current.push(fabricImg);
+        attachSaveHandlers(fabricImg);
         canvas.requestRenderAll();
-      },
-      { crossOrigin: "anonymous" }
-    );
+      }, { crossOrigin: "anonymous" });
+    };
+
+    img.onerror = e => {
+      console.error("Image failed to load:", photoUrl, e);
+    };
   }
+}
 
   // --------- 5. Add institute logo ---------
   if (showLogo && selectedInstitute?.logo) {

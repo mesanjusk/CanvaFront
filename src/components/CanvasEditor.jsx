@@ -1293,12 +1293,10 @@ if (frameSlot && selectedStudent?.photo) {
   fabric.Image.fromURL(selectedStudent.photo.trim(), (img) => {
     const bounds = frameSlot.getBoundingRect();
 
-    // --- FIX: Normalize clipPath correctly ---
+    // clone the frame shape to use as clipPath
     let clipShape;
     if (frameSlot.type === "path") {
       clipShape = new fabric.Path(frameSlot.path, {
-        left: 0,
-        top: 0,
         scaleX: frameSlot.scaleX,
         scaleY: frameSlot.scaleY,
         originX: "center",
@@ -1307,14 +1305,19 @@ if (frameSlot && selectedStudent?.photo) {
     } else {
       clipShape = fabric.util.object.clone(frameSlot);
       clipShape.set({
-        left: 0,
-        top: 0,
         originX: "center",
         originY: "center",
       });
     }
 
-    // Scale photo to fit inside frame
+    // --- IMPORTANT: shift clipShape to image local space ---
+    clipShape.set({
+      left: 0,
+      top: 0,
+      absolutePositioned: false, // key fix
+    });
+
+    // Scale image to fit frame bounds
     const scaleX = bounds.width / img.width;
     const scaleY = bounds.height / img.height;
     const scale = Math.min(scaleX, scaleY);
@@ -1326,13 +1329,15 @@ if (frameSlot && selectedStudent?.photo) {
       originY: "center",
       scaleX: scale,
       scaleY: scale,
-      clipPath: clipShape, // apply clipping
+      clipPath: clipShape, // clip is now relative to the image
     });
 
     img.customId = "studentPhoto";
     canvas.add(img);
 
+    // keep frame visible on top
     frameSlot.bringToFront();
+
     canvas.renderAll();
     studentObjectsRef.current.push(img);
   });

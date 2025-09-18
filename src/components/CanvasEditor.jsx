@@ -1083,6 +1083,12 @@ function attachSaveHandlers(img) {
 useEffect(() => {
   if (!canvas || !selectedStudent) return;
 
+  // Ensure canvas has context
+  if (!canvas.getContext || !canvas.getContext()) {
+    console.warn("Canvas not ready yet.");
+    return;
+  }
+
   // 1️⃣ Find frameSlot
   const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
   if (!frameSlot) {
@@ -1118,14 +1124,16 @@ useEffect(() => {
   studentObjectsRef.current.push(nameObj);
 
   // 4️⃣ Add student photo
-  const photoUrl = Array.isArray(selectedStudent.photo) ? selectedStudent.photo[0] : selectedStudent.photo;
+  const photoUrl = Array.isArray(selectedStudent.photo)
+    ? selectedStudent.photo[0]
+    : selectedStudent.photo;
 
   if (!photoUrl) {
     console.warn("No photo URL for student:", selectedStudent);
     return;
   }
 
-  // Preload image to check if it loads
+  // Preload image to avoid broken image errors
   const imgCheck = new Image();
   imgCheck.crossOrigin = "anonymous";
   imgCheck.src = photoUrl;
@@ -1143,7 +1151,7 @@ useEffect(() => {
           return;
         }
 
-        // Clip shape
+        // Create clip shape depending on frame type
         let clipShape;
         switch (frameSlot.type) {
           case "circle":
@@ -1169,7 +1177,7 @@ useEffect(() => {
             });
         }
 
-        // Scale to fit frame
+        // Scale image to fit the frame
         const scale = Math.min(bounds.width / img.width, bounds.height / img.height);
         img.set({
           left: bounds.left + bounds.width / 2,

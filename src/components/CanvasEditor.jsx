@@ -1015,8 +1015,21 @@ const loadGallaryById = useCallback(
   [applyGallaryResponse, resetHistory, saveHistory]
 );
 
-  // ================= helper ===================
+ /* ----------------- Minimal save/get helpers (fixes `saveProps` not defined`) ----------------- */
+const saveProps = (key, value) => {
+  try {
+    const tpl = (typeof activeTemplateId !== "undefined" && activeTemplateId) ? activeTemplateId : "global";
+    localStorage.setItem(`canvas_props_${tpl}_${key}`, JSON.stringify(value));
+  } catch (e) {
+    console.warn("saveProps failed", e);
+  }
+};
+
+/* ----------------- cacheTemplatePlaceholders (slightly defensive) ----------------- */
 function cacheTemplatePlaceholders(canvas) {
+  if (!canvas) return;
+
+  // find the frame slot
   const frameObj = canvas.getObjects().find(o => o.customId === "frameSlot");
   if (frameObj) {
     saveProps("studentPhoto", {
@@ -1024,61 +1037,86 @@ function cacheTemplatePlaceholders(canvas) {
       top: frameObj.top,
       scaleX: frameObj.scaleX ?? 1,
       scaleY: frameObj.scaleY ?? 1,
-      width:  frameObj.width  ?? frameObj.getScaledWidth(),
+      width: frameObj.width ?? frameObj.getScaledWidth(),
       height: frameObj.height ?? frameObj.getScaledHeight(),
-      shape: frameObj.type === "circle" ? "circle"
-            : frameObj.type === "rect"   ? "rect"
-            : "path",
+      shape: frameObj.type === "circle" ? "circle" : frameObj.type === "rect" ? "rect" : "path",
     });
   }
 
-  const textObj = canvas.getObjects().find(o => o.customId === "studentName");
+  // find the text placeholder for student name (accept templateText too)
+  const textObj = canvas.getObjects().find(o => o.customId === "studentName" || o.customId === "templateText" || (o.type === "i-text" && !o.customId));
   if (textObj) {
     saveProps("studentName", {
-      left:       textObj.left,
-      top:        textObj.top,
-      fontSize:   textObj.fontSize,
-      fill:       textObj.fill,
+      left: textObj.left,
+      top: textObj.top,
+      fontSize: textObj.fontSize,
+      fill: textObj.fill,
       fontFamily: textObj.fontFamily,
       fontWeight: textObj.fontWeight,
-      textAlign:  textObj.textAlign,
-      originX:    textObj.originX,
-      originY:    textObj.originY
+      textAlign: textObj.textAlign,
+      originX: textObj.originX,
+      originY: textObj.originY
     });
   }
 }
 
-// ---------- addStudentPhoto (runs AFTER template is loaded) ----------
-function addStudentPhoto(canvas, selectedStudent) {
-  // remove any old photo first
-  const existingPhoto = canvas.getObjects().find(o => o.customId === "studentPhoto");
+/* ----------------- addStudentPhoto (call this ONLY after template JSON loaded) ----------------- */
+function addStudentPhoto(canvasInstance, student) {
+  if (!canvasInstance) return;
+
+  // remove previous student photo if present
+  const existingPhoto = canvasInstance.getObjects().find(o => o.customId === "studentPhoto");
   if (existingPhoto) {
-    canvas.remove(existingPhoto);
-    studentObjectsRef.current =
-      studentObjectsRef.current.filter(o => o.customId !== "studentPhoto");
+    canvasInstance.remove(existingPhoto);
+    if (studentObjectsRef?.current) {
+      studentObjectsRef.current = studentObjectsRef.current.filter(o => o.customId !== "studentPhoto");
+    }
   }
 
-  const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
-  const photoUrl = Array.isArray(selectedStudent?.photo)
-    ? selectedStudent.photo[0]
-    : selectedStudent?.photo;
+  const frameSlot = canvasInstance.getObjects().find(o => o.customId === "frameSlot");
+  const photoUrl = Array.isArray(student?.photo) ? student.photo[0] : student?.photo;
 
   console.log("[photo-debug] frameSlot:", frameSlot, "photoUrl:", photoUrl);
-  if (!frameSlot || !photoUrl) return;
+  if (!frameSlot || !photoUrl) {
+    console.log("[photo-debug] ⚠️ No frameSlot or photoUrl found -> skipping addStudentPhoto");
+    return;
+  }
 
   fabric.Image.fromURL(photoUrl, (img) => {
+    // bounding box of the frame on canvas
     const bounds = frameSlot.getBoundingRect();
 
-    const clipShape = new fabric.Path(frameSlot.path, {
-      left: 0,
-      top: 0,
-      scaleX: frameSlot.scaleX,
-      scaleY: frameSlot.scaleY,
-      originX: "center",
-      originY: "center",
-    });
+    // build clipPath from the saved frame (path is best for your saved template)
+    let clipShape;
+    if (frameSlot.type === "path" && frameSlot.path) {
+      clipShape = new fabric.Path(frameSlot.path, {
+        left: 0,
+        top: 0,
+        originX: "center",
+        originY: "center",
+      });
+      // apply scale saved on the frame so the path clip matches size
+      clipShape.scaleX = frameSlot.scaleX ?? 1;
+      clipShape.scaleY = frameSlot.scaleY ?? 1;
+    } else if (frameSlot.type === "circle") {
+      clipShape = new fabric.Circle({
+        radius: (frameSlot.radius || (frameSlot.width / 2)) * (frameSlot.scaleX ?? 1),
+        originX: "center",
+        originY: "center",
+      });
+    } else {
+      // rect fallback
+      clipShape = new fabric.Rect({
+        width: (frameSlot.width || bounds.width) * (frameSlot.scaleX ?? 1),
+        height: (frameSlot.height || bounds.height) * (frameSlot.scaleY ?? 1),
+        originX: "center",
+        originY: "center",
+      });
+    }
 
+    // scale the photo to fit entirely inside the frame bounding rect
     const scale = Math.min(bounds.width / img.width, bounds.height / img.height);
+
     img.set({
       left: bounds.left + bounds.width / 2,
       top: bounds.top + bounds.height / 2,
@@ -1090,16 +1128,18 @@ function addStudentPhoto(canvas, selectedStudent) {
     });
 
     img.customId = "studentPhoto";
-    canvas.add(img);
-    frameSlot.bringToFront();      // keep purple outline visible
-    canvas.renderAll();
+    canvasInstance.add(img);
 
-    studentObjectsRef.current.push(img);
+    // keep frame outline visible above photo
+    frameSlot.bringToFront();
+
+    if (studentObjectsRef?.current) studentObjectsRef.current.push(img);
+    canvasInstance.requestRenderAll();
     console.log("[photo-debug] ✅ Student photo clipped inside frame");
   }, { crossOrigin: "anonymous" });
 }
 
-// ================= applyTemplateResponse ===================
+/* ----------------- applyTemplateResponse (loads canvasJson & writes name + photo) ----------------- */
 const applyTemplateResponse = useCallback(
   async (data) => {
     setSavedPlaceholders(data?.placeholders || []);
@@ -1140,32 +1180,66 @@ const applyTemplateResponse = useCallback(
       setTemplateImage(null);
     }
 
-    // -------- load saved canvas JSON & tag placeholders --------
+    // load saved canvas JSON & tag placeholders
     if (data?.canvasJson) {
       canvas.loadFromJSON(data.canvasJson, () => {
-        // Tag the text and frame objects so later code can find them
+        // Tag the text and frame objects so later code can find them.
+        // be permissive: respect existing "templateText" id too.
         canvas.getObjects().forEach(o => {
-          if (o.type === "i-text" && !o.customId) {
-            o.customId = "studentName";
+          if (o.type === "i-text") {
+            // if the template used customId "templateText" or has no id, treat it as studentName placeholder
+            if (!o.customId || o.customId === "templateText" || o.customId.toString().toLowerCase().includes("text")) {
+              o.customId = "studentName";
+            }
           }
-          if (o.type === "path" && o.stroke === "#7c3aed" && !o.customId) {
+          // path/frame detection: either already tagged or matches your purple stroke
+          if ((o.customId === "frameSlot") || (o.type === "path" && (o.stroke === "#7c3aed" || o.stroke === "rgb(124,58,237)"))) {
             o.customId = "frameSlot";
           }
         });
 
+        // replace the placeholder text with selected student's name (if we have a student)
+        const nameObj = canvas.getObjects().find(o => o.customId === "studentName");
+        const displayName = `${selectedStudent?.firstName || ""} ${selectedStudent?.lastName || ""}`.trim();
+
+        if (nameObj && typeof nameObj.set === "function") {
+          // set the text inside the existing template text object
+          nameObj.set({ text: displayName || nameObj.text, selectable: false, evented: false });
+          nameObj.setCoords();
+        } else {
+          // fallback: create a new text object in case template has no editable text placeholder
+          const fallbackName = new fabric.Textbox(displayName || " ", {
+            left: (getSavedProps("studentName")?.left) ?? (canvas.width / 2),
+            top: (getSavedProps("studentName")?.top) ?? (canvas.height - 80),
+            fontSize: (getSavedProps("studentName")?.fontSize) ?? 28,
+            fill: (getSavedProps("studentName")?.fill) ?? "#000",
+            fontFamily: (getSavedProps("studentName")?.fontFamily) || "Arial",
+            fontWeight: (getSavedProps("studentName")?.fontWeight) || "bold",
+            textAlign: (getSavedProps("studentName")?.textAlign) || "center",
+            originX: (getSavedProps("studentName")?.originX) ?? "center",
+            originY: (getSavedProps("studentName")?.originY) ?? "top",
+            width: (getSavedProps("studentName")?.width) ?? (canvas.width - 40),
+          });
+          fallbackName.customId = "studentName";
+          canvas.add(fallbackName);
+          fallbackName.bringToFront();
+        }
+
+        // cache template placeholders for later on (logo, student photo etc.)
         cacheTemplatePlaceholders(canvas);
 
-        // ✅ Add the student photo only after everything is on canvas
+        // *** Add the student photo now that the frameSlot object exists ***
         addStudentPhoto(canvas, selectedStudent);
 
-        canvas.renderAll();
+        canvas.requestRenderAll();
       });
     }
 
     setShowLogo(false);
     setShowSignature(false);
   },
-  [setCanvasSize, selectedStudent]   // depend on selectedStudent so photo updates
+  // note: include canvas and selectedStudent in deps so latest student is used
+  [canvas, setCanvasSize, selectedStudent]
 );
 
 // ---------- Templates list (for right sidebar) ----------

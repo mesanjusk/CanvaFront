@@ -1015,43 +1015,23 @@ const loadGallaryById = useCallback(
   [applyGallaryResponse, resetHistory, saveHistory]
 );
 
-  // Templates list (for right sidebar)
-  useEffect(() => {
-    const loadTemplates = async () => {
-      try {
-        const res = await axios.get("https://canvaback.onrender.com/api/template");
-        setTemplates(res.data?.data || res.data || []);
-      } catch (err) {
-        console.error("Error fetching categories:", err);
-      }
-    };
-    loadTemplates();
-  }, []);
-
   // ================= helper ===================
 function cacheTemplatePlaceholders(canvas) {
-  // find the frame slot
   const frameObj = canvas.getObjects().find(o => o.customId === "frameSlot");
   if (frameObj) {
     saveProps("studentPhoto", {
       left: frameObj.left,
       top: frameObj.top,
-      // these are critical
       scaleX: frameObj.scaleX ?? 1,
       scaleY: frameObj.scaleY ?? 1,
       width:  frameObj.width  ?? frameObj.getScaledWidth(),
       height: frameObj.height ?? frameObj.getScaledHeight(),
-      // identify the shape so you can clip later
-      shape:
-        frameObj.type === "circle"
-          ? "circle"
-          : frameObj.type === "rect"
-          ? "rect"
-          : "path",
+      shape: frameObj.type === "circle" ? "circle"
+            : frameObj.type === "rect"   ? "rect"
+            : "path",
     });
   }
 
-  // find the text placeholder for student name
   const textObj = canvas.getObjects().find(o => o.customId === "studentName");
   if (textObj) {
     saveProps("studentName", {
@@ -1066,6 +1046,57 @@ function cacheTemplatePlaceholders(canvas) {
       originY:    textObj.originY
     });
   }
+}
+
+// ---------- addStudentPhoto (runs AFTER template is loaded) ----------
+function addStudentPhoto(canvas, selectedStudent) {
+  // remove any old photo first
+  const existingPhoto = canvas.getObjects().find(o => o.customId === "studentPhoto");
+  if (existingPhoto) {
+    canvas.remove(existingPhoto);
+    studentObjectsRef.current =
+      studentObjectsRef.current.filter(o => o.customId !== "studentPhoto");
+  }
+
+  const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
+  const photoUrl = Array.isArray(selectedStudent?.photo)
+    ? selectedStudent.photo[0]
+    : selectedStudent?.photo;
+
+  console.log("[photo-debug] frameSlot:", frameSlot, "photoUrl:", photoUrl);
+  if (!frameSlot || !photoUrl) return;
+
+  fabric.Image.fromURL(photoUrl, (img) => {
+    const bounds = frameSlot.getBoundingRect();
+
+    const clipShape = new fabric.Path(frameSlot.path, {
+      left: 0,
+      top: 0,
+      scaleX: frameSlot.scaleX,
+      scaleY: frameSlot.scaleY,
+      originX: "center",
+      originY: "center",
+    });
+
+    const scale = Math.min(bounds.width / img.width, bounds.height / img.height);
+    img.set({
+      left: bounds.left + bounds.width / 2,
+      top: bounds.top + bounds.height / 2,
+      originX: "center",
+      originY: "center",
+      scaleX: scale,
+      scaleY: scale,
+      clipPath: clipShape,
+    });
+
+    img.customId = "studentPhoto";
+    canvas.add(img);
+    frameSlot.bringToFront();      // keep purple outline visible
+    canvas.renderAll();
+
+    studentObjectsRef.current.push(img);
+    console.log("[photo-debug] ✅ Student photo clipped inside frame");
+  }, { crossOrigin: "anonymous" });
 }
 
 // ================= applyTemplateResponse ===================
@@ -1122,8 +1153,10 @@ const applyTemplateResponse = useCallback(
           }
         });
 
-        // cache their positions for future updates
         cacheTemplatePlaceholders(canvas);
+
+        // ✅ Add the student photo only after everything is on canvas
+        addStudentPhoto(canvas, selectedStudent);
 
         canvas.renderAll();
       });
@@ -1132,36 +1165,47 @@ const applyTemplateResponse = useCallback(
     setShowLogo(false);
     setShowSignature(false);
   },
-  [setCanvasSize]
+  [setCanvasSize, selectedStudent]   // depend on selectedStudent so photo updates
 );
 
+// ---------- Templates list (for right sidebar) ----------
+useEffect(() => {
+  const loadTemplates = async () => {
+    try {
+      const res = await axios.get("https://canvaback.onrender.com/api/template");
+      setTemplates(res.data?.data || res.data || []);
+    } catch (err) {
+      console.error("Error fetching templates:", err);
+    }
+  };
+  loadTemplates();
+}, []);
 
+// ---------- Load template by ID ----------
+const loadTemplateById = useCallback(
+  async (id) => {
+    if (!id) return;
+    setLoadingTemplate(true);
+    try {
+      const res = await axios.get(`https://canvaback.onrender.com/api/template/${id}`);
+      await applyTemplateResponse(res.data || {});
+      setActiveTemplateId(id);
+      resetHistory();
+      saveHistoryDebounced();
+    } catch {
+      toast.error("Failed to load template");
+    } finally {
+      setLoadingTemplate(false);
+    }
+  },
+  [applyTemplateResponse, resetHistory, saveHistory]
+);
 
-  const loadTemplateById = useCallback(
-    async (id) => {
-      if (!id) return;
-      setLoadingTemplate(true);
-      try {
-        const res = await axios.get(`https://canvaback.onrender.com/api/template/${id}`);
-        await applyTemplateResponse(res.data || {});
-        setActiveTemplateId(id);
-        resetHistory();
-        saveHistoryDebounced();
-      } catch {
-        toast.error("Failed to load template");
-      } finally {
-        setLoadingTemplate(false);
-      }
-    },
-    [applyTemplateResponse, resetHistory, saveHistory]
-  );
-
-  // Initial template load (from route or prop)
-  useEffect(() => {
-    if (!templateId) return;
-    loadTemplateById(templateId);
-  }, [templateId]);
-
+// Initial template load (from route or prop)
+useEffect(() => {
+  if (!templateId) return;
+  loadTemplateById(templateId);
+}, [templateId, loadTemplateById]);
 
 function attachSaveHandlers(img) {
   const persist = () => {
@@ -1272,61 +1316,6 @@ nameObj.bringToFront();
 canvas.renderAll();
 
 studentObjectsRef.current.push(nameObj);
-
-// ---------- Student Photo inside saved frameSlot ----------
-const existingPhoto = canvas.getObjects().find(o => o.customId === "studentPhoto");
-if (existingPhoto) {
-  canvas.remove(existingPhoto);
-  studentObjectsRef.current =
-    studentObjectsRef.current.filter(o => o.customId !== "studentPhoto");
-}
-
-const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
-const photoUrl = Array.isArray(selectedStudent?.photo)
-  ? selectedStudent.photo[0]
-  : selectedStudent?.photo;
-
-console.log("[photo-debug] frameSlot:", frameSlot, "photoUrl:", photoUrl);
-
-if (frameSlot && photoUrl) {
-  fabric.Image.fromURL(photoUrl, (img) => {
-    // Use the exact frame path for clipping
-    const bounds = frameSlot.getBoundingRect();
-
-    const clipShape = new fabric.Path(frameSlot.path, {
-      left: 0,
-      top: 0,
-      scaleX: frameSlot.scaleX,
-      scaleY: frameSlot.scaleY,
-      originX: "center",
-      originY: "center",
-    });
-
-    const scale = Math.min(bounds.width / img.width, bounds.height / img.height);
-
-    img.set({
-      left: bounds.left + bounds.width / 2,
-      top: bounds.top + bounds.height / 2,
-      originX: "center",
-      originY: "center",
-      scaleX: scale,
-      scaleY: scale,
-      clipPath: clipShape,
-    });
-
-    img.customId = "studentPhoto";
-    canvas.add(img);
-    // keep the purple frame stroke visible above the photo
-    frameSlot.bringToFront();
-    canvas.renderAll();
-
-    studentObjectsRef.current.push(img);
-    console.log("[photo-debug] ✅ Student photo clipped inside frame");
-  }, { crossOrigin: "anonymous" });
-} else {
-  console.log("[photo-debug] ⚠️ No frameSlot or photoUrl found");
-}
-
 
     // 4) Institute logo & signature
     if (showLogo && selectedInstitute?.logo) {

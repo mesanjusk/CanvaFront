@@ -1337,6 +1337,8 @@ function attachSaveHandlers(img) {
 
 
 
+const canvasJsonRef = useRef(null); // ← Add this at top of component
+
 /* ======================= Unified Canvas Render ======================= */
 useEffect(() => {
   if (!canvas) return;
@@ -1373,7 +1375,6 @@ useEffect(() => {
     if (!canvasJsonRef.current) return;
 
     canvas.loadFromJSON(canvasJsonRef.current, () => {
-      // Tag objects
       canvas.getObjects().forEach(o => {
         if (o.type === "i-text" && (!o.customId || /text/i.test(o.customId))) {
           o.customId = "studentName";
@@ -1397,7 +1398,6 @@ useEffect(() => {
         fabric.Image.fromURL(photoUrl, img => {
           if (!img) return;
 
-          // Clip path for frame
           let clipShape;
           if (frameSlot.type === "circle") {
             clipShape = new fabric.Circle({
@@ -1418,7 +1418,6 @@ useEffect(() => {
             });
           }
 
-          // Scale image to fit frame
           const scale = Math.min(bounds.width / img.width, bounds.height / img.height);
           img.set({
             left: bounds.left + bounds.width / 2,
@@ -1505,8 +1504,7 @@ useEffect(() => {
   };
 
   loadTemplateJSON();
-
-}, [canvas, templateImage, canvasJsonRef.current, selectedStudent, selectedInstitute, showLogo, showSignature]);
+}, [canvas, templateImage, selectedStudent, selectedInstitute, showLogo, showSignature]);
 
   /* ============================= Canvas events ============================ */
   useEffect(() => {

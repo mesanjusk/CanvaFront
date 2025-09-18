@@ -1276,7 +1276,7 @@ studentObjectsRef.current.push(nameObj);
 
 
 
-/* ---------- Student Photo with Frame (Heart Shape) ---------- */
+/* ---------- Student Photo with Any Frame ---------- */
 const existingPhoto = canvas
   .getObjects()
   .find((o) => o.customId === "studentPhoto");
@@ -1287,43 +1287,64 @@ if (existingPhoto) {
     studentObjectsRef.current.filter((o) => o.customId !== "studentPhoto");
 }
 
-// Find the heart frame from DB
-const frameSlot = canvas
-  .getObjects()
-  .find((o) => o.customId === "frameSlot");
+// Find saved frame from DB (frameSlot)
+const frameSlot = canvas.getObjects().find((o) => o.customId === "frameSlot");
 
 if (frameSlot && selectedStudent?.photo) {
   fabric.Image.fromURL(selectedStudent.photo, (img) => {
-    // Scale photo to match frame size
-    img.scaleToWidth(frameSlot.width * frameSlot.scaleX);
-    img.scaleToHeight(frameSlot.height * frameSlot.scaleY);
+    const bounds = frameSlot.getBoundingRect();
 
-    // Use the same frame path as clipPath (heart shape)
-    const clipHeart = new fabric.Path(frameSlot.path, {
-      left: frameSlot.left,
-      top: frameSlot.top,
-      scaleX: frameSlot.scaleX,
-      scaleY: frameSlot.scaleY,
-      originX: frameSlot.originX,
-      originY: frameSlot.originY,
-    });
+    // 🔹 Decide clipPath based on frame type
+    let clipShape;
+    if (frameSlot.type === "path") {
+      // Path frame (heart shape, custom design)
+      clipShape = new fabric.Path(frameSlot.path, {
+        left: bounds.left,
+        top: bounds.top,
+        scaleX: frameSlot.scaleX,
+        scaleY: frameSlot.scaleY,
+        absolutePositioned: true,
+        evented: false,
+        selectable: false,
+      });
+    } else {
+      // Rect, Circle, Ellipse, etc.
+      clipShape = fabric.util.object.clone(frameSlot);
+      clipShape.set({
+        left: bounds.left,
+        top: bounds.top,
+        absolutePositioned: true,
+        evented: false,
+        selectable: false,
+      });
+    }
+
+    // 🔹 Scale & position image inside frame
+    const scaleX = bounds.width / img.width;
+    const scaleY = bounds.height / img.height;
+    const scale = Math.min(scaleX, scaleY);
 
     img.set({
-      left: frameSlot.left,
-      top: frameSlot.top,
+      left: bounds.left + bounds.width / 2,
+      top: bounds.top + bounds.height / 2,
       originX: "center",
       originY: "center",
-      clipPath: clipHeart, // <- heart shape clipping
+      scaleX: scale,
+      scaleY: scale,
+      clipPath: clipShape,
     });
 
     img.customId = "studentPhoto";
     canvas.add(img);
-    img.bringToFront();
-    canvas.renderAll();
 
+    // Keep frame outline visible
+    frameSlot.bringToFront();
+
+    canvas.renderAll();
     studentObjectsRef.current.push(img);
   });
 }
+
 
 
     // 4) Institute logo & signature

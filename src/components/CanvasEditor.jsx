@@ -1290,57 +1290,54 @@ if (existingPhoto) {
 const frameSlot = canvas.getObjects().find((o) => o.customId === "frameSlot");
 
 if (frameSlot && selectedStudent?.photo) {
-  fabric.Image.fromURL(selectedStudent.photo.trim(), (img) => {
-    const bounds = frameSlot.getBoundingRect();
+  fabric.Image.fromURL(
+    selectedStudent.photo.trim(),
+    (img) => {
+      const bounds = frameSlot.getBoundingRect();
 
-    // clone the frame shape to use as clipPath
-    let clipShape;
-    if (frameSlot.type === "path") {
-      clipShape = new fabric.Path(frameSlot.path, {
-        scaleX: frameSlot.scaleX,
-        scaleY: frameSlot.scaleY,
-        originX: "center",
-        originY: "center",
-      });
-    } else {
-      clipShape = fabric.util.object.clone(frameSlot);
+      // ---- Clone frame for clipPath ----
+      let clipShape;
+      if (frameSlot.type === "path") {
+        // clone the path as JSON to avoid missing path data
+        clipShape = fabric.util.object.clone(frameSlot);
+      } else {
+        clipShape = fabric.util.object.clone(frameSlot);
+      }
+
       clipShape.set({
+        left: 0,
+        top: 0,
         originX: "center",
         originY: "center",
+        absolutePositioned: false, // key: relative clipping
       });
-    }
 
-    // --- IMPORTANT: shift clipShape to image local space ---
-    clipShape.set({
-      left: 0,
-      top: 0,
-      absolutePositioned: false, // key fix
-    });
+      // ---- Scale image to fit frame bounds ----
+      const scaleX = bounds.width / img.width;
+      const scaleY = bounds.height / img.height;
+      const scale = Math.min(scaleX, scaleY);
 
-    // Scale image to fit frame bounds
-    const scaleX = bounds.width / img.width;
-    const scaleY = bounds.height / img.height;
-    const scale = Math.min(scaleX, scaleY);
+      img.set({
+        left: bounds.left + bounds.width / 2,
+        top: bounds.top + bounds.height / 2,
+        originX: "center",
+        originY: "center",
+        scaleX: scale,
+        scaleY: scale,
+        clipPath: clipShape,
+      });
 
-    img.set({
-      left: bounds.left + bounds.width / 2,
-      top: bounds.top + bounds.height / 2,
-      originX: "center",
-      originY: "center",
-      scaleX: scale,
-      scaleY: scale,
-      clipPath: clipShape, // clip is now relative to the image
-    });
+      img.customId = "studentPhoto";
+      canvas.add(img);
 
-    img.customId = "studentPhoto";
-    canvas.add(img);
+      // Always draw frame outline on top
+      frameSlot.bringToFront();
 
-    // keep frame visible on top
-    frameSlot.bringToFront();
-
-    canvas.renderAll();
-    studentObjectsRef.current.push(img);
-  });
+      canvas.renderAll();
+      studentObjectsRef.current.push(img);
+    },
+    { crossOrigin: "anonymous" } // <-- needed for Cloudinary
+  );
 }
 
 

@@ -1115,7 +1115,8 @@ useEffect(() => {
   studentObjectsRef.current.push(nameObj);
 
   // 2️⃣ Add student photo
-  const photoUrl = selectedStudent?.photo || "";
+const photoUrl = Array.isArray(selectedStudent?.photo) ? selectedStudent.photo[0] : selectedStudent?.photo;
+
   if (photoUrl) {
     fabric.Image.fromURL(photoUrl, img => {
       const bounds = frameSlot.getBoundingRect();

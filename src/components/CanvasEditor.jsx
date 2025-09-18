@@ -1283,9 +1283,17 @@ if (existingPhoto) {
 
 const frameSlot = canvas.getObjects().find((o) => o.customId === "frameSlot");
 
-if (frameSlot && selectedStudent?.photo) {
+// --- Get photo URL safely ---
+let photoUrl = null;
+if (Array.isArray(selectedStudent?.photo) && selectedStudent.photo.length > 0) {
+  photoUrl = selectedStudent.photo[0]; // take first photo from array
+} else if (typeof selectedStudent?.photo === "string" && selectedStudent.photo.trim() !== "") {
+  photoUrl = selectedStudent.photo.trim();
+}
+
+if (frameSlot && photoUrl) {
   fabric.Image.fromURL(
-    selectedStudent.photo.trim(),
+   photoUrl,
     (img) => {
       if (!img) return;
 

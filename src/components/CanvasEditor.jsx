@@ -1074,7 +1074,9 @@ function addStudentPhoto(canvasInstance, student) {
   }
 
   const frameSlot = canvasInstance.getObjects().find(o => o.customId === "frameSlot");
-  const photoUrl = Array.isArray(student?.photo) ? student.photo[0] : student?.photo;
+  // ✅ New
+const photoUrl = student?.photo || "";
+
 
   console.log("[photo-debug] frameSlot:", frameSlot, "photoUrl:", photoUrl);
   if (!frameSlot || !photoUrl) return;

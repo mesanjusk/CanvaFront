@@ -1273,55 +1273,36 @@ canvas.renderAll();
 
 studentObjectsRef.current.push(nameObj);
 
-// ---------- Student Photo with Any Frame ----------
-const existingPhoto = canvas
-  .getObjects()
-  .find((o) => o.customId === "studentPhoto");
-
+// ---------- Student Photo inside saved frameSlot ----------
+const existingPhoto = canvas.getObjects().find(o => o.customId === "studentPhoto");
 if (existingPhoto) {
   canvas.remove(existingPhoto);
   studentObjectsRef.current =
-    studentObjectsRef.current.filter((o) => o.customId !== "studentPhoto");
+    studentObjectsRef.current.filter(o => o.customId !== "studentPhoto");
 }
 
-// ✅ Find frame by flag (preferred) or fallback to customId
-const frameSlot = canvas
-  .getObjects()
-  .find((o) => o.frameSlot === true || o.customId === "frameSlot");
-
-const photoUrl = selectedStudent?.photo?.trim();
+const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
+const photoUrl = Array.isArray(selectedStudent?.photo)
+  ? selectedStudent.photo[0]
+  : selectedStudent?.photo;
 
 console.log("[photo-debug] frameSlot:", frameSlot, "photoUrl:", photoUrl);
 
 if (frameSlot && photoUrl) {
   fabric.Image.fromURL(photoUrl, (img) => {
+    // Use the exact frame path for clipping
     const bounds = frameSlot.getBoundingRect();
 
-    // --- Prepare clip shape ---
-    let clipShape;
-    if (frameSlot.type === "path") {
-      clipShape = new fabric.Path(frameSlot.path, {
-        left: 0,
-        top: 0,
-        scaleX: frameSlot.scaleX,
-        scaleY: frameSlot.scaleY,
-        originX: "center",
-        originY: "center",
-      });
-    } else {
-      clipShape = fabric.util.object.clone(frameSlot);
-      clipShape.set({
-        left: 0,
-        top: 0,
-        originX: "center",
-        originY: "center",
-      });
-    }
+    const clipShape = new fabric.Path(frameSlot.path, {
+      left: 0,
+      top: 0,
+      scaleX: frameSlot.scaleX,
+      scaleY: frameSlot.scaleY,
+      originX: "center",
+      originY: "center",
+    });
 
-    // --- Scale photo to fit inside frame ---
-    const scaleX = bounds.width / img.width;
-    const scaleY = bounds.height / img.height;
-    const scale = Math.min(scaleX, scaleY);
+    const scale = Math.min(bounds.width / img.width, bounds.height / img.height);
 
     img.set({
       left: bounds.left + bounds.width / 2,
@@ -1335,16 +1316,17 @@ if (frameSlot && photoUrl) {
 
     img.customId = "studentPhoto";
     canvas.add(img);
-
+    // keep the purple frame stroke visible above the photo
     frameSlot.bringToFront();
     canvas.renderAll();
-    studentObjectsRef.current.push(img);
 
-    console.log("[photo-debug] Photo added ✅ inside frame");
-  });
+    studentObjectsRef.current.push(img);
+    console.log("[photo-debug] ✅ Student photo clipped inside frame");
+  }, { crossOrigin: "anonymous" });
 } else {
-  console.log("[photo-debug] No frameSlot or photoUrl found — skipping photo");
+  console.log("[photo-debug] ⚠️ No frameSlot or photoUrl found");
 }
+
 
     // 4) Institute logo & signature
     if (showLogo && selectedInstitute?.logo) {

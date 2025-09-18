@@ -1273,14 +1273,8 @@ canvas.renderAll();
 
 studentObjectsRef.current.push(nameObj);
 
-
-
-
 // ---------- Student Photo with Any Frame ----------
-const existingPhoto = canvas
-  .getObjects()
-  .find((o) => o.customId === "studentPhoto");
-
+const existingPhoto = canvas.getObjects().find((o) => o.customId === "studentPhoto");
 if (existingPhoto) {
   canvas.remove(existingPhoto);
   studentObjectsRef.current =
@@ -1293,26 +1287,21 @@ if (frameSlot && selectedStudent?.photo) {
   fabric.Image.fromURL(
     selectedStudent.photo.trim(),
     (img) => {
+      if (!img) return;
+
       const bounds = frameSlot.getBoundingRect();
 
-      // ---- Clone frame for clipPath ----
-      let clipShape;
-      if (frameSlot.type === "path") {
-        // clone the path as JSON to avoid missing path data
-        clipShape = fabric.util.object.clone(frameSlot);
-      } else {
-        clipShape = fabric.util.object.clone(frameSlot);
-      }
-
+      // Always use fresh copy of frame for clipPath
+      let clipShape = fabric.util.object.clone(frameSlot);
       clipShape.set({
         left: 0,
         top: 0,
         originX: "center",
         originY: "center",
-        absolutePositioned: false, // key: relative clipping
+        absolutePositioned: false,
       });
 
-      // ---- Scale image to fit frame bounds ----
+      // Scale image to fit
       const scaleX = bounds.width / img.width;
       const scaleY = bounds.height / img.height;
       const scale = Math.min(scaleX, scaleY);
@@ -1325,22 +1314,22 @@ if (frameSlot && selectedStudent?.photo) {
         scaleX: scale,
         scaleY: scale,
         clipPath: clipShape,
+        selectable: false,
+        evented: false,
       });
 
       img.customId = "studentPhoto";
       canvas.add(img);
 
-      // Always draw frame outline on top
+      // Frame outline always on top
       frameSlot.bringToFront();
 
       canvas.renderAll();
       studentObjectsRef.current.push(img);
     },
-    { crossOrigin: "anonymous" } // <-- needed for Cloudinary
+    { crossOrigin: "anonymous" }
   );
 }
-
-
 
     // 4) Institute logo & signature
     if (showLogo && selectedInstitute?.logo) {

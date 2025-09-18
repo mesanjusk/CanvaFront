@@ -1188,7 +1188,7 @@ function attachSaveHandlers(img) {
 useEffect(() => {
   if (!canvas || !selectedStudent) return;
 
-  // ---------- 1) Remove only dynamic objects ----------
+  // 1) Remove ONLY dynamic objects (keep template)
   const dynamicIds = ["studentName", "studentPhoto", "logo", "signature"];
   canvas.getObjects().forEach(o => {
     if (dynamicIds.includes(o.customId)) canvas.remove(o);
@@ -1197,13 +1197,13 @@ useEffect(() => {
   logoRef.current = null;
   signatureRef.current = null;
 
-  // ---------- 2) Add / update background ----------
-  const addTemplateBg = () => {
-    if (!templateImage) return;
+  // 2) Make sure the template background + frame are present
+  //    If templateImage is available, ensure there is a bgRef.
+  if (templateImage && !bgRef.current) {
     const addBg = (bg) => {
       bg.scaleX = canvas.width / bg.width;
       bg.scaleY = canvas.height / bg.height;
-      bg.set({ selectable: false, evented: false });
+      bg.set({ selectable: false, evented: false, customId: "templateBg" });
       canvas.add(bg);
       bg.sendToBack();
       bgRef.current = bg;
@@ -1214,23 +1214,11 @@ useEffect(() => {
     } else {
       addBg(templateImage);
     }
-  };
-  addTemplateBg();
+  }
 
-  // Helper for safe image load
-  const safeLoadImage = (url, cb) => {
-    if (!url) return;
-    fabric.Image.fromURL(
-      url,
-      (img) => { try { cb && cb(img); } catch (e) { console.error(e); } },
-      { crossOrigin: "anonymous" }
-    );
-  };
-
-  // ---------- 3) Student Name ----------
+  // 3) Add Student Name
   const namePlaceholder = studentLayoutsRef.current.studentName;
   const displayName = `${selectedStudent?.firstName || ""} ${selectedStudent?.lastName || ""}`.trim();
-
   const nameObj = new fabric.Textbox(displayName, {
     left: namePlaceholder?.left ?? canvas.width / 2,
     top: namePlaceholder?.top ?? (canvas.height - 80),
@@ -1243,17 +1231,13 @@ useEffect(() => {
     originY: namePlaceholder?.originY ?? "top",
     width: namePlaceholder?.width ?? (canvas.width - 40),
   });
-
   nameObj.customId = "studentName";
   canvas.add(nameObj);
   nameObj.bringToFront();
   studentObjectsRef.current.push(nameObj);
 
-  // ---------- 4) Student Photo inside saved frame ----------
-  const frameSlot = canvas
-    .getObjects()
-    .find(o => o.customId === "frameSlot");   // <-- frame is still there
-
+  // 4) Add Student Photo inside frameSlot
+  const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
   const photoUrl = Array.isArray(selectedStudent?.photo)
     ? selectedStudent.photo[0]
     : selectedStudent?.photo;
@@ -1263,22 +1247,18 @@ useEffect(() => {
   if (frameSlot && photoUrl) {
     fabric.Image.fromURL(photoUrl, (img) => {
       const bounds = frameSlot.getBoundingRect();
+      const clipShape = frameSlot.type === "path"
+        ? new fabric.Path(frameSlot.path, {
+            left: 0,
+            top: 0,
+            scaleX: frameSlot.scaleX,
+            scaleY: frameSlot.scaleY,
+            originX: "center",
+            originY: "center",
+          })
+        : fabric.util.object.clone(frameSlot);
 
-      // clipPath same shape/size as frame
-      let clipShape;
-      if (frameSlot.type === "path") {
-        clipShape = new fabric.Path(frameSlot.path, {
-          left: 0,
-          top: 0,
-          scaleX: frameSlot.scaleX,
-          scaleY: frameSlot.scaleY,
-          originX: "center",
-          originY: "center",
-        });
-      } else {
-        clipShape = fabric.util.object.clone(frameSlot);
-        clipShape.set({ left: 0, top: 0, originX: "center", originY: "center" });
-      }
+      clipShape.set({ left: 0, top: 0, originX: "center", originY: "center" });
 
       const scale = Math.min(bounds.width / img.width, bounds.height / img.height);
       img.set({
@@ -1293,16 +1273,18 @@ useEffect(() => {
 
       img.customId = "studentPhoto";
       canvas.add(img);
-      img.bringToFront();       // keep above background
+      img.bringToFront();
       studentObjectsRef.current.push(img);
-
       console.log("[photo-debug] Photo added ✅ inside frame");
     }, { crossOrigin: "anonymous" });
   } else {
     console.log("[photo-debug] No frameSlot or photoUrl found — skipping photo");
   }
 
-  // ---------- 5) Institute logo ----------
+  // 5) Logo & signature (unchanged)
+  const safeLoadImage = (url, cb) =>
+    url && fabric.Image.fromURL(url, img => cb && cb(img), { crossOrigin: "anonymous" });
+
   if (showLogo && selectedInstitute?.logo) {
     const savedLogo = getSavedProps("logo");
     safeLoadImage(selectedInstitute.logo, (img) => {
@@ -1326,7 +1308,6 @@ useEffect(() => {
     });
   }
 
-  // ---------- 6) Signature ----------
   if (showSignature && selectedInstitute?.signature) {
     const savedSign = getSavedProps("signature");
     safeLoadImage(selectedInstitute.signature, (img) => {

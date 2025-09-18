@@ -1276,7 +1276,7 @@ studentObjectsRef.current.push(nameObj);
 
 
 
-/* ---------- Student Photo with Any Frame ---------- */
+// ---------- Student Photo with Any Frame ----------
 const existingPhoto = canvas
   .getObjects()
   .find((o) => o.customId === "studentPhoto");
@@ -1287,39 +1287,34 @@ if (existingPhoto) {
     studentObjectsRef.current.filter((o) => o.customId !== "studentPhoto");
 }
 
-// Find saved frame from DB (frameSlot)
 const frameSlot = canvas.getObjects().find((o) => o.customId === "frameSlot");
 
 if (frameSlot && selectedStudent?.photo) {
-  fabric.Image.fromURL(selectedStudent.photo, (img) => {
+  fabric.Image.fromURL(selectedStudent.photo.trim(), (img) => {
     const bounds = frameSlot.getBoundingRect();
 
-    // 🔹 Decide clipPath based on frame type
+    // --- FIX: Normalize clipPath correctly ---
     let clipShape;
     if (frameSlot.type === "path") {
-      // Path frame (heart shape, custom design)
       clipShape = new fabric.Path(frameSlot.path, {
-        left: bounds.left,
-        top: bounds.top,
+        left: 0,
+        top: 0,
         scaleX: frameSlot.scaleX,
         scaleY: frameSlot.scaleY,
-        absolutePositioned: true,
-        evented: false,
-        selectable: false,
+        originX: "center",
+        originY: "center",
       });
     } else {
-      // Rect, Circle, Ellipse, etc.
       clipShape = fabric.util.object.clone(frameSlot);
       clipShape.set({
-        left: bounds.left,
-        top: bounds.top,
-        absolutePositioned: true,
-        evented: false,
-        selectable: false,
+        left: 0,
+        top: 0,
+        originX: "center",
+        originY: "center",
       });
     }
 
-    // 🔹 Scale & position image inside frame
+    // Scale photo to fit inside frame
     const scaleX = bounds.width / img.width;
     const scaleY = bounds.height / img.height;
     const scale = Math.min(scaleX, scaleY);
@@ -1331,15 +1326,13 @@ if (frameSlot && selectedStudent?.photo) {
       originY: "center",
       scaleX: scale,
       scaleY: scale,
-      clipPath: clipShape,
+      clipPath: clipShape, // apply clipping
     });
 
     img.customId = "studentPhoto";
     canvas.add(img);
 
-    // Keep frame outline visible
     frameSlot.bringToFront();
-
     canvas.renderAll();
     studentObjectsRef.current.push(img);
   });

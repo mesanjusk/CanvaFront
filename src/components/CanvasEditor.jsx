@@ -1130,15 +1130,22 @@ useEffect(() => {
   if (templateId) loadTemplateById(templateId);
 }, [templateId, loadTemplateById]);
 
+// ----- Safe image loader -----
+function safeLoadImage(url, callback) {
+  const img = new Image();
+  img.crossOrigin = "anonymous"; // needed for Cloudinary or external images
+  img.onload = () => callback(new fabric.Image(img));
+  img.onerror = () => console.error("Failed to load image:", url);
+  img.src = url;
+}
+
+// ----- Main useEffect -----
 useEffect(() => {
   const currentStudent = bulkMode
     ? filteredStudents.find(s => s?.uuid === bulkList[bulkIndex]) || null
     : selectedStudent;
 
   if (!canvas || !currentStudent) return;
-
-  const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
-  if (!frameSlot) return;
 
   // ----- Remove old student name and placeholder -----
   const oldName = canvas.getObjects().find(o => o.customId === "studentName");
@@ -1150,8 +1157,8 @@ useEffect(() => {
   // ----- Add student name -----
   const displayName = `${currentStudent.firstName || ""} ${currentStudent.lastName || ""}`.trim();
   const nameObj = new fabric.Textbox(displayName, {
-    left: frameSlot.left + frameSlot.width / 2,
-    top: frameSlot.top + frameSlot.height + 10,
+    left: canvas.width / 2, // center horizontally
+    top: canvas.height * 0.7, // below photo
     fontSize: 28,
     fill: "#000",
     fontFamily: "Arial",
@@ -1159,14 +1166,14 @@ useEffect(() => {
     textAlign: "center",
     originX: "center",
     originY: "top",
-    width: frameSlot.width,
+    width: 300, // adjust as needed
     selectable: false,
     evented: false,
     customId: "studentName"
   });
   canvas.add(nameObj);
 
-  // ----- Student photo logic with saved props -----
+  // ----- Student photo logic -----
   const current = currentStudent;
   const photoUrl = Array.isArray(current?.photo) ? current.photo[0] : current?.photo;
   const savedPhoto = getSavedProps("studentPhoto") || {};
@@ -1178,6 +1185,7 @@ useEffect(() => {
     const existingPhoto = canvas.getObjects().find(obj => obj.customId === "studentPhoto");
 
     if (existingPhoto) {
+      // Update existing photo
       existingPhoto.set({
         left:   savedPhoto.left   ?? existingPhoto.left,
         top:    savedPhoto.top    ?? existingPhoto.top,
@@ -1186,8 +1194,9 @@ useEffect(() => {
       });
       canvas.requestRenderAll();
     } else {
+      // Load new photo
       safeLoadImage(photoUrl, img => {
-        const phWidth  = Math.min(400, canvas.width  * 0.6);
+        const phWidth  = Math.min(400, canvas.width * 0.6);
         const phHeight = Math.min(400, canvas.height * 0.6);
         const autoScale = Math.min(phWidth / img.width, phHeight / img.height, 1);
 
@@ -1202,6 +1211,7 @@ useEffect(() => {
         img.customId = "studentPhoto";
         img.field    = "studentPhoto";
 
+        // Apply frame/clip if saved
         if (savedShape) {
           applyMaskAndFrame(canvas, img, savedShape, {
             stroke: frameBorder,
@@ -1223,7 +1233,7 @@ useEffect(() => {
           evented: true,
         });
 
-        img.on("selected",   () => setActiveStudentPhoto(img));
+        img.on("selected", () => setActiveStudentPhoto(img));
         img.on("deselected", () => setActiveStudentPhoto(null));
         img.on("mousedblclick", () => {
           enterAdjustMode(img);
@@ -1237,7 +1247,9 @@ useEffect(() => {
       });
     }
   }
+
 }, [canvas, selectedStudent, bulkMode, bulkIndex]);
+
 
 
 

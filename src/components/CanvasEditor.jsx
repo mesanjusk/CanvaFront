@@ -1147,11 +1147,11 @@ useEffect(() => {
   if (!canvas || !currentStudent) return;
 
   // ----- Remove old student name and placeholder -----
-  const oldName = canvas.getObjects().find(o => o.customId === "studentName");
-  if (oldName) canvas.remove(oldName);
-
-  const placeholder = canvas.getObjects().find(o => o.customId === "templateText");
-  if (placeholder) canvas.remove(placeholder);
+  canvas.getObjects().forEach(obj => {
+    if (obj.customId === "studentName" || obj.customId === "templateText" || obj.customId === "studentPhoto") {
+      canvas.remove(obj);
+    }
+  });
 
   // ----- Get frameSlot -----
   const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
@@ -1176,29 +1176,29 @@ useEffect(() => {
   });
   canvas.add(nameObj);
 
-  // ----- Add or update student photo -----
+  // ----- Add student photo -----
   const photoUrl = Array.isArray(currentStudent?.photo) ? currentStudent.photo[0] : currentStudent?.photo;
   if (!photoUrl) return;
 
-  // Remove old photo first
-  const oldPhoto = canvas.getObjects().find(o => o.customId === "studentPhoto");
-  if (oldPhoto) canvas.remove(oldPhoto);
-
-  // Wait for next animation frame to ensure frameSlot is rendered
-  requestAnimationFrame(() => {
+  const loadPhoto = () => {
     const bounds = frameSlot.getBoundingRect(true);
-    if (!bounds.width || !bounds.height) return;
+    if (!bounds.width || !bounds.height) {
+      // Try again after 50ms if bounds not ready
+      setTimeout(loadPhoto, 50);
+      return;
+    }
 
     fabric.Image.fromURL(photoUrl, (img) => {
       if (!img) return;
 
+      // Scale image to fit the frame
       const scale = Math.min(bounds.width / img.width, bounds.height / img.height);
 
       img.set({
-        originX: "center",
-        originY: "center",
         left: bounds.left + bounds.width / 2,
         top: bounds.top + bounds.height / 2,
+        originX: "center",
+        originY: "center",
         scaleX: scale,
         scaleY: scale,
         selectable: false,
@@ -1215,13 +1215,16 @@ useEffect(() => {
 
       canvas.add(img);
 
-      // Move above frame
+      // Ensure photo is above frame
       const frameIndex = canvas.getObjects().indexOf(frameSlot);
       if (frameIndex >= 0) img.moveTo(frameIndex + 1);
 
       canvas.requestRenderAll();
     }, { crossOrigin: "anonymous" });
-  });
+  };
+
+  // Start loading photo
+  loadPhoto();
 
 }, [canvas, selectedStudent, bulkMode, bulkIndex]);
 

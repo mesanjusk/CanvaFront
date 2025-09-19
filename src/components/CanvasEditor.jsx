@@ -1240,7 +1240,6 @@ useEffect(() => {
           fitImageToFrame(img, "cover");
         });
 
-        attachSaveHandlers(img);
         canvas.add(img);
         studentObjectsRef.current.push(img);
         canvas.requestRenderAll();
@@ -1249,8 +1248,6 @@ useEffect(() => {
   }
 
 }, [canvas, selectedStudent, bulkMode, bulkIndex]);
-
-
 
 
 /* ======================= 5. Helper to load assets (logo/signature) ======================= */

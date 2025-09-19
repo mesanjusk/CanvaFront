@@ -1140,130 +1140,129 @@ function safeLoadImage(url, callback) {
 }
 
 useEffect(() => {
+  // figure out which student we’re showing
   const currentStudent = bulkMode
     ? filteredStudents.find(s => s?.uuid === bulkList[bulkIndex]) || null
     : selectedStudent;
 
   if (!canvas || !currentStudent) return;
 
-  // ----- Remove old objects -----
-  canvas.getObjects().forEach(obj => {
-    if (["studentName", "templateText", "studentPhoto"].includes(obj.customId)) {
-      canvas.remove(obj);
+  // ---- remove old student-specific objects ----
+  canvas.getObjects().forEach(o => {
+    if (["studentName", "templateText", "studentPhoto"].includes(o.customId)) {
+      canvas.remove(o);
     }
   });
 
-  // ----- Get frameSlot -----
+  // ---- find the frameSlot and wait until it has bounds ----
   const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
- if (!frameSlot) {
-    // retry after 30ms
-    const t = setTimeout(() => setSelectedStudent(selectedStudent), 30);
+  if (!frameSlot) return; // no frame at all – nothing to do
+
+  const bounds = frameSlot.getBoundingRect(true);
+  if (!bounds.width || !bounds.height) {
+    // retry once the layout settles
+    const t = setTimeout(() => setSelectedStudent(s => ({ ...s })), 30);
     return () => clearTimeout(t);
   }
 
-  // ----- Add student name in single line -----
-  const displayName = `${currentStudent.firstName || ""} ${currentStudent.lastName || ""}`.trim();
-  const nameObj = new fabric.Text(displayName, {
-    left: frameSlot.left + frameSlot.width / 2,
-    top: frameSlot.top + frameSlot.height + 10,
-    fontSize: 28,
-    fill: "#000",
-    fontFamily: "Arial",
-    fontWeight: "bold",
-    originX: "center",
-    originY: "top",
-    selectable: false,
-    evented: false,
-    customId: "studentName"
-  });
-  canvas.add(nameObj);
+  // ---- add student name ----
+  const name = `${currentStudent.firstName || ""} ${currentStudent.lastName || ""}`.trim();
+  if (name) {
+    const nameObj = new fabric.Text(name, {
+      left: bounds.left + bounds.width / 2,
+      top:  bounds.top  + bounds.height + 10,
+      originX: "center",
+      originY: "top",
+      fontSize: 28,
+      fill: "#000",
+      fontFamily: "Arial",
+      fontWeight: "bold",
+      selectable: false,
+      evented: false,
+      customId: "studentName"
+    });
+    canvas.add(nameObj);
+  }
 
-  // ----- Load student photo -----
-  const photoUrl = Array.isArray(currentStudent?.photo) ? currentStudent.photo[0] : currentStudent?.photo;
+  // ---- photo url ----
+  const photoUrl = Array.isArray(currentStudent.photo)
+    ? currentStudent.photo[0]
+    : currentStudent.photo;
   if (!photoUrl) return;
 
-  const savedPhoto = getSavedProps("studentPhoto") || {};
+  // per-student saved props, fall back to template-level
+  const perStudent = studentLayoutsRef.current?.[currentStudent.uuid]?.studentPhotoProps;
+  const savedPhoto = perStudent ?? getSavedProps("studentPhoto") ?? {};
 
-  safeLoadImage(photoUrl, (img) => {
+  // ---- load and place the image ----
+  safeLoadImage(photoUrl, img => {
     if (!img) return;
 
-    // ----- Determine clip shape -----
+    // clipPath that exactly matches the frameSlot’s shape
     let clipPath;
     if (frameSlot.type === "path" && frameSlot.path) {
       clipPath = new fabric.Path(frameSlot.path, {
         originX: "center",
         originY: "center",
         left: frameSlot.left,
-        top: frameSlot.top,
+        top:  frameSlot.top,
         scaleX: frameSlot.scaleX || 1,
         scaleY: frameSlot.scaleY || 1,
         absolutePositioned: true
       });
     } else {
-      const bounds = frameSlot.getBoundingRect(true);
       clipPath = new fabric.Rect({
-        width: bounds.width,
+        width:  bounds.width,
         height: bounds.height,
         originX: "center",
         originY: "center",
-        left: bounds.left + bounds.width / 2,
-        top: bounds.top + bounds.height / 2,
+        left: bounds.left + bounds.width  / 2,
+        top:  bounds.top  + bounds.height / 2,
         absolutePositioned: true
       });
     }
 
-    // ----- Scale image to cover frame -----
-    const bounds = clipPath.getBoundingRect(true);
-    const scaleX = bounds.width / img.width;
-    const scaleY = bounds.height / img.height;
-    const scale = Math.max(scaleX, scaleY); // cover frame
+    // scale to cover the frame
+    const scale = Math.max(bounds.width / img.width, bounds.height / img.height);
 
     img.set({
       originX: "center",
       originY: "center",
-      left: bounds.left + bounds.width / 2,
-      top: bounds.top + bounds.height / 2,
+      left:   savedPhoto.left   ?? bounds.left + bounds.width  / 2,
+      top:    savedPhoto.top    ?? bounds.top  + bounds.height / 2,
       scaleX: savedPhoto.scaleX ?? scale,
       scaleY: savedPhoto.scaleY ?? scale,
-      angle: savedPhoto.angle ?? 0,
+      angle:  savedPhoto.angle  ?? 0,
       selectable: true,
       evented: true,
       customId: "studentPhoto",
       clipPath
     });
 
-    // Event handlers
-    img.on("selected", () => setActiveStudentPhoto(img));
-    img.on("deselected", () => setActiveStudentPhoto(null));
-    img.on("mousedblclick", () => {
-      enterAdjustMode(img);
-      fitImageToFrame(img, "cover");
-    });
-
-    // Save photo state
-    const savePhotoState = () => {
-      saveProps("studentPhoto", {
+    // keep per-student transform updated
+    const persist = () => {
+      const uuid = currentStudent.uuid;
+      if (!studentLayoutsRef.current[uuid]) studentLayoutsRef.current[uuid] = {};
+      studentLayoutsRef.current[uuid].studentPhotoProps = {
         left: img.left,
         top: img.top,
         scaleX: img.scaleX,
         scaleY: img.scaleY,
-        angle: img.angle,
-        shape: frameSlot
-      });
+        angle: img.angle
+      };
+      saveProps("studentPhoto", studentLayoutsRef.current[uuid].studentPhotoProps);
     };
-    img.on("modified", savePhotoState);
+    img.on("modified", persist);
+    img.on("scaling",  persist);
+    img.on("moving",   persist);
 
+    // add and stack correctly
     canvas.add(img);
-
-    // Move photo above frame
-    const frameIndex = canvas.getObjects().indexOf(frameSlot);
-    if (frameIndex >= 0) img.moveTo(frameIndex + 1);
-
+    img.moveTo(canvas.getObjects().indexOf(frameSlot) + 1);
     studentObjectsRef.current.push(img);
     canvas.requestRenderAll();
   });
-
-}, [canvas, selectedStudent, bulkMode, bulkIndex]);
+}, [canvas, selectedStudent, bulkMode, bulkIndex, filteredStudents, bulkList]);
 
 
 /* ======================= 5. Helper to load assets (logo/signature) ======================= */
@@ -1585,25 +1584,24 @@ const gotoIndex = (idx) => {
 
   // Load saved layout
   const saved = studentLayoutsRef.current[uuid];
-  if (saved) {
-    if (saved.objects) {
-      saved.objects = saved.objects.filter((obj) => obj.customId !== "studentPhoto");
-    }
-
-    canvasRef.current.loadFromJSON(saved, () => {
-      canvasRef.current.renderAll();
-
-      // ✅ Wait a tiny bit to ensure objects are fully ready
-      setTimeout(() => {
-        setSelectedStudent(st); // trigger useEffect to add photo
-      }, 30);
-    });
-  } else {
-    canvasRef.current.requestRenderAll();
-    setTimeout(() => {
-      setSelectedStudent(st); // trigger useEffect to add photo
-    }, 30);
+if (saved?.canvas) {
+  // load the saved canvas JSON (which we stored as `.canvas`)
+  const savedJson = JSON.parse(JSON.stringify(saved.canvas)); // defensive clone
+  // ensure no studentPhoto objects present
+  if (Array.isArray(savedJson.objects)) {
+    savedJson.objects = savedJson.objects.filter(obj => obj.customId !== "studentPhoto");
   }
+  canvasRef.current.loadFromJSON(savedJson, () => {
+    canvasRef.current.renderAll();
+    // now set selected student which will trigger the student useEffect
+    setSelectedStudent(st);
+  });
+} else {
+  // no saved canvas, just update student
+  canvasRef.current.requestRenderAll();
+  setSelectedStudent(st);
+}
+
 };
 
 

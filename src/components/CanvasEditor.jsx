@@ -1551,12 +1551,12 @@ function loadTemplateAsset(id, url, canvas) {
     if (bulkMode) rebuildBulkFromFiltered();
   }, [bulkMode, filteredStudents]); // eslint-disable-line
 
-const gotoIndex = (idx) => {
+
+  const gotoIndex = (idx) => {
   if (!bulkList.length) return;
 
-  // Save current canvas state for current student
+  // Save current canvas layout without student photo
   if (canvasRef.current && bulkList[bulkIndex]) {
-    // Before saving, remove student photo so it’s not serialized into JSON
     const objs = canvasRef.current.getObjects();
     objs
       .filter((o) => o.customId === "studentPhoto")
@@ -1574,19 +1574,17 @@ const gotoIndex = (idx) => {
     (filteredStudents.length ? filteredStudents : allStudents).find(
       (s) => s.uuid === uuid
     ) || null;
+
+  // This will trigger the useEffect to re-add the photo
   setSelectedStudent(st);
 
+  // Load saved layout (without photo)
   if (canvasRef.current) {
     const saved = studentLayoutsRef.current[uuid];
-
     if (saved) {
-      // Remove any photos from JSON before loading
       if (saved.objects) {
-        saved.objects = saved.objects.filter(
-          (obj) => obj.customId !== "studentPhoto"
-        );
+        saved.objects = saved.objects.filter((obj) => obj.customId !== "studentPhoto");
       }
-
       canvasRef.current.loadFromJSON(saved, () => {
         canvasRef.current.renderAll();
       });
@@ -1595,7 +1593,6 @@ const gotoIndex = (idx) => {
     }
   }
 };
-
 
   const prevStudent = () => gotoIndex(bulkIndex - 1);
   const nextStudent = () => gotoIndex(bulkIndex + 1);

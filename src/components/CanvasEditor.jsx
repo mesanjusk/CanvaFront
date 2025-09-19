@@ -1140,56 +1140,6 @@ useEffect(() => {
   const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
   if (!frameSlot) return;
 
-  // ----- Remove old student photo -----
-  const oldPhoto = canvas.getObjects().find(o => o.customId === "studentPhoto");
-  if (oldPhoto) canvas.remove(oldPhoto);
-
-  // ----- Add student photo -----
-  const photoUrl = Array.isArray(currentStudent?.photo) ? currentStudent.photo[0] : currentStudent?.photo;
-  if (photoUrl) {
-    fabric.Image.fromURL(photoUrl, (img) => {
-      if (!img) return;
-
-      // Wait for the next frame to ensure frameSlot bounds are ready
-      requestAnimationFrame(() => {
-        const bounds = frameSlot.getBoundingRect(true);
-        if (!bounds.width || !bounds.height) {
-          console.warn("FrameSlot bounds not ready yet");
-          return;
-        }
-
-        const scale = Math.min(bounds.width / img.width, bounds.height / img.height);
-
-        img.set({
-          left: bounds.left + bounds.width / 2,
-          top: bounds.top + bounds.height / 2,
-          originX: "center",
-          originY: "center",
-          scaleX: scale,
-          scaleY: scale,
-          selectable: false,
-          evented: false,
-          customId: "studentPhoto",
-          clipPath: new fabric.Rect({
-            width: bounds.width,
-            height: bounds.height,
-            originX: "center",
-            originY: "center",
-            absolutePositioned: true
-          })
-        });
-
-        canvas.add(img);
-
-        // Move above the frame
-        const frameIndex = canvas.getObjects().indexOf(frameSlot);
-        if (frameIndex >= 0) img.moveTo(frameIndex + 1);
-
-        canvas.requestRenderAll();
-      });
-    }, { crossOrigin: "anonymous" });
-  }
-
   // ----- Remove old student name and placeholder -----
   const oldName = canvas.getObjects().find(o => o.customId === "studentName");
   if (oldName) canvas.remove(oldName);
@@ -1214,11 +1164,81 @@ useEffect(() => {
     evented: false,
     customId: "studentName"
   });
-
   canvas.add(nameObj);
-  canvas.requestRenderAll();
 
+  // ----- Student photo logic with saved props -----
+  const current = currentStudent;
+  const photoUrl = Array.isArray(current?.photo) ? current.photo[0] : current?.photo;
+  const savedPhoto = getSavedProps("studentPhoto") || {};
+  const photoLeft  = savedPhoto.left ?? Math.round(canvas.width * 0.5);
+  const photoTop   = savedPhoto.top  ?? Math.round(canvas.height * 0.33);
+  const savedShape = savedPhoto.shape || null;
+
+  if (photoUrl) {
+    const existingPhoto = canvas.getObjects().find(obj => obj.customId === "studentPhoto");
+
+    if (existingPhoto) {
+      existingPhoto.set({
+        left:   savedPhoto.left   ?? existingPhoto.left,
+        top:    savedPhoto.top    ?? existingPhoto.top,
+        scaleX: savedPhoto.scaleX ?? existingPhoto.scaleX,
+        scaleY: savedPhoto.scaleY ?? existingPhoto.scaleY,
+      });
+      canvas.requestRenderAll();
+    } else {
+      safeLoadImage(photoUrl, img => {
+        const phWidth  = Math.min(400, canvas.width  * 0.6);
+        const phHeight = Math.min(400, canvas.height * 0.6);
+        const autoScale = Math.min(phWidth / img.width, phHeight / img.height, 1);
+
+        img.set({
+          originX: "center",
+          originY: "center",
+          left: photoLeft,
+          top: photoTop,
+          scaleX: savedPhoto.scaleX ?? autoScale,
+          scaleY: savedPhoto.scaleY ?? autoScale,
+        });
+        img.customId = "studentPhoto";
+        img.field    = "studentPhoto";
+
+        if (savedShape) {
+          applyMaskAndFrame(canvas, img, savedShape, {
+            stroke: frameBorder,
+            strokeWidth: frameWidth,
+            rx: frameCorner,
+            absolute: false,
+            followImage: true,
+          });
+        }
+
+        img.set({
+          lockMovementX: false,
+          lockMovementY: false,
+          lockScalingX: false,
+          lockScalingY: false,
+          lockRotation: false,
+          hasControls: true,
+          selectable: true,
+          evented: true,
+        });
+
+        img.on("selected",   () => setActiveStudentPhoto(img));
+        img.on("deselected", () => setActiveStudentPhoto(null));
+        img.on("mousedblclick", () => {
+          enterAdjustMode(img);
+          fitImageToFrame(img, "cover");
+        });
+
+        attachSaveHandlers(img);
+        canvas.add(img);
+        studentObjectsRef.current.push(img);
+        canvas.requestRenderAll();
+      });
+    }
+  }
 }, [canvas, selectedStudent, bulkMode, bulkIndex]);
+
 
 
 /* ======================= 5. Helper to load assets (logo/signature) ======================= */

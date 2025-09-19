@@ -1552,10 +1552,10 @@ function loadTemplateAsset(id, url, canvas) {
   }, [bulkMode, filteredStudents]); // eslint-disable-line
 
 
-  const gotoIndex = (idx) => {
+const gotoIndex = (idx) => {
   if (!bulkList.length) return;
 
-  // Save current canvas layout without student photo
+  // Save current layout without photo
   if (canvasRef.current && bulkList[bulkIndex]) {
     const objs = canvasRef.current.getObjects();
     objs
@@ -1575,10 +1575,7 @@ function loadTemplateAsset(id, url, canvas) {
       (s) => s.uuid === uuid
     ) || null;
 
-  // This will trigger the useEffect to re-add the photo
-  setSelectedStudent(st);
-
-  // Load saved layout (without photo)
+  // Load saved layout first
   if (canvasRef.current) {
     const saved = studentLayoutsRef.current[uuid];
     if (saved) {
@@ -1587,10 +1584,15 @@ function loadTemplateAsset(id, url, canvas) {
       }
       canvasRef.current.loadFromJSON(saved, () => {
         canvasRef.current.renderAll();
+        // Now update the selected student to trigger useEffect
+        setSelectedStudent(st);
       });
     } else {
       canvasRef.current.requestRenderAll();
+      setSelectedStudent(st);
     }
+  } else {
+    setSelectedStudent(st);
   }
 };
 

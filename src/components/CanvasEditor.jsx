@@ -1133,7 +1133,7 @@ useEffect(() => {
 // ----- Safe image loader -----
 function safeLoadImage(url, callback) {
   const img = new Image();
-  img.crossOrigin = "anonymous"; 
+  img.crossOrigin = "anonymous";
   img.onload = () => callback(new fabric.Image(img));
   img.onerror = () => console.error("Failed to load image:", url);
   img.src = url;
@@ -1146,37 +1146,35 @@ useEffect(() => {
 
   if (!canvas || !currentStudent) return;
 
-  // Remove old objects
+  // ----- Remove old objects -----
   canvas.getObjects().forEach(obj => {
     if (["studentName", "templateText", "studentPhoto"].includes(obj.customId)) {
       canvas.remove(obj);
     }
   });
 
-  // Get frameSlot
+  // ----- Get frameSlot -----
   const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
   if (!frameSlot) return;
 
-  // Add student name
+  // ----- Add student name in single line -----
   const displayName = `${currentStudent.firstName || ""} ${currentStudent.lastName || ""}`.trim();
-  const nameObj = new fabric.Textbox(displayName, {
+  const nameObj = new fabric.Text(displayName, {
     left: frameSlot.left + frameSlot.width / 2,
     top: frameSlot.top + frameSlot.height + 10,
     fontSize: 28,
     fill: "#000",
     fontFamily: "Arial",
     fontWeight: "bold",
-    textAlign: "center",
     originX: "center",
     originY: "top",
-    width: frameSlot.width,
     selectable: false,
     evented: false,
     customId: "studentName"
   });
   canvas.add(nameObj);
 
-  // Load student photo
+  // ----- Load student photo -----
   const photoUrl = Array.isArray(currentStudent?.photo) ? currentStudent.photo[0] : currentStudent?.photo;
   if (!photoUrl) return;
 
@@ -1186,9 +1184,8 @@ useEffect(() => {
     if (!img) return;
 
     // ----- Determine clip shape -----
-    let clipPath = null;
+    let clipPath;
     if (frameSlot.type === "path" && frameSlot.path) {
-      // Use the path itself as clipPath
       clipPath = new fabric.Path(frameSlot.path, {
         originX: "center",
         originY: "center",
@@ -1199,7 +1196,6 @@ useEffect(() => {
         absolutePositioned: true
       });
     } else {
-      // Fallback: rectangle
       const bounds = frameSlot.getBoundingRect(true);
       clipPath = new fabric.Rect({
         width: bounds.width,
@@ -1212,11 +1208,11 @@ useEffect(() => {
       });
     }
 
-    // ----- Scale image to cover the frame shape -----
+    // ----- Scale image to cover frame -----
     const bounds = clipPath.getBoundingRect(true);
     const scaleX = bounds.width / img.width;
     const scaleY = bounds.height / img.height;
-    const scale = Math.max(scaleX, scaleY); // object-fit: cover
+    const scale = Math.max(scaleX, scaleY); // cover frame
 
     img.set({
       originX: "center",
@@ -1229,7 +1225,7 @@ useEffect(() => {
       selectable: true,
       evented: true,
       customId: "studentPhoto",
-      clipPath: clipPath
+      clipPath
     });
 
     // Event handlers
@@ -1242,15 +1238,14 @@ useEffect(() => {
 
     // Save photo state
     const savePhotoState = () => {
-      const state = {
+      saveProps("studentPhoto", {
         left: img.left,
         top: img.top,
         scaleX: img.scaleX,
         scaleY: img.scaleY,
         angle: img.angle,
-        shape: frameSlot // save frame for next load
-      };
-      saveProps("studentPhoto", state);
+        shape: frameSlot
+      });
     };
     img.on("modified", savePhotoState);
 
@@ -1263,6 +1258,7 @@ useEffect(() => {
     studentObjectsRef.current.push(img);
     canvas.requestRenderAll();
   });
+
 }, [canvas, selectedStudent, bulkMode, bulkIndex]);
 
 

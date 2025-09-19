@@ -1133,7 +1133,7 @@ useEffect(() => {
 // ----- Safe image loader -----
 function safeLoadImage(url, callback) {
   const img = new Image();
-  img.crossOrigin = "anonymous"; // needed for Cloudinary or external images
+  img.crossOrigin = "anonymous"; 
   img.onload = () => callback(new fabric.Image(img));
   img.onerror = () => console.error("Failed to load image:", url);
   img.src = url;
@@ -1146,18 +1146,18 @@ useEffect(() => {
 
   if (!canvas || !currentStudent) return;
 
-  // ----- Remove old student objects -----
+  // Remove old objects
   canvas.getObjects().forEach(obj => {
     if (["studentName", "templateText", "studentPhoto"].includes(obj.customId)) {
       canvas.remove(obj);
     }
   });
 
-  // ----- Get frameSlot -----
+  // Get frameSlot
   const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
   if (!frameSlot) return;
 
-  // ----- Add student name below frame -----
+  // Add student name
   const displayName = `${currentStudent.firstName || ""} ${currentStudent.lastName || ""}`.trim();
   const nameObj = new fabric.Textbox(displayName, {
     left: frameSlot.left + frameSlot.width / 2,
@@ -1176,7 +1176,7 @@ useEffect(() => {
   });
   canvas.add(nameObj);
 
-  // ----- Load student photo -----
+  // Load student photo
   const photoUrl = Array.isArray(currentStudent?.photo) ? currentStudent.photo[0] : currentStudent?.photo;
   if (!photoUrl) return;
 
@@ -1185,12 +1185,38 @@ useEffect(() => {
   safeLoadImage(photoUrl, (img) => {
     if (!img) return;
 
-    const bounds = frameSlot.getBoundingRect(true);
+    // ----- Determine clip shape -----
+    let clipPath = null;
+    if (frameSlot.type === "path" && frameSlot.path) {
+      // Use the path itself as clipPath
+      clipPath = new fabric.Path(frameSlot.path, {
+        originX: "center",
+        originY: "center",
+        left: frameSlot.left,
+        top: frameSlot.top,
+        scaleX: frameSlot.scaleX || 1,
+        scaleY: frameSlot.scaleY || 1,
+        absolutePositioned: true
+      });
+    } else {
+      // Fallback: rectangle
+      const bounds = frameSlot.getBoundingRect(true);
+      clipPath = new fabric.Rect({
+        width: bounds.width,
+        height: bounds.height,
+        originX: "center",
+        originY: "center",
+        left: bounds.left + bounds.width / 2,
+        top: bounds.top + bounds.height / 2,
+        absolutePositioned: true
+      });
+    }
 
-    // Scale to cover the frame
+    // ----- Scale image to cover the frame shape -----
+    const bounds = clipPath.getBoundingRect(true);
     const scaleX = bounds.width / img.width;
     const scaleY = bounds.height / img.height;
-    const scale = Math.max(scaleX, scaleY);
+    const scale = Math.max(scaleX, scaleY); // object-fit: cover
 
     img.set({
       originX: "center",
@@ -1203,27 +1229,18 @@ useEffect(() => {
       selectable: true,
       evented: true,
       customId: "studentPhoto",
-      field: "studentPhoto"
+      clipPath: clipPath
     });
 
-    // ----- Clip image to frame -----
-    const clipRect = new fabric.Rect({
-      left: bounds.left + bounds.width / 2,
-      top: bounds.top + bounds.height / 2,
-      width: bounds.width,
-      height: bounds.height,
-      originX: "center",
-      originY: "center",
-      absolutePositioned: true
+    // Event handlers
+    img.on("selected", () => setActiveStudentPhoto(img));
+    img.on("deselected", () => setActiveStudentPhoto(null));
+    img.on("mousedblclick", () => {
+      enterAdjustMode(img);
+      fitImageToFrame(img, "cover");
     });
-    img.set({ clipPath: clipRect });
 
-    // ----- Enable interactive adjustment -----
-    img.on("moving", () => canvas.requestRenderAll());
-    img.on("scaling", () => canvas.requestRenderAll());
-    img.on("rotating", () => canvas.requestRenderAll());
-
-    // Save position, scale, rotation on modifications
+    // Save photo state
     const savePhotoState = () => {
       const state = {
         left: img.left,
@@ -1231,15 +1248,15 @@ useEffect(() => {
         scaleX: img.scaleX,
         scaleY: img.scaleY,
         angle: img.angle,
-        shape: { width: bounds.width, height: bounds.height }
+        shape: frameSlot // save frame for next load
       };
-      saveProps("studentPhoto", state); // your save function
+      saveProps("studentPhoto", state);
     };
     img.on("modified", savePhotoState);
 
     canvas.add(img);
 
-    // Ensure photo is above frame
+    // Move photo above frame
     const frameIndex = canvas.getObjects().indexOf(frameSlot);
     if (frameIndex >= 0) img.moveTo(frameIndex + 1);
 

@@ -1082,18 +1082,15 @@ function attachSaveHandlers(img) {
 useEffect(() => {
   if (!canvas || !selectedStudent) return;
 
-  // -------- Remove old student objects --------
+  // -------- Remove old student objects only --------
   canvas.getObjects().forEach(obj => {
     if (["studentPhoto", "studentName"].includes(obj.customId)) {
       canvas.remove(obj);
     }
   });
-  studentObjectsRef.current = [];
-
-  // -------- Find frameSlot --------
-  const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
 
   // -------- Add student photo --------
+  const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
   const photoUrl = Array.isArray(selectedStudent.photo)
     ? selectedStudent.photo[0]
     : selectedStudent.photo;
@@ -1103,37 +1100,10 @@ useEffect(() => {
 
     fabric.Image.fromURL(
       photoUrl,
-      img => {
+      (img) => {
         if (!img) return;
 
-        // Create clip path
-        let clipShape;
-        if (frameSlot.type === "circle") {
-          clipShape = new fabric.Circle({
-            radius: bounds.width / 2,
-            originX: "center",
-            originY: "center",
-            absolutePositioned: true
-          });
-        } else if (frameSlot.type === "path" && frameSlot.path) {
-          clipShape = new fabric.Path(frameSlot.path, {
-            originX: "center",
-            originY: "center",
-            absolutePositioned: true
-          });
-          clipShape.scaleX = frameSlot.scaleX ?? 1;
-          clipShape.scaleY = frameSlot.scaleY ?? 1;
-        } else {
-          clipShape = new fabric.Rect({
-            width: bounds.width,
-            height: bounds.height,
-            originX: "center",
-            originY: "center",
-            absolutePositioned: true
-          });
-        }
-
-        // Scale image into frame
+        // Scale + clip
         const scale = Math.min(bounds.width / img.width, bounds.height / img.height);
         img.set({
           left: bounds.left + bounds.width / 2,
@@ -1142,16 +1112,19 @@ useEffect(() => {
           originY: "center",
           scaleX: scale,
           scaleY: scale,
-          clipPath: clipShape,
           selectable: false,
           evented: false,
-          customId: "studentPhoto"
+          customId: "studentPhoto",
+          clipPath: new fabric.Rect({
+            width: bounds.width,
+            height: bounds.height,
+            originX: "center",
+            originY: "center"
+          })
         });
 
         canvas.add(img);
-        img.moveTo(frameSlot.index); // keep photo inside frame layer
-        studentObjectsRef.current.push(img);
-        attachSaveHandlers(img);
+        img.moveTo(frameSlot.index + 1);
         canvas.requestRenderAll();
       },
       { crossOrigin: "anonymous" }
@@ -1170,8 +1143,8 @@ useEffect(() => {
     fontFamily: savedName?.fontFamily || "Arial",
     fontWeight: savedName?.fontWeight ?? "bold",
     textAlign: savedName?.textAlign || "center",
-    originX: savedName?.originX ?? "center",
-    originY: savedName?.originY ?? "top",
+    originX: "center",
+    originY: "top",
     width: savedName?.width ?? (frameSlot?.width ?? canvas.width - 40),
     selectable: false,
     evented: false,
@@ -1179,11 +1152,8 @@ useEffect(() => {
   });
 
   canvas.add(nameObj);
-  studentObjectsRef.current.push(nameObj);
-
   canvas.requestRenderAll();
 }, [canvas, selectedStudent]);
-
 
 
 /* ======================= 4. Load & apply template ======================= */
@@ -1313,12 +1283,13 @@ function attachSaveHandlers(img) {
 const canvasJsonRef = useRef(null); // keep this at top
 
 useEffect(() => {
-  if (!canvas || !selectedStudent) return;
+  if (!canvas) return;
 
-  // 🔹 Clear the whole canvas before loading new stuff
+  // -------- Clear everything once --------
   canvas.clear();
   studentObjectsRef.current = [];
 
+  // -------- Add template background --------
   const drawBg = (bg) => {
     bg.scaleX = canvas.width / bg.width;
     bg.scaleY = canvas.height / bg.height;
@@ -1326,21 +1297,21 @@ useEffect(() => {
     canvas.add(bg);
     bg.sendToBack();
     bgRef.current = bg;
-    console.log("[debug] Background added:", bg);
   };
 
-  // -------- Load template JSON --------
+  if (templateImage) {
+    if (templateImage.clone) templateImage.clone(drawBg);
+    else drawBg(templateImage);
+  }
+
+  // -------- Load template JSON (frameSlot & placeholders) --------
   const json = canvasJsonRef.current;
   if (json) {
-    console.log("[debug] Loading JSON into canvas:", json);
-
     canvas.loadFromJSON(json, () => {
-      console.log("[debug] JSON loaded, objects:", canvas.getObjects());
-
-      // Normalize customIds
-      canvas.getObjects().forEach(o => {
+      // Normalize customId values
+      canvas.getObjects().forEach((o) => {
         if (o.type === "i-text" && (!o.customId || /text/i.test(o.customId))) {
-          o.customId = "studentName";
+          o.customId = "templateText";
         }
         if (
           o.customId === "frameSlot" ||
@@ -1351,124 +1322,14 @@ useEffect(() => {
         }
       });
 
-      // 🔹 Add background AFTER JSON is loaded
-      if (templateImage) {
-        if (templateImage.clone) templateImage.clone(drawBg);
-        else drawBg(templateImage);
-      }
-
-      // -------- Student photo --------
-      const photoUrl = Array.isArray(selectedStudent.photo)
-        ? selectedStudent.photo[0]
-        : selectedStudent.photo;
-
-      console.log("[debug] Selected student photo URL:", photoUrl);
-
-      setTimeout(() => {
-        const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
-        console.log("[debug] FrameSlot found:", frameSlot);
-
-        if (frameSlot && photoUrl) {
-          const bounds = frameSlot.getBoundingRect();
-          console.log("[debug] FrameSlot bounds:", bounds);
-
-          fabric.Image.fromURL(
-            photoUrl,
-            (img) => {
-              if (!img) {
-                console.warn("[debug] Image failed to load:", photoUrl);
-                return;
-              }
-              console.log("[debug] Student photo loaded:", img);
-
-              // Clip path
-              let clipShape;
-              if (frameSlot.type === "circle") {
-                clipShape = new fabric.Circle({
-                  radius: bounds.width / 2,
-                  originX: "center",
-                  originY: "center"
-                });
-              } else if (frameSlot.type === "path" && frameSlot.path) {
-                clipShape = new fabric.Path(frameSlot.path, {
-                  originX: "center",
-                  originY: "center"
-                });
-                clipShape.scaleX = frameSlot.scaleX ?? 1;
-                clipShape.scaleY = frameSlot.scaleY ?? 1;
-              } else {
-                clipShape = new fabric.Rect({
-                  width: bounds.width,
-                  height: bounds.height,
-                  originX: "center",
-                  originY: "center"
-                });
-              }
-
-              const scale = Math.min(bounds.width / img.width, bounds.height / img.height);
-              img.set({
-                left: bounds.left + bounds.width / 2,
-                top: bounds.top + bounds.height / 2,
-                originX: "center",
-                originY: "center",
-                scaleX: scale,
-                scaleY: scale,
-                clipPath: clipShape,
-                selectable: false,
-                evented: false,
-                customId: "studentPhoto"
-              });
-
-              canvas.add(img);
-              frameSlot.bringToFront();
-              studentObjectsRef.current.push(img);
-              attachSaveHandlers(img);
-              canvas.requestRenderAll();
-
-              console.log("[debug] Student photo added to canvas");
-            },
-            { crossOrigin: "anonymous" }
-          );
-        } else {
-          console.warn("[debug] No frameSlot or photoUrl found — skipping photo");
-        }
-      }, 50);
-
-      // -------- Student name --------
-      const displayName = `${selectedStudent.firstName || ""} ${selectedStudent.lastName || ""}`.trim();
-      console.log("[debug] Student display name:", displayName);
-
-      const savedName = getSavedProps("studentName");
-      const nameObj = new fabric.Textbox(displayName, {
-        left: savedName?.left ?? canvas.width / 2,
-        top: savedName?.top ?? canvas.height - 80,
-        fontSize: savedName?.fontSize ?? 28,
-        fill: savedName?.fill ?? "#000",
-        fontFamily: savedName?.fontFamily || "Arial",
-        fontWeight: savedName?.fontWeight ?? "bold",
-        textAlign: savedName?.textAlign || "center",
-        originX: savedName?.originX ?? "center",
-        originY: savedName?.originY ?? "top",
-        width: savedName?.width ?? canvas.width - 40,
-        selectable: false,
-        evented: false,
-        customId: "studentName"
-      });
-      canvas.add(nameObj);
-      studentObjectsRef.current.push(nameObj);
-      console.log("[debug] Student name added:", nameObj);
-
-      // -------- Logo & signature --------
+      // -------- Add institute logo and signature (optional) --------
       const addImageField = (src, ref, id, defaultScale = 0.2) => {
-        if (!src || canvas.getObjects().some(o => o.customId === id)) return;
+        if (!src || canvas.getObjects().find((o) => o.customId === id)) return;
         const saved = getSavedProps(id);
+
         fabric.Image.fromURL(
           src,
           (img) => {
-            if (!img) {
-              console.warn("[debug] Failed to load image field:", id, src);
-              return;
-            }
             if (saved) {
               img.set({
                 left: saved.left ?? 20,
@@ -1481,7 +1342,7 @@ useEffect(() => {
                   saved.height && img.height
                     ? saved.height / img.height
                     : saved.scaleY ?? 1,
-                angle: saved.angle ?? 0
+                angle: saved.angle ?? 0,
               });
             } else {
               img.scaleToWidth(canvas.width * defaultScale);
@@ -1491,19 +1352,19 @@ useEffect(() => {
             ref.current = img;
             canvas.add(img);
             img.setCoords();
-            console.log(`[debug] ${id} added:`, img);
           },
           { crossOrigin: "anonymous" }
         );
       };
 
       if (showLogo) addImageField(selectedInstitute?.logo, logoRef, "logo", 0.2);
-      if (showSignature) addImageField(selectedInstitute?.signature, signatureRef, "signature", 0.3);
+      if (showSignature)
+        addImageField(selectedInstitute?.signature, signatureRef, "signature", 0.3);
 
       canvas.requestRenderAll();
     });
   }
-}, [canvas, templateImage, canvasJsonRef, selectedStudent, selectedInstitute, showLogo, showSignature]);
+}, [canvas, templateImage, canvasJsonRef, showLogo, showSignature]);
 
   /* ============================= Canvas events ============================ */
   useEffect(() => {

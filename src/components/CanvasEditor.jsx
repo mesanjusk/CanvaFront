@@ -1164,19 +1164,21 @@ useEffect(() => {
     const t = setTimeout(() => setSelectedStudent(s => ({ ...s })), 30);
     return () => clearTimeout(t);
   }
-
-  // ---- add student name ----
+  
+ // ✅ student name at saved position
+  const savedName = getSavedProps("studentName") || {};
   const name = `${currentStudent.firstName || ""} ${currentStudent.lastName || ""}`.trim();
   if (name) {
-    const nameObj = new fabric.Text(name, {
-      left: bounds.left + bounds.width / 2,
-      top:  bounds.top  + bounds.height + 10,
-      originX: "center",
-      originY: "top",
-      fontSize: 28,
-      fill: "#000",
-      fontFamily: "Arial",
-      fontWeight: "bold",
+    const nameObj = new fabric.Textbox(name, {
+      left: savedName.left ?? canvas.width / 2,
+      top:  savedName.top  ?? canvas.height - 80,
+      fontSize: savedName.fontSize ?? 28,
+      fill: savedName.fill ?? "#000",
+      fontFamily: savedName.fontFamily || "Arial",
+      fontWeight: savedName.fontWeight ?? "bold",
+      originX: savedName.originX ?? "center",
+      originY: savedName.originY ?? "top",
+      width: savedName.width ?? canvas.width - 40,
       selectable: false,
       evented: false,
       customId: "studentName"
@@ -2186,27 +2188,34 @@ if (saved?.canvas) {
           )}
         </div>
 
-        {bulkMode && (
-          <div className="mt-4 flex items-center justify-center gap-2">
-            <button
-              className="p-2 rounded-full bg-white border hover:bg-gray-100"
-              title="Previous"
-              onClick={prevStudent}
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <div className="px-2 text-xs text-gray-600">
-              {bulkList.length ? `${bulkIndex + 1}/${bulkList.length}` : "0/0"}
-            </div>
-            <button
-              className="p-2 rounded-full bg-white border hover:bg-gray-100"
-              title="Next"
-              onClick={nextStudent}
-            >
-              <ChevronRight size={18} />
-            </button>
-          </div>
-        )}
+       {bulkMode && (
+  <div className="mt-4 flex items-center justify-center gap-4">
+    <button
+      type="button"
+      className="p-3 rounded-full bg-white border shadow-sm active:scale-95"
+      title="Previous"
+      onClick={prevStudent}
+      onTouchEnd={prevStudent}   
+    >
+      <ChevronLeft size={20} />
+    </button>
+
+    <div className="px-2 text-sm text-gray-700">
+      {bulkList.length ? `${bulkIndex + 1}/${bulkList.length}` : "0/0"}
+    </div>
+
+    <button
+      type="button"
+      className="p-3 rounded-full bg-white border shadow-sm active:scale-95"
+      title="Next"
+      onClick={nextStudent}
+      onTouchEnd={nextStudent}   
+    >
+      <ChevronRight size={20} />
+    </button>
+  </div>
+)}
+
       </div>
         {cropSrc && (
           <ImageCropModal

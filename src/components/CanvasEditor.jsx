@@ -1180,21 +1180,17 @@ useEffect(() => {
   const photoUrl = Array.isArray(currentStudent?.photo) ? currentStudent.photo[0] : currentStudent?.photo;
   if (!photoUrl) return;
 
-  const existingPhoto = canvas.getObjects().find(obj => obj.customId === "studentPhoto");
+  // Remove old photo first
+  const oldPhoto = canvas.getObjects().find(o => o.customId === "studentPhoto");
+  if (oldPhoto) canvas.remove(oldPhoto);
 
-  // Helper to load image safely
-  const safeLoadImage = (url, callback) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => callback(new fabric.Image(img));
-    img.onerror = () => console.error("Failed to load image:", url);
-    img.src = url;
-  };
+  // Wait for next animation frame to ensure frameSlot is rendered
+  requestAnimationFrame(() => {
+    const bounds = frameSlot.getBoundingRect(true);
+    if (!bounds.width || !bounds.height) return;
 
-  if (!existingPhoto) {
-    safeLoadImage(photoUrl, img => {
-      const bounds = frameSlot.getBoundingRect(true);
-      if (!bounds.width || !bounds.height) return;
+    fabric.Image.fromURL(photoUrl, (img) => {
+      if (!img) return;
 
       const scale = Math.min(bounds.width / img.width, bounds.height / img.height);
 
@@ -1218,24 +1214,17 @@ useEffect(() => {
       });
 
       canvas.add(img);
+
+      // Move above frame
       const frameIndex = canvas.getObjects().indexOf(frameSlot);
       if (frameIndex >= 0) img.moveTo(frameIndex + 1);
-      canvas.requestRenderAll();
-    });
-  } else {
-    const bounds = frameSlot.getBoundingRect(true);
-    const scale = Math.min(bounds.width / existingPhoto.width, bounds.height / existingPhoto.height);
 
-    existingPhoto.set({
-      left: bounds.left + bounds.width / 2,
-      top: bounds.top + bounds.height / 2,
-      scaleX: scale,
-      scaleY: scale
-    });
-    canvas.requestRenderAll();
-  }
+      canvas.requestRenderAll();
+    }, { crossOrigin: "anonymous" });
+  });
 
 }, [canvas, selectedStudent, bulkMode, bulkIndex]);
+
 
 
 /* ======================= 5. Helper to load assets (logo/signature) ======================= */

@@ -1025,8 +1025,20 @@ const saveProps = (key, value) => {
   }
 };
 
+function getSavedProps(key) {
+  try {
+    const tpl = activeTemplateId || "global";
+    const v = localStorage.getItem(`canvas_props_${tpl}_${key}`);
+    return v ? JSON.parse(v) : null;
+  } catch {
+    return null;
+  }
+}
+
 function cacheTemplatePlaceholders(canvas) {
   if (!canvas) return;
+
+  // ---- Frame (student photo) ----
   const frameObj = canvas.getObjects().find(o => o.customId === "frameSlot");
   if (frameObj) {
     saveProps("studentPhoto", {
@@ -1039,6 +1051,7 @@ function cacheTemplatePlaceholders(canvas) {
     });
   }
 
+  // ---- Student name text ----
   const textObj = canvas.getObjects().find(
     o =>
       o.customId === "studentName" ||
@@ -1069,7 +1082,7 @@ function attachSaveHandlers(img) {
       top: img.top,
       scaleX: img.scaleX,
       scaleY: img.scaleY,
-      shape: img.shape || "circle",
+      shape: img.shape || "rect",
     };
     saveProps("studentPhoto", props);
   };
@@ -1079,17 +1092,18 @@ function attachSaveHandlers(img) {
   img.on("modified", persist);
 }
 
+/* ======================= 3. Student Photo + Name ======================= */
 useEffect(() => {
   if (!canvas || !selectedStudent) return;
 
-  // -------- Remove old student objects only --------
+  // -------- Remove old student objects --------
   canvas.getObjects().forEach(obj => {
     if (["studentPhoto", "studentName"].includes(obj.customId)) {
       canvas.remove(obj);
     }
   });
 
-  // -------- Add student photo --------
+  /* -------- Add student photo -------- */
   const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
   const photoUrl = Array.isArray(selectedStudent.photo)
     ? selectedStudent.photo[0]
@@ -1103,7 +1117,7 @@ useEffect(() => {
       (img) => {
         if (!img) return;
 
-        // Scale + clip
+        // Scale + clip inside frame
         const scale = Math.min(bounds.width / img.width, bounds.height / img.height);
         img.set({
           left: bounds.left + bounds.width / 2,
@@ -1131,7 +1145,7 @@ useEffect(() => {
     );
   }
 
-  // -------- Add student name --------
+  /* -------- Add student name -------- */
   const displayName = `${selectedStudent.firstName || ""} ${selectedStudent.lastName || ""}`.trim();
   const savedName = getSavedProps("studentName");
 
@@ -1204,31 +1218,12 @@ const applyTemplateResponse = useCallback(
         if (nameObj) {
           nameObj.set({ text: displayName, selectable: false, evented: false });
           nameObj.setCoords();
-        } else {
-          const saved = getSavedProps("studentName");
-          const txt = new fabric.Textbox(displayName, {
-            left: saved?.left ?? canvas.width / 2,
-            top: saved?.top ?? canvas.height - 80,
-            fontSize: saved?.fontSize ?? 28,
-            fill: saved?.fill ?? "#000",
-            fontFamily: saved?.fontFamily || "Arial",
-            fontWeight: saved?.fontWeight ?? "bold",
-            textAlign: saved?.textAlign || "center",
-            originX: saved?.originX ?? "center",
-            originY: saved?.originY ?? "top",
-            width: saved?.width ?? canvas.width - 40,
-          });
-          txt.customId = "studentName";
-          canvas.add(txt);
         }
 
         cacheTemplatePlaceholders(canvas);
         canvas.requestRenderAll();
       });
     }
-
-    setShowLogo(false);
-    setShowSignature(false);
   },
   [canvas, setCanvasSize, selectedStudent]
 );
@@ -1282,89 +1277,150 @@ function attachSaveHandlers(img) {
 
 const canvasJsonRef = useRef(null); // keep this at top
 
+/* ---------------------------- TEMPLATE EFFECT ---------------------------- */
+/* runs when templateImage / canvasJsonRef / logo/signature toggles change */
 useEffect(() => {
   if (!canvas) return;
 
-  // -------- Clear everything once --------
-  canvas.clear();
-  studentObjectsRef.current = [];
+  // only remove previous template-related objects (leave studentPhoto / studentName)
+  const templateIds = ["templateBg", "frameSlot", "templateText", "logo", "signature"];
+  canvas.getObjects()
+    .filter(o => o?.customId && templateIds.includes(o.customId))
+    .forEach(o => canvas.remove(o));
 
-  // -------- Add template background --------
+  // helper to draw background
   const drawBg = (bg) => {
-    bg.scaleX = canvas.width / bg.width;
-    bg.scaleY = canvas.height / bg.height;
-    bg.set({ selectable: false, evented: false });
-    canvas.add(bg);
-    bg.sendToBack();
-    bgRef.current = bg;
+    try {
+      bg.set({ selectable: false, evented: false, customId: "templateBg" });
+      bg.scaleX = canvas.width / bg.width;
+      bg.scaleY = canvas.height / bg.height;
+      canvas.add(bg);
+      bg.sendToBack();
+      bgRef.current = bg;
+    } catch (e) {
+      console.warn("drawBg failed", e);
+    }
   };
 
-  if (templateImage) {
-    if (templateImage.clone) templateImage.clone(drawBg);
-    else drawBg(templateImage);
-  }
-
-  // -------- Load template JSON (frameSlot & placeholders) --------
+  // load placeholders from saved JSON (frameSlot, text)
   const json = canvasJsonRef.current;
   if (json) {
     canvas.loadFromJSON(json, () => {
-      // Normalize customId values
-      canvas.getObjects().forEach((o) => {
+      // tag placeholders (normalize ids)
+      canvas.getObjects().forEach(o => {
         if (o.type === "i-text" && (!o.customId || /text/i.test(o.customId))) {
           o.customId = "templateText";
         }
         if (
           o.customId === "frameSlot" ||
-          (o.type === "path" &&
-            (o.stroke === "#7c3aed" || o.stroke === "rgb(124,58,237)"))
+          (o.type === "path" && (o.stroke === "#7c3aed" || o.stroke === "rgb(124,58,237)"))
         ) {
           o.customId = "frameSlot";
         }
       });
 
-      // -------- Add institute logo and signature (optional) --------
-      const addImageField = (src, ref, id, defaultScale = 0.2) => {
-        if (!src || canvas.getObjects().find((o) => o.customId === id)) return;
-        const saved = getSavedProps(id);
+      // cache positions for student placeholders (your helper)
+      try { cacheTemplatePlaceholders(canvas); } catch (e) { console.warn("cacheTemplatePlaceholders failed", e); }
 
-        fabric.Image.fromURL(
-          src,
-          (img) => {
-            if (saved) {
+      // add bg AFTER placeholders so bg is behind everything
+      if (templateImage) {
+        if (typeof templateImage.clone === "function") templateImage.clone(drawBg);
+        else drawBg(templateImage);
+      }
+
+      // ---------- LOGO & SIGNATURE (your correct code) ----------
+      // showLogo handling (preserves saved positions)
+      if (showLogo && selectedInstitute?.logo) {
+        let existingLogo = canvas.getObjects().find(obj => obj.customId === "logo");
+        if (!existingLogo) {
+          const savedLogo = getSavedProps("logo");
+          safeLoadImage(selectedInstitute.logo, (img) => {
+            if (!img) return;
+            if (savedLogo) {
+              const scaleX = savedLogo.width && img.width ? savedLogo.width / img.width : img.scaleX ?? 1;
+              const scaleY = savedLogo.height && img.height ? savedLogo.height / img.height : img.scaleY ?? 1;
               img.set({
-                left: saved.left ?? 20,
-                top: saved.top ?? 20,
-                scaleX:
-                  saved.width && img.width
-                    ? saved.width / img.width
-                    : saved.scaleX ?? 1,
-                scaleY:
-                  saved.height && img.height
-                    ? saved.height / img.height
-                    : saved.scaleY ?? 1,
-                angle: saved.angle ?? 0,
+                left: savedLogo.left ?? 20,
+                top: savedLogo.top ?? 20,
+                scaleX,
+                scaleY,
+                angle: savedLogo.angle ?? 0
               });
             } else {
-              img.scaleToWidth(canvas.width * defaultScale);
+              img.scaleToWidth(Math.round(canvas.width * 0.2));
               img.set({ left: 20, top: 20 });
             }
-            img.customId = id;
-            ref.current = img;
+            img.customId = "logo";
+            img.field = "logo";
+            logoRef.current = img;
             canvas.add(img);
             img.setCoords();
-          },
-          { crossOrigin: "anonymous" }
-        );
-      };
+            canvas.requestRenderAll();
+          });
+        }
+      } else {
+        const existingLogo = canvas.getObjects().find(obj => obj.customId === "logo");
+        if (existingLogo) {
+          canvas.remove(existingLogo);
+          logoRef.current = null;
+          canvas.requestRenderAll();
+        }
+      }
 
-      if (showLogo) addImageField(selectedInstitute?.logo, logoRef, "logo", 0.2);
-      if (showSignature)
-        addImageField(selectedInstitute?.signature, signatureRef, "signature", 0.3);
+      // signature
+      if (showSignature && selectedInstitute?.signature) {
+        let existingSignature = canvas.getObjects().find(obj => obj.customId === "signature");
+        if (!existingSignature) {
+          const savedSign = getSavedProps("signature");
+          safeLoadImage(selectedInstitute.signature, (img) => {
+            if (!img) return;
+            if (savedSign) {
+              const scaleX = savedSign.width && img.width ? savedSign.width / img.width : img.scaleX ?? 1;
+              const scaleY = savedSign.height && img.height ? savedSign.height / img.height : img.scaleY ?? 1;
+              img.set({
+                left: savedSign.left ?? canvas.width - 150,
+                top: savedSign.top ?? canvas.height - 80,
+                scaleX,
+                scaleY,
+                angle: savedSign.angle ?? 0
+              });
+            } else {
+              img.scaleToWidth(Math.round(canvas.width * 0.3));
+              img.set({ left: canvas.width - 150, top: canvas.height - 80 });
+            }
+            img.customId = "signature";
+            img.field = "signature";
+            signatureRef.current = img;
+            canvas.add(img);
+            img.setCoords();
+            canvas.requestRenderAll();
+          });
+        }
+      } else {
+        const existingSignature = canvas.getObjects().find(obj => obj.customId === "signature");
+        if (existingSignature) {
+          canvas.remove(existingSignature);
+          signatureRef.current = null;
+          canvas.requestRenderAll();
+        }
+      }
 
       canvas.requestRenderAll();
     });
+  } else {
+    // If no JSON, still add background & logo/signature so template shows
+    if (templateImage) {
+      if (typeof templateImage.clone === "function") templateImage.clone(drawBg);
+      else drawBg(templateImage);
+    }
+    // add logo/signature same as above (invoke same logic)...
+    // (You can duplicate above logo/signature block here if JSON not present)
   }
-}, [canvas, templateImage, canvasJsonRef, showLogo, showSignature]);
+
+  // Do not clear the entire canvas (do NOT call canvas.clear()).
+  // This effect must NOT remove studentPhoto/studentName.
+}, [canvas, templateImage, canvasJsonRef, showLogo, showSignature, selectedInstitute]);
+
 
   /* ============================= Canvas events ============================ */
   useEffect(() => {

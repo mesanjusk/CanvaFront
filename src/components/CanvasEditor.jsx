@@ -1146,9 +1146,9 @@ useEffect(() => {
 
   if (!canvas || !currentStudent) return;
 
-  // ----- Remove old student name and placeholder -----
+  // ----- Remove old student name, placeholder, and photo -----
   canvas.getObjects().forEach(obj => {
-    if (obj.customId === "studentName" || obj.customId === "templateText" || obj.customId === "studentPhoto") {
+    if (["studentName", "templateText", "studentPhoto"].includes(obj.customId)) {
       canvas.remove(obj);
     }
   });
@@ -1176,33 +1176,35 @@ useEffect(() => {
   });
   canvas.add(nameObj);
 
-  // ----- Add student photo -----
+  // ----- Add or update student photo -----
   const photoUrl = Array.isArray(currentStudent?.photo) ? currentStudent.photo[0] : currentStudent?.photo;
   if (!photoUrl) return;
 
   const loadPhoto = () => {
     const bounds = frameSlot.getBoundingRect(true);
     if (!bounds.width || !bounds.height) {
-      // Try again after 50ms if bounds not ready
+      // Retry if bounds not ready
       setTimeout(loadPhoto, 50);
       return;
     }
 
-    fabric.Image.fromURL(photoUrl, (img) => {
+    safeLoadImage(photoUrl, (img) => {
       if (!img) return;
 
-      // Scale image to fit the frame
-      const scale = Math.min(bounds.width / img.width, bounds.height / img.height);
+      // Scale image to cover frame (like object-fit: cover)
+      const scaleX = bounds.width / img.width;
+      const scaleY = bounds.height / img.height;
+      const scale = Math.max(scaleX, scaleY); // cover the frame
 
       img.set({
-        left: bounds.left + bounds.width / 2,
-        top: bounds.top + bounds.height / 2,
         originX: "center",
         originY: "center",
+        left: bounds.left + bounds.width / 2,
+        top: bounds.top + bounds.height / 2,
         scaleX: scale,
         scaleY: scale,
-        selectable: false,
-        evented: false,
+        selectable: true,
+        evented: true,
         customId: "studentPhoto",
         clipPath: new fabric.Rect({
           width: bounds.width,
@@ -1213,17 +1215,25 @@ useEffect(() => {
         })
       });
 
+      // Add event handlers
+      img.on("selected", () => setActiveStudentPhoto(img));
+      img.on("deselected", () => setActiveStudentPhoto(null));
+      img.on("mousedblclick", () => {
+        enterAdjustMode(img);
+        fitImageToFrame(img, "cover");
+      });
+
       canvas.add(img);
 
-      // Ensure photo is above frame
+      // Move photo above frame
       const frameIndex = canvas.getObjects().indexOf(frameSlot);
       if (frameIndex >= 0) img.moveTo(frameIndex + 1);
 
+      studentObjectsRef.current.push(img);
       canvas.requestRenderAll();
-    }, { crossOrigin: "anonymous" });
+    });
   };
 
-  // Start loading photo
   loadPhoto();
 
 }, [canvas, selectedStudent, bulkMode, bulkIndex]);

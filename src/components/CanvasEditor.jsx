@@ -1155,7 +1155,11 @@ useEffect(() => {
 
   // ----- Get frameSlot -----
   const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
-  if (!frameSlot) return;
+ if (!frameSlot) {
+    // retry after 30ms
+    const t = setTimeout(() => setSelectedStudent(selectedStudent), 30);
+    return () => clearTimeout(t);
+  }
 
   // ----- Add student name in single line -----
   const displayName = `${currentStudent.firstName || ""} ${currentStudent.lastName || ""}`.trim();
@@ -1555,13 +1559,12 @@ function loadTemplateAsset(id, url, canvas) {
 const gotoIndex = (idx) => {
   if (!bulkList.length) return;
 
-  // Save current layout without photo
+  // Save current layout without student photo
   if (canvasRef.current && bulkList[bulkIndex]) {
     const objs = canvasRef.current.getObjects();
     objs
       .filter((o) => o.customId === "studentPhoto")
       .forEach((p) => canvasRef.current.remove(p));
-
     studentLayoutsRef.current[bulkList[bulkIndex]] = canvasRef.current.toJSON();
   }
 
@@ -1575,26 +1578,34 @@ const gotoIndex = (idx) => {
       (s) => s.uuid === uuid
     ) || null;
 
-  // Load saved layout first
-  if (canvasRef.current) {
-    const saved = studentLayoutsRef.current[uuid];
-    if (saved) {
-      if (saved.objects) {
-        saved.objects = saved.objects.filter((obj) => obj.customId !== "studentPhoto");
-      }
-      canvasRef.current.loadFromJSON(saved, () => {
-        canvasRef.current.renderAll();
-        // Now update the selected student to trigger useEffect
-        setSelectedStudent(st);
-      });
-    } else {
-      canvasRef.current.requestRenderAll();
-      setSelectedStudent(st);
-    }
-  } else {
+  if (!canvasRef.current) {
     setSelectedStudent(st);
+    return;
+  }
+
+  // Load saved layout
+  const saved = studentLayoutsRef.current[uuid];
+  if (saved) {
+    if (saved.objects) {
+      saved.objects = saved.objects.filter((obj) => obj.customId !== "studentPhoto");
+    }
+
+    canvasRef.current.loadFromJSON(saved, () => {
+      canvasRef.current.renderAll();
+
+      // ✅ Wait a tiny bit to ensure objects are fully ready
+      setTimeout(() => {
+        setSelectedStudent(st); // trigger useEffect to add photo
+      }, 30);
+    });
+  } else {
+    canvasRef.current.requestRenderAll();
+    setTimeout(() => {
+      setSelectedStudent(st); // trigger useEffect to add photo
+    }, 30);
   }
 };
+
 
   const prevStudent = () => gotoIndex(bulkIndex - 1);
   const nextStudent = () => gotoIndex(bulkIndex + 1);

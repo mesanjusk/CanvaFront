@@ -1176,68 +1176,89 @@ useEffect(() => {
   });
   canvas.add(nameObj);
 
-  // ----- Add or update student photo -----
+  // ----- Add student photo -----
   const photoUrl = Array.isArray(currentStudent?.photo) ? currentStudent.photo[0] : currentStudent?.photo;
   if (!photoUrl) return;
 
-  const loadPhoto = () => {
-    const bounds = frameSlot.getBoundingRect(true);
-    if (!bounds.width || !bounds.height) {
-      // Retry if bounds not ready
-      setTimeout(loadPhoto, 50);
-      return;
+  const savedPhoto = getSavedProps("studentPhoto") || {};
+  const savedShape = savedPhoto.shape || null;
+
+  // Check if photo already exists
+  const existingPhoto = canvas.getObjects().find(obj => obj.customId === "studentPhoto");
+  if (existingPhoto) {
+    existingPhoto.set({
+      left: savedPhoto.left ?? existingPhoto.left,
+      top: savedPhoto.top ?? existingPhoto.top,
+      scaleX: savedPhoto.scaleX ?? existingPhoto.scaleX,
+      scaleY: savedPhoto.scaleY ?? existingPhoto.scaleY
+    });
+    canvas.requestRenderAll();
+    return;
+  }
+
+  // Load new photo
+  safeLoadImage(photoUrl, (img) => {
+    if (!img) return;
+
+    // Compute default position if no saved photo
+    const photoLeft = savedPhoto.left ?? (frameSlot.left + frameSlot.width / 2);
+    const photoTop = savedPhoto.top ?? (frameSlot.top + frameSlot.height / 2);
+
+    // Scale image to fit saved shape or frameSlot
+    let scaleX = 1, scaleY = 1;
+    if (savedShape) {
+      scaleX = savedShape.width / img.width;
+      scaleY = savedShape.height / img.height;
+    } else {
+      const bounds = frameSlot.getBoundingRect(true);
+      scaleX = bounds.width / img.width;
+      scaleY = bounds.height / img.height;
+    }
+    const scale = Math.min(scaleX, scaleY); // fit inside frame
+
+    img.set({
+      originX: "center",
+      originY: "center",
+      left: photoLeft,
+      top: photoTop,
+      scaleX: savedPhoto.scaleX ?? scale,
+      scaleY: savedPhoto.scaleY ?? scale,
+      selectable: true,
+      evented: true,
+      customId: "studentPhoto",
+      field: "studentPhoto"
+    });
+
+    // Apply mask/frame if saved
+    if (savedShape) {
+      applyMaskAndFrame(canvas, img, savedShape, {
+        stroke: frameBorder,
+        strokeWidth: frameWidth,
+        rx: frameCorner,
+        absolute: false,
+        followImage: true
+      });
     }
 
-    safeLoadImage(photoUrl, (img) => {
-      if (!img) return;
-
-      // Scale image to cover frame (like object-fit: cover)
-      const scaleX = bounds.width / img.width;
-      const scaleY = bounds.height / img.height;
-      const scale = Math.max(scaleX, scaleY); // cover the frame
-
-      img.set({
-        originX: "center",
-        originY: "center",
-        left: bounds.left + bounds.width / 2,
-        top: bounds.top + bounds.height / 2,
-        scaleX: scale,
-        scaleY: scale,
-        selectable: true,
-        evented: true,
-        customId: "studentPhoto",
-        clipPath: new fabric.Rect({
-          width: bounds.width,
-          height: bounds.height,
-          originX: "center",
-          originY: "center",
-          absolutePositioned: true
-        })
-      });
-
-      // Add event handlers
-      img.on("selected", () => setActiveStudentPhoto(img));
-      img.on("deselected", () => setActiveStudentPhoto(null));
-      img.on("mousedblclick", () => {
-        enterAdjustMode(img);
-        fitImageToFrame(img, "cover");
-      });
-
-      canvas.add(img);
-
-      // Move photo above frame
-      const frameIndex = canvas.getObjects().indexOf(frameSlot);
-      if (frameIndex >= 0) img.moveTo(frameIndex + 1);
-
-      studentObjectsRef.current.push(img);
-      canvas.requestRenderAll();
+    // Event handlers
+    img.on("selected", () => setActiveStudentPhoto(img));
+    img.on("deselected", () => setActiveStudentPhoto(null));
+    img.on("mousedblclick", () => {
+      enterAdjustMode(img);
+      fitImageToFrame(img, "cover");
     });
-  };
 
-  loadPhoto();
+    attachSaveHandlers(img);
+    canvas.add(img);
 
+    // Ensure photo is above frame
+    const frameIndex = canvas.getObjects().indexOf(frameSlot);
+    if (frameIndex >= 0) img.moveTo(frameIndex + 1);
+
+    studentObjectsRef.current.push(img);
+    canvas.requestRenderAll();
+  });
 }, [canvas, selectedStudent, bulkMode, bulkIndex]);
-
 
 
 /* ======================= 5. Helper to load assets (logo/signature) ======================= */

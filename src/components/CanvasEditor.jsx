@@ -1140,7 +1140,6 @@ function safeLoadImage(url, callback) {
 }
 
 useEffect(() => {
-  // figure out which student we’re showing
   const currentStudent = bulkMode
     ? filteredStudents.find(s => s?.uuid === bulkList[bulkIndex]) || null
     : selectedStudent;
@@ -1149,36 +1148,25 @@ useEffect(() => {
 
   // ---- remove old student-specific objects ----
   canvas.getObjects().forEach(o => {
-    if (["studentName", "templateText", "studentPhoto"].includes(o.customId)) {
+    if (["studentName", "studentPhoto"].includes(o.customId)) {
       canvas.remove(o);
     }
   });
 
-  // ---- find the frameSlot and wait until it has bounds ----
-  const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
-  if (!frameSlot) return; // no frame at all – nothing to do
-
-  const bounds = frameSlot.getBoundingRect(true);
-  if (!bounds.width || !bounds.height) {
-    // retry once the layout settles
-    const t = setTimeout(() => setSelectedStudent(s => ({ ...s })), 30);
-    return () => clearTimeout(t);
-  }
-  
- // ✅ student name at saved position
-  const savedName = getSavedProps("studentName") || {};
+  // ---- locate the saved text object from template ----
+  const templateTextObj = canvas.getObjects().find(o => o.customId === "templateText");
   const name = `${currentStudent.firstName || ""} ${currentStudent.lastName || ""}`.trim();
-  if (name) {
+  if (name && templateTextObj) {
     const nameObj = new fabric.Textbox(name, {
-      left: savedName.left ?? canvas.width / 2,
-      top:  savedName.top  ?? canvas.height - 80,
-      fontSize: savedName.fontSize ?? 28,
-      fill: savedName.fill ?? "#000",
-      fontFamily: savedName.fontFamily || "Arial",
-      fontWeight: savedName.fontWeight ?? "bold",
-      originX: savedName.originX ?? "center",
-      originY: savedName.originY ?? "top",
-      width: savedName.width ?? canvas.width - 40,
+      left: templateTextObj.left,
+      top: templateTextObj.top,
+      originX: templateTextObj.originX,
+      originY: templateTextObj.originY,
+      fontSize: templateTextObj.fontSize,
+      fontFamily: templateTextObj.fontFamily,
+      fill: templateTextObj.fill,
+      fontWeight: templateTextObj.fontWeight,
+      width: templateTextObj.width,
       selectable: false,
       evented: false,
       customId: "studentName"
@@ -1186,45 +1174,49 @@ useEffect(() => {
     canvas.add(nameObj);
   }
 
-  // ---- photo url ----
+  // ---- frame slot for photo ----
+  const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
+  if (!frameSlot) return;
+
+  const bounds = frameSlot.getBoundingRect(true);
+  if (!bounds.width || !bounds.height) {
+    const t = setTimeout(() => setSelectedStudent(s => ({ ...s })), 30);
+    return () => clearTimeout(t);
+  }
+
+  // ---- student photo ----
   const photoUrl = Array.isArray(currentStudent.photo)
     ? currentStudent.photo[0]
     : currentStudent.photo;
   if (!photoUrl) return;
 
-  // per-student saved props, fall back to template-level
   const perStudent = studentLayoutsRef.current?.[currentStudent.uuid]?.studentPhotoProps;
   const savedPhoto = perStudent ?? getSavedProps("studentPhoto") ?? {};
 
-  // ---- load and place the image ----
   safeLoadImage(photoUrl, img => {
     if (!img) return;
 
-    // clipPath that exactly matches the frameSlot’s shape
-    let clipPath;
-    if (frameSlot.type === "path" && frameSlot.path) {
-      clipPath = new fabric.Path(frameSlot.path, {
-        originX: "center",
-        originY: "center",
-        left: frameSlot.left,
-        top:  frameSlot.top,
-        scaleX: frameSlot.scaleX || 1,
-        scaleY: frameSlot.scaleY || 1,
-        absolutePositioned: true
-      });
-    } else {
-      clipPath = new fabric.Rect({
-        width:  bounds.width,
-        height: bounds.height,
-        originX: "center",
-        originY: "center",
-        left: bounds.left + bounds.width  / 2,
-        top:  bounds.top  + bounds.height / 2,
-        absolutePositioned: true
-      });
-    }
+    // clipPath matching the frameSlot
+    const clipPath = frameSlot.type === "path" && frameSlot.path
+      ? new fabric.Path(frameSlot.path, {
+          originX: "center",
+          originY: "center",
+          left: frameSlot.left,
+          top:  frameSlot.top,
+          scaleX: frameSlot.scaleX || 1,
+          scaleY: frameSlot.scaleY || 1,
+          absolutePositioned: true
+        })
+      : new fabric.Rect({
+          width:  bounds.width,
+          height: bounds.height,
+          originX: "center",
+          originY: "center",
+          left: bounds.left + bounds.width  / 2,
+          top:  bounds.top  + bounds.height / 2,
+          absolutePositioned: true
+        });
 
-    // scale to cover the frame
     const scale = Math.max(bounds.width / img.width, bounds.height / img.height);
 
     img.set({
@@ -1241,7 +1233,7 @@ useEffect(() => {
       clipPath
     });
 
-    // keep per-student transform updated
+    // Persist per-student transform
     const persist = () => {
       const uuid = currentStudent.uuid;
       if (!studentLayoutsRef.current[uuid]) studentLayoutsRef.current[uuid] = {};
@@ -1258,13 +1250,17 @@ useEffect(() => {
     img.on("scaling",  persist);
     img.on("moving",   persist);
 
-    // add and stack correctly
     canvas.add(img);
     img.moveTo(canvas.getObjects().indexOf(frameSlot) + 1);
+
+    // hide the purple stroke so only the photo shows
+    frameSlot.set({ stroke: null, selectable: false, evented: false });
+
     studentObjectsRef.current.push(img);
     canvas.requestRenderAll();
   });
 }, [canvas, selectedStudent, bulkMode, bulkIndex, filteredStudents, bulkList]);
+
 
 
 /* ======================= 5. Helper to load assets (logo/signature) ======================= */

@@ -1131,7 +1131,10 @@ useEffect(() => {
 }, [templateId, loadTemplateById]);
 
 useEffect(() => {
-  if (!canvas || !selectedStudent) return;
+  const currentStudent = bulkMode
+  ? filteredStudents.find(s => s?.uuid === bulkList[bulkIndex]) || null
+  : selectedStudent;
+  if (!canvas || !currentStudent) return;
 
   const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
   if (!frameSlot) return;
@@ -1140,7 +1143,7 @@ useEffect(() => {
   const oldPhoto = canvas.getObjects().find(o => o.customId === "studentPhoto");
   if (oldPhoto) canvas.remove(oldPhoto);
 
-  const photoUrl = Array.isArray(selectedStudent?.photo) ? selectedStudent.photo[0] : selectedStudent?.photo;
+  const photoUrl = Array.isArray(currentStudent?.photo) ? currentStudent.photo[0] : currentStudent?.photo;
   console.log(photoUrl);
   if (photoUrl) {
     fabric.Image.fromURL(photoUrl, (img) => {
@@ -1189,7 +1192,7 @@ useEffect(() => {
   if (placeholder) canvas.remove(placeholder);
 
   // ----- Add student name -----
-  const displayName = `${selectedStudent.firstName || ""} ${selectedStudent.lastName || ""}`.trim();
+  const displayName = `${currentStudent.firstName || ""} ${currentStudent.lastName || ""}`.trim();
   const nameObj = new fabric.Textbox(displayName, {
     left: frameSlot.left + frameSlot.width / 2,
     top: frameSlot.top + frameSlot.height + 10,

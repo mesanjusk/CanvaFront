@@ -1153,21 +1153,42 @@ useEffect(() => {
     }
   });
 
-// ---- locate the saved text object from template ----
-const templateTextObj = canvas.getObjects().find(o => o.customId === "templateText");
+// Compute display name
 const name = `${currentStudent.firstName || ""} ${currentStudent.lastName || ""}`.trim();
 
-if (name && templateTextObj) {
-  // ✅ Update the existing object instead of adding a new one
-  templateTextObj.set({
+// Try to find existing template text object
+let nameObj = canvas.getObjects().find(o => o.customId === "studentName" || o.customId === "templateText");
+
+if (nameObj) {
+  // ✅ Update existing object
+  nameObj.set({
     text: name,
     selectable: false,
-    evented: false,
-    customId: "studentName"   // optional tag if you still want it
+    evented: false
   });
+} else {
+  // ✅ If not found, create a new text object
+  const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
+  if (!frameSlot) return; // can't position name without frame
 
-  canvas.requestRenderAll();
+  nameObj = new fabric.Text(name, {
+    left: frameSlot.left + frameSlot.width / 2,
+    top: frameSlot.top + frameSlot.height + 10,
+    fontSize: 28,
+    fill: "#000",
+    fontFamily: "Arial",
+    fontWeight: "bold",
+    originX: "center",
+    originY: "top",
+    selectable: false,
+    evented: false,
+    customId: "studentName"
+  });
+  canvas.add(nameObj);
 }
+
+// Render
+canvas.requestRenderAll();
 
 
   // ---- frame slot for photo ----

@@ -1132,8 +1132,9 @@ useEffect(() => {
 
 useEffect(() => {
   const currentStudent = bulkMode
-  ? filteredStudents.find(s => s?.uuid === bulkList[bulkIndex]) || null
-  : selectedStudent;
+    ? filteredStudents.find(s => s?.uuid === bulkList[bulkIndex]) || null
+    : selectedStudent;
+
   if (!canvas || !currentStudent) return;
 
   const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
@@ -1143,49 +1144,54 @@ useEffect(() => {
   const oldPhoto = canvas.getObjects().find(o => o.customId === "studentPhoto");
   if (oldPhoto) canvas.remove(oldPhoto);
 
+  // ----- Add student photo -----
   const photoUrl = Array.isArray(currentStudent?.photo) ? currentStudent.photo[0] : currentStudent?.photo;
-  console.log(photoUrl);
   if (photoUrl) {
     fabric.Image.fromURL(photoUrl, (img) => {
       if (!img) return;
 
-      canvas.renderAll();
-      const bounds = frameSlot.getBoundingRect(true);
-      if (!bounds.width || !bounds.height) return;
+      // Wait for the next frame to ensure frameSlot bounds are ready
+      requestAnimationFrame(() => {
+        const bounds = frameSlot.getBoundingRect(true);
+        if (!bounds.width || !bounds.height) {
+          console.warn("FrameSlot bounds not ready yet");
+          return;
+        }
 
-      const scale = Math.min(bounds.width / img.width, bounds.height / img.height);
+        const scale = Math.min(bounds.width / img.width, bounds.height / img.height);
 
-      img.set({
-        left: bounds.left + bounds.width / 2,
-        top: bounds.top + bounds.height / 2,
-        originX: "center",
-        originY: "center",
-        scaleX: scale,
-        scaleY: scale,
-        selectable: false,
-        evented: false,
-        customId: "studentPhoto",
-        clipPath: new fabric.Rect({
-          width: bounds.width,
-          height: bounds.height,
+        img.set({
+          left: bounds.left + bounds.width / 2,
+          top: bounds.top + bounds.height / 2,
           originX: "center",
           originY: "center",
-          absolutePositioned: true
-        })
+          scaleX: scale,
+          scaleY: scale,
+          selectable: false,
+          evented: false,
+          customId: "studentPhoto",
+          clipPath: new fabric.Rect({
+            width: bounds.width,
+            height: bounds.height,
+            originX: "center",
+            originY: "center",
+            absolutePositioned: true
+          })
+        });
+
+        canvas.add(img);
+
+        // Move above the frame
+        const frameIndex = canvas.getObjects().indexOf(frameSlot);
+        if (frameIndex >= 0) img.moveTo(frameIndex + 1);
+
+        canvas.requestRenderAll();
       });
-
-      canvas.add(img);
-
-      // Move above the frame
-      const frameIndex = canvas.getObjects().indexOf(frameSlot);
-      if (frameIndex >= 0) img.moveTo(frameIndex + 1);
-
-      canvas.requestRenderAll();
     }, { crossOrigin: "anonymous" });
   }
 
-  // ----- Remove old student name -----
-   const oldName = canvas.getObjects().find(o => o.customId === "studentName");
+  // ----- Remove old student name and placeholder -----
+  const oldName = canvas.getObjects().find(o => o.customId === "studentName");
   if (oldName) canvas.remove(oldName);
 
   const placeholder = canvas.getObjects().find(o => o.customId === "templateText");
@@ -1208,10 +1214,12 @@ useEffect(() => {
     evented: false,
     customId: "studentName"
   });
+
   canvas.add(nameObj);
   canvas.requestRenderAll();
 
-}, [canvas, selectedStudent]);
+}, [canvas, selectedStudent, bulkMode, bulkIndex]);
+
 
 /* ======================= 5. Helper to load assets (logo/signature) ======================= */
 function loadTemplateAsset(id, url, canvas) {

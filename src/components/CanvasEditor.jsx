@@ -1025,16 +1025,6 @@ const saveProps = (key, value) => {
   }
 };
 
-function getSavedProps(key) {
-  try {
-    const tpl = activeTemplateId || "global";
-    const v = localStorage.getItem(`canvas_props_${tpl}_${key}`);
-    return v ? JSON.parse(v) : null;
-  } catch {
-    return null;
-  }
-}
-
 function cacheTemplatePlaceholders(canvas) {
   if (!canvas) return;
 

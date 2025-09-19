@@ -1153,26 +1153,22 @@ useEffect(() => {
     }
   });
 
-  // ---- locate the saved text object from template ----
-  const templateTextObj = canvas.getObjects().find(o => o.customId === "templateText");
-  const name = `${currentStudent.firstName || ""} ${currentStudent.lastName || ""}`.trim();
-  if (name && templateTextObj) {
-    const nameObj = new fabric.Textbox(name, {
-      left: templateTextObj.left,
-      top: templateTextObj.top,
-      originX: templateTextObj.originX,
-      originY: templateTextObj.originY,
-      fontSize: templateTextObj.fontSize,
-      fontFamily: templateTextObj.fontFamily,
-      fill: templateTextObj.fill,
-      fontWeight: templateTextObj.fontWeight,
-      width: templateTextObj.width,
-      selectable: false,
-      evented: false,
-      customId: "studentName"
-    });
-    canvas.add(nameObj);
-  }
+// ---- locate the saved text object from template ----
+const templateTextObj = canvas.getObjects().find(o => o.customId === "templateText");
+const name = `${currentStudent.firstName || ""} ${currentStudent.lastName || ""}`.trim();
+
+if (name && templateTextObj) {
+  // ✅ Update the existing object instead of adding a new one
+  templateTextObj.set({
+    text: name,
+    selectable: false,
+    evented: false,
+    customId: "studentName"   // optional tag if you still want it
+  });
+
+  canvas.requestRenderAll();
+}
+
 
   // ---- frame slot for photo ----
   const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");

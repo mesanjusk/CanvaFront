@@ -1079,105 +1079,61 @@ function attachSaveHandlers(img) {
   img.on("modified", persist);
 }
 
-/* ======================= Unified Student Render ======================= */
 useEffect(() => {
   if (!canvas || !selectedStudent) return;
 
-  // Ensure canvas has context
-  if (!canvas.getContext || !canvas.getContext()) {
-    console.warn("Canvas not ready yet.");
-    return;
-  }
-
-  // 1️⃣ Find frameSlot
-  const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
-  if (!frameSlot) {
-    console.warn("No frameSlot found on canvas.");
-    return;
-  }
-
-  // 2️⃣ Remove previous student objects
-  canvas.getObjects()
-    .filter(o => ["studentPhoto", "studentName"].includes(o.customId))
-    .forEach(o => canvas.remove(o));
+  // -------- Remove old student objects --------
+  canvas.getObjects().forEach(obj => {
+    if (["studentPhoto", "studentName"].includes(obj.customId)) {
+      canvas.remove(obj);
+    }
+  });
   studentObjectsRef.current = [];
 
-  // 3️⃣ Add student name
-  const displayName = `${selectedStudent.firstName || ""} ${selectedStudent.lastName || ""}`.trim();
-  const savedName = getSavedProps("studentName");
-  const nameObj = new fabric.Textbox(displayName, {
-    left: savedName?.left ?? frameSlot.left,
-    top: savedName?.top ?? frameSlot.top + frameSlot.height + 10,
-    fontSize: savedName?.fontSize ?? 28,
-    fill: savedName?.fill ?? "#000",
-    fontFamily: savedName?.fontFamily || "Arial",
-    fontWeight: savedName?.fontWeight ?? "bold",
-    textAlign: savedName?.textAlign || "center",
-    originX: savedName?.originX ?? "center",
-    originY: savedName?.originY ?? "top",
-    width: savedName?.width ?? frameSlot.width,
-    selectable: false,
-    evented: false,
-    customId: "studentName",
-  });
-  canvas.add(nameObj);
-  studentObjectsRef.current.push(nameObj);
+  // -------- Find frameSlot --------
+  const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
 
-  // 4️⃣ Add student photo
+  // -------- Add student photo --------
   const photoUrl = Array.isArray(selectedStudent.photo)
     ? selectedStudent.photo[0]
     : selectedStudent.photo;
 
-  if (!photoUrl) {
-    console.warn("No photo URL for student:", selectedStudent);
-    return;
-  }
+  if (frameSlot && photoUrl) {
+    const bounds = frameSlot.getBoundingRect();
 
-  // Preload image to avoid broken image errors
-  const imgCheck = new Image();
-  imgCheck.crossOrigin = "anonymous";
-  imgCheck.src = photoUrl;
-  imgCheck.onload = () => {
-    try {
-      fabric.Image.fromURL(photoUrl, img => {
-        if (!img) {
-          console.error("Fabric returned null image");
-          return;
-        }
+    fabric.Image.fromURL(
+      photoUrl,
+      img => {
+        if (!img) return;
 
-        const bounds = frameSlot.getBoundingRect();
-        if (!bounds.width || !bounds.height) {
-          console.warn("Invalid frameSlot bounds:", bounds);
-          return;
-        }
-
-        // Create clip shape depending on frame type
+        // Create clip path
         let clipShape;
-        switch (frameSlot.type) {
-          case "circle":
-            clipShape = new fabric.Circle({
-              radius: (frameSlot.radius || frameSlot.width / 2) * (frameSlot.scaleX ?? 1),
-              originX: "center",
-              originY: "center",
-            });
-            break;
-          case "path":
-            if (frameSlot.path) {
-              clipShape = new fabric.Path(frameSlot.path, { originX: "center", originY: "center" });
-              clipShape.scaleX = frameSlot.scaleX ?? 1;
-              clipShape.scaleY = frameSlot.scaleY ?? 1;
-            }
-            break;
-          default:
-            clipShape = new fabric.Rect({
-              width: bounds.width,
-              height: bounds.height,
-              originX: "center",
-              originY: "center",
-            });
+        if (frameSlot.type === "circle") {
+          clipShape = new fabric.Circle({
+            radius: bounds.width / 2,
+            originX: "center",
+            originY: "center",
+            absolutePositioned: true
+          });
+        } else if (frameSlot.type === "path" && frameSlot.path) {
+          clipShape = new fabric.Path(frameSlot.path, {
+            originX: "center",
+            originY: "center",
+            absolutePositioned: true
+          });
+          clipShape.scaleX = frameSlot.scaleX ?? 1;
+          clipShape.scaleY = frameSlot.scaleY ?? 1;
+        } else {
+          clipShape = new fabric.Rect({
+            width: bounds.width,
+            height: bounds.height,
+            originX: "center",
+            originY: "center",
+            absolutePositioned: true
+          });
         }
 
-        // Scale image to fit the frame
+        // Scale image into frame
         const scale = Math.min(bounds.width / img.width, bounds.height / img.height);
         img.set({
           left: bounds.left + bounds.width / 2,
@@ -1189,27 +1145,44 @@ useEffect(() => {
           clipPath: clipShape,
           selectable: false,
           evented: false,
-          customId: "studentPhoto",
+          customId: "studentPhoto"
         });
 
         canvas.add(img);
-        frameSlot.bringToFront();
+        img.moveTo(frameSlot.index); // keep photo inside frame layer
         studentObjectsRef.current.push(img);
         attachSaveHandlers(img);
         canvas.requestRenderAll();
-      }, { crossOrigin: "anonymous" });
-    } catch (err) {
-      console.error("Fabric image error:", err);
-    }
-  };
+      },
+      { crossOrigin: "anonymous" }
+    );
+  }
 
-  imgCheck.onerror = e => {
-    console.error("Image failed to load:", photoUrl, e);
-  };
+  // -------- Add student name --------
+  const displayName = `${selectedStudent.firstName || ""} ${selectedStudent.lastName || ""}`.trim();
+  const savedName = getSavedProps("studentName");
+
+  const nameObj = new fabric.Textbox(displayName, {
+    left: savedName?.left ?? (frameSlot ? frameSlot.left + frameSlot.width / 2 : canvas.width / 2),
+    top: savedName?.top ?? (frameSlot ? frameSlot.top + frameSlot.height + 10 : canvas.height - 80),
+    fontSize: savedName?.fontSize ?? 28,
+    fill: savedName?.fill ?? "#000",
+    fontFamily: savedName?.fontFamily || "Arial",
+    fontWeight: savedName?.fontWeight ?? "bold",
+    textAlign: savedName?.textAlign || "center",
+    originX: savedName?.originX ?? "center",
+    originY: savedName?.originY ?? "top",
+    width: savedName?.width ?? (frameSlot?.width ?? canvas.width - 40),
+    selectable: false,
+    evented: false,
+    customId: "studentName"
+  });
+
+  canvas.add(nameObj);
+  studentObjectsRef.current.push(nameObj);
 
   canvas.requestRenderAll();
 }, [canvas, selectedStudent]);
-
 
 
 
@@ -1337,92 +1310,138 @@ function attachSaveHandlers(img) {
 
 
 
-const canvasJsonRef = useRef(null); // ← Add this at top of component
+const canvasJsonRef = useRef(null); // keep this at top
 
 useEffect(() => {
   if (!canvas || !selectedStudent) return;
 
-  // -------- Clear previous objects --------
-  canvas.getObjects().forEach(obj => {
-    if (["studentPhoto", "studentName", "logo", "signature"].includes(obj.customId)) {
-      canvas.remove(obj);
-    }
-  });
+  // 🔹 Clear the whole canvas before loading new stuff
+  canvas.clear();
   studentObjectsRef.current = [];
 
-  // -------- Add template background --------
-  if (templateImage) {
-    const drawBg = bg => {
-      bg.scaleX = canvas.width / bg.width;
-      bg.scaleY = canvas.height / bg.height;
-      bg.set({ selectable: false, evented: false });
-      canvas.add(bg);
-      bg.sendToBack();
-      bgRef.current = bg;
-    };
-    if (templateImage.clone) templateImage.clone(drawBg);
-    else drawBg(templateImage);
-  }
+  const drawBg = (bg) => {
+    bg.scaleX = canvas.width / bg.width;
+    bg.scaleY = canvas.height / bg.height;
+    bg.set({ selectable: false, evented: false });
+    canvas.add(bg);
+    bg.sendToBack();
+    bgRef.current = bg;
+    console.log("[debug] Background added:", bg);
+  };
 
-  // -------- Load template JSON (frameSlot & placeholders) --------
-  const json = canvasJsonRef?.current;
+  // -------- Load template JSON --------
+  const json = canvasJsonRef.current;
   if (json) {
+    console.log("[debug] Loading JSON into canvas:", json);
+
     canvas.loadFromJSON(json, () => {
+      console.log("[debug] JSON loaded, objects:", canvas.getObjects());
+
+      // Normalize customIds
       canvas.getObjects().forEach(o => {
-        if (o.type === "i-text" && (!o.customId || /text/i.test(o.customId))) o.customId = "studentName";
-        if (o.customId === "frameSlot" || (o.type === "path" && (o.stroke === "#7c3aed" || o.stroke === "rgb(124,58,237)"))) o.customId = "frameSlot";
+        if (o.type === "i-text" && (!o.customId || /text/i.test(o.customId))) {
+          o.customId = "studentName";
+        }
+        if (
+          o.customId === "frameSlot" ||
+          (o.type === "path" &&
+            (o.stroke === "#7c3aed" || o.stroke === "rgb(124,58,237)"))
+        ) {
+          o.customId = "frameSlot";
+        }
       });
 
-      // -------- Add student photo --------
-      const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
-      const photoUrl = Array.isArray(selectedStudent.photo) ? selectedStudent.photo[0] : selectedStudent.photo;
-
-      if (frameSlot && photoUrl) {
-        const bounds = frameSlot.getBoundingRect();
-
-        fabric.Image.fromURL(photoUrl, img => {
-          if (!img) return;
-
-          // Clip path
-          let clipShape;
-          if (frameSlot.type === "circle") {
-            clipShape = new fabric.Circle({ radius: bounds.width / 2, originX: "center", originY: "center" });
-          } else if (frameSlot.type === "path" && frameSlot.path) {
-            clipShape = new fabric.Path(frameSlot.path, { originX: "center", originY: "center" });
-            clipShape.scaleX = frameSlot.scaleX ?? 1;
-            clipShape.scaleY = frameSlot.scaleY ?? 1;
-          } else {
-            clipShape = new fabric.Rect({ width: bounds.width, height: bounds.height, originX: "center", originY: "center" });
-          }
-
-          const scale = Math.min(bounds.width / img.width, bounds.height / img.height);
-          img.set({
-            left: bounds.left + bounds.width / 2,
-            top: bounds.top + bounds.height / 2,
-            originX: "center",
-            originY: "center",
-            scaleX: scale,
-            scaleY: scale,
-            clipPath: clipShape,
-            selectable: false,
-            evented: false,
-            customId: "studentPhoto"
-          });
-
-          canvas.add(img);
-          frameSlot.bringToFront();
-          studentObjectsRef.current.push(img);
-          attachSaveHandlers(img);
-          canvas.requestRenderAll();
-        }, { crossOrigin: "anonymous" });
+      // 🔹 Add background AFTER JSON is loaded
+      if (templateImage) {
+        if (templateImage.clone) templateImage.clone(drawBg);
+        else drawBg(templateImage);
       }
 
-      // -------- Add student name --------
+      // -------- Student photo --------
+      const photoUrl = Array.isArray(selectedStudent.photo)
+        ? selectedStudent.photo[0]
+        : selectedStudent.photo;
+
+      console.log("[debug] Selected student photo URL:", photoUrl);
+
+      setTimeout(() => {
+        const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
+        console.log("[debug] FrameSlot found:", frameSlot);
+
+        if (frameSlot && photoUrl) {
+          const bounds = frameSlot.getBoundingRect();
+          console.log("[debug] FrameSlot bounds:", bounds);
+
+          fabric.Image.fromURL(
+            photoUrl,
+            (img) => {
+              if (!img) {
+                console.warn("[debug] Image failed to load:", photoUrl);
+                return;
+              }
+              console.log("[debug] Student photo loaded:", img);
+
+              // Clip path
+              let clipShape;
+              if (frameSlot.type === "circle") {
+                clipShape = new fabric.Circle({
+                  radius: bounds.width / 2,
+                  originX: "center",
+                  originY: "center"
+                });
+              } else if (frameSlot.type === "path" && frameSlot.path) {
+                clipShape = new fabric.Path(frameSlot.path, {
+                  originX: "center",
+                  originY: "center"
+                });
+                clipShape.scaleX = frameSlot.scaleX ?? 1;
+                clipShape.scaleY = frameSlot.scaleY ?? 1;
+              } else {
+                clipShape = new fabric.Rect({
+                  width: bounds.width,
+                  height: bounds.height,
+                  originX: "center",
+                  originY: "center"
+                });
+              }
+
+              const scale = Math.min(bounds.width / img.width, bounds.height / img.height);
+              img.set({
+                left: bounds.left + bounds.width / 2,
+                top: bounds.top + bounds.height / 2,
+                originX: "center",
+                originY: "center",
+                scaleX: scale,
+                scaleY: scale,
+                clipPath: clipShape,
+                selectable: false,
+                evented: false,
+                customId: "studentPhoto"
+              });
+
+              canvas.add(img);
+              frameSlot.bringToFront();
+              studentObjectsRef.current.push(img);
+              attachSaveHandlers(img);
+              canvas.requestRenderAll();
+
+              console.log("[debug] Student photo added to canvas");
+            },
+            { crossOrigin: "anonymous" }
+          );
+        } else {
+          console.warn("[debug] No frameSlot or photoUrl found — skipping photo");
+        }
+      }, 50);
+
+      // -------- Student name --------
       const displayName = `${selectedStudent.firstName || ""} ${selectedStudent.lastName || ""}`.trim();
+      console.log("[debug] Student display name:", displayName);
+
       const savedName = getSavedProps("studentName");
       const nameObj = new fabric.Textbox(displayName, {
         left: savedName?.left ?? canvas.width / 2,
-        top: savedName?.top ?? (frameSlot ? frameSlot.top + frameSlot.height + 10 : canvas.height - 80),
+        top: savedName?.top ?? canvas.height - 80,
         fontSize: savedName?.fontSize ?? 28,
         fill: savedName?.fill ?? "#000",
         fontFamily: savedName?.fontFamily || "Arial",
@@ -1430,36 +1449,52 @@ useEffect(() => {
         textAlign: savedName?.textAlign || "center",
         originX: savedName?.originX ?? "center",
         originY: savedName?.originY ?? "top",
-        width: savedName?.width ?? (frameSlot?.width ?? canvas.width - 40),
+        width: savedName?.width ?? canvas.width - 40,
         selectable: false,
         evented: false,
         customId: "studentName"
       });
       canvas.add(nameObj);
       studentObjectsRef.current.push(nameObj);
+      console.log("[debug] Student name added:", nameObj);
 
-      // -------- Add logo and signature --------
+      // -------- Logo & signature --------
       const addImageField = (src, ref, id, defaultScale = 0.2) => {
-        if (!src || canvas.getObjects().find(o => o.customId === id)) return;
+        if (!src || canvas.getObjects().some(o => o.customId === id)) return;
         const saved = getSavedProps(id);
-        fabric.Image.fromURL(src, img => {
-          if (saved) {
-            img.set({
-              left: saved.left ?? 20,
-              top: saved.top ?? 20,
-              scaleX: saved.width && img.width ? saved.width / img.width : saved.scaleX ?? 1,
-              scaleY: saved.height && img.height ? saved.height / img.height : saved.scaleY ?? 1,
-              angle: saved.angle ?? 0
-            });
-          } else {
-            img.scaleToWidth(canvas.width * defaultScale);
-            img.set({ left: 20, top: 20 });
-          }
-          img.customId = id;
-          ref.current = img;
-          canvas.add(img);
-          img.setCoords();
-        }, { crossOrigin: "anonymous" });
+        fabric.Image.fromURL(
+          src,
+          (img) => {
+            if (!img) {
+              console.warn("[debug] Failed to load image field:", id, src);
+              return;
+            }
+            if (saved) {
+              img.set({
+                left: saved.left ?? 20,
+                top: saved.top ?? 20,
+                scaleX:
+                  saved.width && img.width
+                    ? saved.width / img.width
+                    : saved.scaleX ?? 1,
+                scaleY:
+                  saved.height && img.height
+                    ? saved.height / img.height
+                    : saved.scaleY ?? 1,
+                angle: saved.angle ?? 0
+              });
+            } else {
+              img.scaleToWidth(canvas.width * defaultScale);
+              img.set({ left: 20, top: 20 });
+            }
+            img.customId = id;
+            ref.current = img;
+            canvas.add(img);
+            img.setCoords();
+            console.log(`[debug] ${id} added:`, img);
+          },
+          { crossOrigin: "anonymous" }
+        );
       };
 
       if (showLogo) addImageField(selectedInstitute?.logo, logoRef, "logo", 0.2);
@@ -1468,8 +1503,7 @@ useEffect(() => {
       canvas.requestRenderAll();
     });
   }
-}, [canvas, templateImage, canvasJsonRef?.current, selectedStudent, selectedInstitute, showLogo, showSignature]);
-
+}, [canvas, templateImage, canvasJsonRef, selectedStudent, selectedInstitute, showLogo, showSignature]);
 
   /* ============================= Canvas events ============================ */
   useEffect(() => {

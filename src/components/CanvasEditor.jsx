@@ -1130,21 +1130,27 @@ useEffect(() => {
   if (templateId) loadTemplateById(templateId);
 }, [templateId, loadTemplateById]);
 
-/* ======================= 4. Render Student Photo & Name ======================= */
 useEffect(() => {
   if (!canvas || !selectedStudent) return;
 
+  // Find the frame slot (wait until loaded)
   const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
   if (!frameSlot) return;
 
-  // Remove old photo
+  // ----- Remove old student photo -----
   const oldPhoto = canvas.getObjects().find(o => o.customId === "studentPhoto");
   if (oldPhoto) canvas.remove(oldPhoto);
 
   const photoUrl = Array.isArray(selectedStudent.photo) ? selectedStudent.photo[0] : selectedStudent.photo;
   if (photoUrl) {
-    fabric.Image.fromURL(photoUrl, img => {
-      const bounds = frameSlot.getBoundingRect();
+    fabric.Image.fromURL(photoUrl, (img) => {
+      if (!img) return;
+
+      // Get frame bounds AFTER template is fully rendered
+      canvas.renderAll(); // ensure frameSlot has correct bounding rect
+      const bounds = frameSlot.getBoundingRect(true); // include stroke
+      if (!bounds.width || !bounds.height) return; // exit if invalid
+
       const scale = Math.min(bounds.width / img.width, bounds.height / img.height);
 
       img.set({
@@ -1157,7 +1163,12 @@ useEffect(() => {
         selectable: false,
         evented: false,
         customId: "studentPhoto",
-        clipPath: new fabric.Rect({ width: bounds.width, height: bounds.height, originX: "center", originY: "center" })
+        clipPath: new fabric.Rect({
+          width: bounds.width,
+          height: bounds.height,
+          originX: "center",
+          originY: "center"
+        })
       });
 
       canvas.add(img);
@@ -1166,9 +1177,9 @@ useEffect(() => {
     }, { crossOrigin: "anonymous" });
   }
 
-  // Remove old name
-  const oldName = canvas.getObjects().find(o => o.customId === "studentName");
-  if (oldName) canvas.remove(oldName);
+  // ----- Replace placeholder text with student name -----
+  const placeholder = canvas.getObjects().find(o => o.customId === "templateText");
+  if (placeholder) canvas.remove(placeholder); // remove "Double click to edit"
 
   const displayName = `${selectedStudent.firstName || ""} ${selectedStudent.lastName || ""}`.trim();
   const nameObj = new fabric.Textbox(displayName, {

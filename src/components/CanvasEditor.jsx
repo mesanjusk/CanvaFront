@@ -1139,7 +1139,6 @@ function safeLoadImage(url, callback) {
   img.src = url;
 }
 
-// ----- Main useEffect -----
 useEffect(() => {
   const currentStudent = bulkMode
     ? filteredStudents.find(s => s?.uuid === bulkList[bulkIndex]) || null
@@ -1154,11 +1153,15 @@ useEffect(() => {
   const placeholder = canvas.getObjects().find(o => o.customId === "templateText");
   if (placeholder) canvas.remove(placeholder);
 
-  // ----- Add student name -----
+  // ----- Get frameSlot -----
+  const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
+  if (!frameSlot) return;
+
+  // ----- Add student name below the frame -----
   const displayName = `${currentStudent.firstName || ""} ${currentStudent.lastName || ""}`.trim();
   const nameObj = new fabric.Textbox(displayName, {
-    left: canvas.width / 2, // center horizontally
-    top: canvas.height * 0.7, // below photo
+    left: frameSlot.left + frameSlot.width / 2,
+    top: frameSlot.top + frameSlot.height + 10,
     fontSize: 28,
     fill: "#000",
     fontFamily: "Arial",
@@ -1166,85 +1169,70 @@ useEffect(() => {
     textAlign: "center",
     originX: "center",
     originY: "top",
-    width: 300, // adjust as needed
+    width: frameSlot.width,
     selectable: false,
     evented: false,
     customId: "studentName"
   });
   canvas.add(nameObj);
 
-  // ----- Student photo logic -----
-  const current = currentStudent;
-  const photoUrl = Array.isArray(current?.photo) ? current.photo[0] : current?.photo;
-  const savedPhoto = getSavedProps("studentPhoto") || {};
-  const photoLeft  = savedPhoto.left ?? Math.round(canvas.width * 0.5);
-  const photoTop   = savedPhoto.top  ?? Math.round(canvas.height * 0.33);
-  const savedShape = savedPhoto.shape || null;
+  // ----- Add or update student photo -----
+  const photoUrl = Array.isArray(currentStudent?.photo) ? currentStudent.photo[0] : currentStudent?.photo;
+  if (!photoUrl) return;
 
-  if (photoUrl) {
-    const existingPhoto = canvas.getObjects().find(obj => obj.customId === "studentPhoto");
+  const existingPhoto = canvas.getObjects().find(obj => obj.customId === "studentPhoto");
 
-    if (existingPhoto) {
-      // Update existing photo
-      existingPhoto.set({
-        left:   savedPhoto.left   ?? existingPhoto.left,
-        top:    savedPhoto.top    ?? existingPhoto.top,
-        scaleX: savedPhoto.scaleX ?? existingPhoto.scaleX,
-        scaleY: savedPhoto.scaleY ?? existingPhoto.scaleY,
-      });
-      canvas.requestRenderAll();
-    } else {
-      // Load new photo
-      safeLoadImage(photoUrl, img => {
-        const phWidth  = Math.min(400, canvas.width * 0.6);
-        const phHeight = Math.min(400, canvas.height * 0.6);
-        const autoScale = Math.min(phWidth / img.width, phHeight / img.height, 1);
+  // Helper to load image safely
+  const safeLoadImage = (url, callback) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => callback(new fabric.Image(img));
+    img.onerror = () => console.error("Failed to load image:", url);
+    img.src = url;
+  };
 
-        img.set({
+  if (!existingPhoto) {
+    safeLoadImage(photoUrl, img => {
+      const bounds = frameSlot.getBoundingRect(true);
+      if (!bounds.width || !bounds.height) return;
+
+      const scale = Math.min(bounds.width / img.width, bounds.height / img.height);
+
+      img.set({
+        originX: "center",
+        originY: "center",
+        left: bounds.left + bounds.width / 2,
+        top: bounds.top + bounds.height / 2,
+        scaleX: scale,
+        scaleY: scale,
+        selectable: false,
+        evented: false,
+        customId: "studentPhoto",
+        clipPath: new fabric.Rect({
+          width: bounds.width,
+          height: bounds.height,
           originX: "center",
           originY: "center",
-          left: photoLeft,
-          top: photoTop,
-          scaleX: savedPhoto.scaleX ?? autoScale,
-          scaleY: savedPhoto.scaleY ?? autoScale,
-        });
-        img.customId = "studentPhoto";
-        img.field    = "studentPhoto";
-
-        // Apply frame/clip if saved
-        if (savedShape) {
-          applyMaskAndFrame(canvas, img, savedShape, {
-            stroke: frameBorder,
-            strokeWidth: frameWidth,
-            rx: frameCorner,
-            absolute: false,
-            followImage: true,
-          });
-        }
-
-        img.set({
-          lockMovementX: false,
-          lockMovementY: false,
-          lockScalingX: false,
-          lockScalingY: false,
-          lockRotation: false,
-          hasControls: true,
-          selectable: true,
-          evented: true,
-        });
-
-        img.on("selected", () => setActiveStudentPhoto(img));
-        img.on("deselected", () => setActiveStudentPhoto(null));
-        img.on("mousedblclick", () => {
-          enterAdjustMode(img);
-          fitImageToFrame(img, "cover");
-        });
-
-        canvas.add(img);
-        studentObjectsRef.current.push(img);
-        canvas.requestRenderAll();
+          absolutePositioned: true
+        })
       });
-    }
+
+      canvas.add(img);
+      const frameIndex = canvas.getObjects().indexOf(frameSlot);
+      if (frameIndex >= 0) img.moveTo(frameIndex + 1);
+      canvas.requestRenderAll();
+    });
+  } else {
+    const bounds = frameSlot.getBoundingRect(true);
+    const scale = Math.min(bounds.width / existingPhoto.width, bounds.height / existingPhoto.height);
+
+    existingPhoto.set({
+      left: bounds.left + bounds.width / 2,
+      top: bounds.top + bounds.height / 2,
+      scaleX: scale,
+      scaleY: scale
+    });
+    canvas.requestRenderAll();
   }
 
 }, [canvas, selectedStudent, bulkMode, bulkIndex]);

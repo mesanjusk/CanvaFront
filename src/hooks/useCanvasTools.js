@@ -68,28 +68,74 @@ text.customId = "templateText";
   };
 
   const addImage = (url) => {
-    const canvas = canvasRef.current;
-    if (!canvas || !url) return;
+  const canvas = canvasRef.current;
+  if (!canvas || !url) return;
 
-    fabric.Image.fromURL(
-      url,
-      (img) => {
-        const maxWidth = 300;
-        const scale = Math.min(1, maxWidth / img.width);
-        img.set({
-          left: canvas.width / 2 - (img.width * scale) / 2,
-          top: canvas.height / 2 - (img.height * scale) / 2,
-          scaleX: scale,
-          scaleY: scale,
-          selectable: true,
+  // find the saved frame
+  const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
+  if (!frameSlot) {
+    // no frame? fallback to plain add
+    return fabric.Image.fromURL(url, img => {
+      img.set({
+        left: canvas.width / 2,
+        top:  canvas.height / 2,
+        originX: "center",
+        originY: "center",
+        selectable: true
+      });
+      canvas.add(img);
+      canvas.setActiveObject(img);
+      canvas.requestRenderAll();
+    });
+  }
+
+  // compute bounding box
+  const bounds = frameSlot.getBoundingRect(true);
+
+  fabric.Image.fromURL(url, img => {
+    // clip path that matches frame
+    const clipPath = (frameSlot.type === "path" && frameSlot.path)
+      ? new fabric.Path(frameSlot.path, {
+          originX: "center",
+          originY: "center",
+          left: frameSlot.left,
+          top:  frameSlot.top,
+          scaleX: frameSlot.scaleX || 1,
+          scaleY: frameSlot.scaleY || 1,
+          absolutePositioned: true
+        })
+      : new fabric.Rect({
+          width:  bounds.width,
+          height: bounds.height,
+          originX: "center",
+          originY: "center",
+          left: bounds.left + bounds.width  / 2,
+          top:  bounds.top  + bounds.height / 2,
+          absolutePositioned: true
         });
-        canvas.add(img);
-        canvas.setActiveObject(img);
-        canvas.requestRenderAll();
-      },
-      { crossOrigin: "anonymous" }
-    );
-  };
+
+    // scale so it covers the frame area
+    const scale = Math.max(bounds.width / img.width, bounds.height / img.height);
+
+    img.set({
+      originX: "center",
+      originY: "center",
+      left: bounds.left + bounds.width  / 2,
+      top:  bounds.top  + bounds.height / 2,
+      scaleX: scale,
+      scaleY: scale,
+      clipPath,
+      selectable: true,
+      customId: "uploadedPhoto"   // optional tag
+    });
+
+    // add right above the frame
+    canvas.add(img);
+    img.moveTo(canvas.getObjects().indexOf(frameSlot) + 1);
+    canvas.setActiveObject(img);
+    canvas.requestRenderAll();
+  }, { crossOrigin: "anonymous" });
+}
 
   const handleCroppedImage = (dataUrl) => {
     addImage(dataUrl);

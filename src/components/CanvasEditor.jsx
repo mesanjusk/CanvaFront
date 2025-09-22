@@ -343,17 +343,17 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     setCanvasSize,
   } = useCanvasTools({ width: tplSize.w, height: tplSize.h });
 
-  const handleUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        setCropSrc(reader.result);
-        cropCallbackRef.current = (croppedUrl) => addImage(croppedUrl);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
+const handleUpload = (e) => { 
+  const file = e.target.files?.[0]; 
+  if (file) { 
+    const reader = new FileReader(); 
+    reader.onload = () => { 
+      setCropSrc(reader.result); 
+      cropCallbackRef.current = (croppedUrl) => addImage(croppedUrl); 
+    }; 
+    reader.readAsDataURL(file); 
+  } 
+};
 
   const {
     activeObj,

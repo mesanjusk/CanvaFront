@@ -1069,9 +1069,12 @@ const renderTemplate = useCallback(async (data) => {
     .filter(o => o?.customId && templateIds.includes(o.customId))
     .forEach(o => canvas.remove(o));
 
-  // Set canvas size
-  const w = Number(data?.width) || canvas.width;
-  const h = Number(data?.height) || canvas.height;
+   /* ---- 1️⃣  Resize canvas ---- */
+  const parent = stageRef.current;
+  const w = Number(data?.width)  || parent.offsetWidth  || 600;
+  const h = Number(data?.height) || parent.offsetHeight || 400;
+  canvas.setWidth(w);
+  canvas.setHeight(h);
   setTplSize({ w, h });
   setCanvasSize?.(w, h);
 
@@ -1079,9 +1082,13 @@ const renderTemplate = useCallback(async (data) => {
   if (data?.image) {
     await new Promise(resolve => {
       fabric.Image.fromURL(data.image, img => {
-        img.set({ selectable: false, evented: false, customId: "templateBg" });
-        img.scaleX = canvas.width / img.width;
-        img.scaleY = canvas.height / img.height;
+       img.set({
+            selectable: false,
+            evented: false,
+            customId: "templateBg",
+            scaleX: w / img.width,
+            scaleY: h / img.height
+          });
         canvas.add(img);
         img.sendToBack();
         resolve();
@@ -2184,7 +2191,7 @@ if (saved?.canvas) {
       {/* CENTER / Canva-like viewport */}
       <main
         ref={viewportRef}
-        className={`absolute bg-gray-100 top-14 left-0 right-0 ${isRightbarOpen ? "md:right-80" : "right-0"} bottom-14 md:bottom-16 overflow-auto flex items-center justify-center`}
+        className={`absolute bg-gray-100 top-14 left-0 right-0 bottom-0 ${isRightbarOpen ? "md:right-80" : "right-0"} overflow-auto flex items-center justify-center`}
       >
       <div className="flex flex-col items-center">
         <div

@@ -1217,8 +1217,6 @@ canvas.requestRenderAll();
   const perStudent = studentLayoutsRef.current?.[currentStudent.uuid]?.studentPhotoProps;
   const savedPhoto = perStudent ?? getSavedProps("studentPhoto") ?? {};
 
-const scale = Math.max(bounds.width / img.width, bounds.height / img.height);
-
   safeLoadImage(photoUrl, img => {
     if (!img) return;
 

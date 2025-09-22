@@ -1220,26 +1220,42 @@ canvas.requestRenderAll();
   safeLoadImage(photoUrl, img => {
     if (!img) return;
 
-    // clipPath matching the frameSlot
-    const clipPath = frameSlot.type === "path" && frameSlot.path
-      ? new fabric.Path(frameSlot.path, {
-          originX: "center",
-          originY: "center",
-          left: frameSlot.left,
-          top:  frameSlot.top,
-          scaleX: frameSlot.scaleX || 1,
-          scaleY: frameSlot.scaleY || 1,
-          absolutePositioned: true
-        })
-      : new fabric.Rect({
-          width:  bounds.width,
-          height: bounds.height,
-          originX: "center",
-          originY: "center",
-          left: bounds.left + bounds.width  / 2,
-          top:  bounds.top  + bounds.height / 2,
-          absolutePositioned: true
-        });
+  let clipPath;
+if (frameSlot.type === "path" && frameSlot.path) {
+  // Case 1: Path-based frame
+  clipPath = new fabric.Path(frameSlot.path, {
+    originX: "center",
+    originY: "center",
+    left: frameSlot.left,
+    top: frameSlot.top,
+    scaleX: frameSlot.scaleX || 1,
+    scaleY: frameSlot.scaleY || 1,
+    absolutePositioned: true
+  });
+} else if (frameSlot.type === "polygon" && frameSlot.points) {
+  // ✅ Case 2: Polygon (your hexagon frame)
+  clipPath = new fabric.Polygon(frameSlot.points, {
+    originX: "center",
+    originY: "center",
+    left: frameSlot.left,
+    top: frameSlot.top,
+    scaleX: frameSlot.scaleX || 1,
+    scaleY: frameSlot.scaleY || 1,
+    absolutePositioned: true
+  });
+} else {
+  // Fallback rectangle
+  clipPath = new fabric.Rect({
+    width: bounds.width,
+    height: bounds.height,
+    originX: "center",
+    originY: "center",
+    left: bounds.left + bounds.width / 2,
+    top: bounds.top + bounds.height / 2,
+    absolutePositioned: true
+  });
+}
+
 
     const scale = Math.max(bounds.width / img.width, bounds.height / img.height);
 

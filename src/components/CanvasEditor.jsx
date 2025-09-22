@@ -1160,33 +1160,43 @@ useEffect(() => {
     }
   });
 
-  // ---- display name ----
-  const name = `${currentStudent.firstName || ""} ${currentStudent.lastName || ""}`.trim();
-  let nameObj = canvas.getObjects().find(
-    o => o.customId === "studentName" || o.customId === "templateText"
-  );
+// Compute display name
+const name = `${currentStudent.firstName || ""} ${currentStudent.lastName || ""}`.trim();
 
-  if (nameObj) {
-    nameObj.set({ text: name, selectable: false, evented: false });
-  } else {
-    const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
-    if (!frameSlot) return;
-    nameObj = new fabric.Text(name, {
-      left: frameSlot.left + frameSlot.width / 2,
-      top: frameSlot.top + frameSlot.height + 10,
-      fontSize: 28,
-      fill: "#000",
-      fontFamily: "Arial",
-      fontWeight: "bold",
-      originX: "center",
-      originY: "top",
-      selectable: false,
-      evented: false,
-      customId: "studentName"
-    });
-    canvas.add(nameObj);
-  }
-  canvas.requestRenderAll();
+// Try to find existing template text object
+let nameObj = canvas.getObjects().find(o => o.customId === "studentName" || o.customId === "templateText");
+
+if (nameObj) {
+  // ✅ Update existing object
+  nameObj.set({
+    text: name,
+    selectable: false,
+    evented: false
+  });
+} else {
+  // ✅ If not found, create a new text object
+  const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
+  if (!frameSlot) return; // can't position name without frame
+
+  nameObj = new fabric.Text(name, {
+    left: frameSlot.left + frameSlot.width / 2,
+    top: frameSlot.top + frameSlot.height + 10,
+    fontSize: 28,
+    fill: "#000",
+    fontFamily: "Arial",
+    fontWeight: "bold",
+    originX: "center",
+    originY: "top",
+    selectable: false,
+    evented: false,
+    customId: "studentName"
+  });
+  canvas.add(nameObj);
+}
+
+// Render
+canvas.requestRenderAll();
+
 
   // ---- frame slot for photo ----
   const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
@@ -1207,16 +1217,31 @@ useEffect(() => {
   const perStudent = studentLayoutsRef.current?.[currentStudent.uuid]?.studentPhotoProps;
   const savedPhoto = perStudent ?? getSavedProps("studentPhoto") ?? {};
 
+const scale = Math.max(bounds.width / img.width, bounds.height / img.height);
+
   safeLoadImage(photoUrl, img => {
     if (!img) return;
 
-    frameSlot.clone(clone => {
-    // make sure the clone is non-interactive and absolutely positioned
-    clone.set({
-      absolutePositioned: true,
-      selectable: false,
-      evented: false
-    })
+    // clipPath matching the frameSlot
+    const clipPath = frameSlot.type === "path" && frameSlot.path
+      ? new fabric.Path(frameSlot.path, {
+          originX: "center",
+          originY: "center",
+          left: frameSlot.left,
+          top:  frameSlot.top,
+          scaleX: frameSlot.scaleX || 1,
+          scaleY: frameSlot.scaleY || 1,
+          absolutePositioned: true
+        })
+      : new fabric.Rect({
+          width:  bounds.width,
+          height: bounds.height,
+          originX: "center",
+          originY: "center",
+          left: bounds.left + bounds.width  / 2,
+          top:  bounds.top  + bounds.height / 2,
+          absolutePositioned: true
+        });
 
     const scale = Math.max(bounds.width / img.width, bounds.height / img.height);
 
@@ -1231,10 +1256,10 @@ useEffect(() => {
       selectable: true,
       evented: true,
       customId: "studentPhoto",
-      clipPath        // 👈 hexagon/shape masking happens here
+      clipPath
     });
 
-    // persist per-student transform
+    // Persist per-student transform
     const persist = () => {
       const uuid = currentStudent.uuid;
       if (!studentLayoutsRef.current[uuid]) studentLayoutsRef.current[uuid] = {};
@@ -1254,15 +1279,13 @@ useEffect(() => {
     canvas.add(img);
     img.moveTo(canvas.getObjects().indexOf(frameSlot) + 1);
 
-    // optional: hide the purple stroke
+    // hide the purple stroke so only the photo shows
     frameSlot.set({ stroke: null, selectable: false, evented: false });
 
     studentObjectsRef.current.push(img);
     canvas.requestRenderAll();
   });
-});
 }, [canvas, selectedStudent, bulkMode, bulkIndex, filteredStudents, bulkList]);
-
 
 
 

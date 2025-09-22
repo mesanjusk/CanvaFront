@@ -93,48 +93,65 @@ text.customId = "templateText";
   const bounds = frameSlot.getBoundingRect(true);
 
   fabric.Image.fromURL(url, img => {
-    // clip path that matches frame
-    const clipPath = (frameSlot.type === "path" && frameSlot.path)
-      ? new fabric.Path(frameSlot.path, {
-          originX: "center",
-          originY: "center",
-          left: frameSlot.left,
-          top:  frameSlot.top,
-          scaleX: frameSlot.scaleX || 1,
-          scaleY: frameSlot.scaleY || 1,
-          absolutePositioned: true
-        })
-      : new fabric.Rect({
-          width:  bounds.width,
-          height: bounds.height,
-          originX: "center",
-          originY: "center",
-          left: bounds.left + bounds.width  / 2,
-          top:  bounds.top  + bounds.height / 2,
-          absolutePositioned: true
-        });
+  let clipPath;
 
-    // scale so it covers the frame area
-    const scale = Math.max(bounds.width / img.width, bounds.height / img.height);
-
-    img.set({
+  if (frameSlot.type === "path" && frameSlot.path) {
+    // Path frame
+    clipPath = new fabric.Path(frameSlot.path, {
       originX: "center",
       originY: "center",
-      left: bounds.left + bounds.width  / 2,
-      top:  bounds.top  + bounds.height / 2,
-      scaleX: scale,
-      scaleY: scale,
-      clipPath,
-      selectable: true,
-      customId: "uploadedPhoto"   // optional tag
+      left: frameSlot.left,
+      top: frameSlot.top,
+      scaleX: frameSlot.scaleX || 1,
+      scaleY: frameSlot.scaleY || 1,
+      absolutePositioned: true
     });
+  } else if (frameSlot.type === "polygon" && frameSlot.points) {
+    // ✅ Polygon frame (your hexagon)
+    clipPath = new fabric.Polygon(frameSlot.points, {
+      originX: "center",
+      originY: "center",
+      left: frameSlot.left,
+      top: frameSlot.top,
+      scaleX: frameSlot.scaleX || 1,
+      scaleY: frameSlot.scaleY || 1,
+      absolutePositioned: true
+    });
+  } else {
+    // Fallback rectangle
+    clipPath = new fabric.Rect({
+      width: bounds.width,
+      height: bounds.height,
+      originX: "center",
+      originY: "center",
+      left: bounds.left + bounds.width / 2,
+      top: bounds.top + bounds.height / 2,
+      absolutePositioned: true
+    });
+  }
 
-    // add right above the frame
-    canvas.add(img);
-    img.moveTo(canvas.getObjects().indexOf(frameSlot) + 1);
-    canvas.setActiveObject(img);
-    canvas.requestRenderAll();
-  }, { crossOrigin: "anonymous" });
+  // scale so it covers the frame area
+  const scale = Math.max(bounds.width / img.width, bounds.height / img.height);
+
+  img.set({
+    originX: "center",
+    originY: "center",
+    left: bounds.left + bounds.width / 2,
+    top: bounds.top + bounds.height / 2,
+    scaleX: scale,
+    scaleY: scale,
+    clipPath,
+    selectable: true,
+    customId: "uploadedPhoto"
+  });
+
+  // add right above the frame
+  canvas.add(img);
+  img.moveTo(canvas.getObjects().indexOf(frameSlot) + 1);
+  canvas.setActiveObject(img);
+  canvas.requestRenderAll();
+}, { crossOrigin: "anonymous" });
+
 }
 
   const handleCroppedImage = (dataUrl) => {

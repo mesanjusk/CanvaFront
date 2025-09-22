@@ -1210,12 +1210,13 @@ useEffect(() => {
   safeLoadImage(photoUrl, img => {
     if (!img) return;
 
-    // ✅ use an exact clone of frameSlot for perfect masking
-    const clipPath = frameSlot.clone({
+    frameSlot.clone(clone => {
+    // make sure the clone is non-interactive and absolutely positioned
+    clone.set({
       absolutePositioned: true,
       selectable: false,
       evented: false
-    });
+    })
 
     const scale = Math.max(bounds.width / img.width, bounds.height / img.height);
 
@@ -1259,6 +1260,7 @@ useEffect(() => {
     studentObjectsRef.current.push(img);
     canvas.requestRenderAll();
   });
+});
 }, [canvas, selectedStudent, bulkMode, bulkIndex, filteredStudents, bulkList]);
 
 

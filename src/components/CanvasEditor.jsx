@@ -1087,7 +1087,12 @@ const renderTemplate = useCallback(async (data) => {
           img.scaleToWidth(w);
           img.scaleToHeight(h);
 
-          // ✅ Only set as background, not as object
+           // 🔒 Background only, not selectable
+          img.set({
+            selectable: false,
+            evented: false,
+          });
+
           canvas.setBackgroundImage(
             img,
             canvas.renderAll.bind(canvas),

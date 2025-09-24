@@ -1064,7 +1064,7 @@ const renderTemplate = useCallback(async (data) => {
   if (!canvas) return;
 
   // Remove only template objects (leave student photo/name)
-  const templateIds = ["templateBg", "frameSlot", "templateText", "logo", "signature"];
+  const templateIds = ["frameSlot", "templateText", "logo", "signature"];
   canvas.getObjects()
     .filter(o => o?.customId && templateIds.includes(o.customId))
     .forEach(o => canvas.remove(o));
@@ -1078,34 +1078,40 @@ const renderTemplate = useCallback(async (data) => {
   setTplSize({ w, h });
   setCanvasSize?.(w, h);
 
-  // Add background
+   /* ---- 2️⃣ Set background as fixed ---- */
   if (data?.image) {
     await new Promise(resolve => {
-      fabric.Image.fromURL(data.image, img => {
-       img.set({
-            selectable: false,
-            evented: false,
-            customId: "templateBg",
-            scaleX: w / img.width,
-            scaleY: h / img.height
-          });
-        canvas.add(img);
-        img.sendToBack();
-        resolve();
-      }, { crossOrigin: "anonymous" });
+      fabric.Image.fromURL(
+        data.image,
+        (img) => {
+          canvas.setBackgroundImage(
+            img,
+            canvas.renderAll.bind(canvas),
+            {
+              scaleX: w / img.width,
+              scaleY: h / img.height,
+              originX: "left",
+              originY: "top",
+              crossOrigin: "anonymous"
+            }
+          );
+          resolve();
+        }, { crossOrigin: "anonymous" });
     });
   }
 
-  // Load canvas JSON placeholders
+  /* ---- 3️⃣ Load JSON placeholders ---- */
   if (data?.canvasJson) {
     canvas.loadFromJSON(data.canvasJson, () => {
-      canvas.getObjects().forEach(o => {
-       canvas.getObjects().forEach(o => {
-  if (o.customId === "templateBg" || o.customId === "templateText" || o.customId === "logo" || o.customId === "signature" || o.customId === "frameSlot") {
-    o.set({ selectable: false, evented: false }); 
-  }
-});
-
+      canvas.getObjects().forEach((o) => {
+        if (
+          o.customId === "templateText" ||
+          o.customId === "logo" ||
+          o.customId === "signature" ||
+          o.customId === "frameSlot"
+        ) {
+          o.set({ selectable: false, evented: false });
+        }
       });
       cacheTemplatePlaceholders(canvas);
       canvas.requestRenderAll();
@@ -2093,26 +2099,31 @@ if (saved?.canvas) {
               <Images size={16} /> Template
             </button>
 
-        {/* Download + Export PDF (mobile + desktop) */}
-<div className="flex gap-2 sm:gap-2 overflow-x-auto sm:overflow-visible sm:flex-nowrap w-full sm:w-auto py-2 sm:py-0">
-  {/* Download current */}
-  <button
-    title="Download PNG"
-    onClick={downloadCurrentPNG}
-    className="flex-shrink-0 p-2 rounded-full bg-green-600 text-white shadow hover:bg-green-700"
-  >
-    <Download size={18} />
-  </button>
+      {/* Download + Export PDF (mobile + desktop) */}
+<div className="flex gap-2 sm:gap-2 w-full sm:w-auto py-2 sm:py-0
+                overflow-x-auto sm:overflow-visible 
+                scrollbar-hide"> 
+  <div className="flex flex-nowrap">
+    {/* Download current */}
+    <button
+      title="Download PNG"
+      onClick={downloadCurrentPNG}
+      className="flex-shrink-0 p-2 rounded-full bg-green-600 text-white shadow hover:bg-green-700"
+    >
+      <Download size={18} />
+    </button>
 
-  {/* Export PDF */}
-  <button
-    title="Export PDF"
-    onClick={exportSinglePDF}
-    className="flex-shrink-0 p-2 rounded-full bg-purple-600 text-white shadow hover:bg-purple-700"
-  >
-    <FileDown size={18} />
-  </button>
+    {/* Export PDF */}
+    <button
+      title="Export PDF"
+      onClick={exportSinglePDF}
+      className="flex-shrink-0 p-2 rounded-full bg-purple-600 text-white shadow hover:bg-purple-700"
+    >
+      <FileDown size={18} />
+    </button>
+  </div>
 </div>
+
 
 
             <button

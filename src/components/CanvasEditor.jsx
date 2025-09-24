@@ -1063,7 +1063,7 @@ function cacheTemplatePlaceholders(canvas) {
 const renderTemplate = useCallback(async (data) => {
   if (!canvas) return;
 
-  // Remove only template objects (leave student photo/name)
+  // --- Clean all old template objects (including templateBg) ---
   const templateIds = ["frameSlot", "templateText", "logo", "signature", "templateBg"];
   canvas.getObjects()
     .filter(o => o?.customId && templateIds.includes(o.customId))
@@ -1084,11 +1084,10 @@ const renderTemplate = useCallback(async (data) => {
       fabric.Image.fromURL(
         data.image,
         (img) => {
-          // Fit to canvas
           img.scaleToWidth(w);
           img.scaleToHeight(h);
 
-          // ✅ Only set as background (not added as object)
+          // ✅ Only set as background, not as object
           canvas.setBackgroundImage(
             img,
             canvas.renderAll.bind(canvas),
@@ -1097,7 +1096,6 @@ const renderTemplate = useCallback(async (data) => {
               originY: "top"
             }
           );
-
           resolve();
         },
         { crossOrigin: "anonymous" }
@@ -1107,7 +1105,13 @@ const renderTemplate = useCallback(async (data) => {
 
   /* ---- 3️⃣ Load JSON placeholders ---- */
   if (data?.canvasJson) {
-    canvas.loadFromJSON(data.canvasJson, () => {
+    // ❌ Strip out templateBg before loading JSON
+    let json = typeof data.canvasJson === "string" ? JSON.parse(data.canvasJson) : data.canvasJson;
+    if (json.objects) {
+      json.objects = json.objects.filter(o => o.customId !== "templateBg");
+    }
+
+    canvas.loadFromJSON(json, () => {
       canvas.getObjects().forEach((o) => {
         if (
           o.customId === "templateText" ||

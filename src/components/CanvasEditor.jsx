@@ -1267,7 +1267,7 @@ if (nameObj) {
   const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
   if (!frameSlot) return; // can't position name without frame
 
-  nameObj = new fabric.Text(name, {
+  nameObj = new fabric.IText(name, {
     left: frameSlot.left + frameSlot.width / 2,
     top: frameSlot.top + frameSlot.height + 10,
     fontSize: 28,
@@ -1278,6 +1278,10 @@ if (nameObj) {
     originY: "top",
     selectable: true,
     evented: true,
+    editable: true,
+     hasControls: true,
+  lockMovementX: false,
+  lockMovementY: false,
     customId: "studentName"
   });
   canvas.add(nameObj);
@@ -2070,7 +2074,7 @@ if (saved?.canvas) {
             </div>
           )}
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 overflow-x-auto p-2">
             <label className="text-xs">W</label>
             <input
               type="number"
@@ -2180,9 +2184,7 @@ if (saved?.canvas) {
               <Images size={16} /> Template
             </button>
 
-    {/* Toolbar wrapper */}
-<div className="w-full sm:w-auto overflow-x-auto sm:overflow-visible">
-  <div className="flex gap-2 px-2 sm:px-0">
+   
     {/* Download current */}
     <button
       title="Download PNG"
@@ -2200,9 +2202,7 @@ if (saved?.canvas) {
     >
       <FileDown size={18} />
     </button>
-  </div>
-</div>
-
+  
             <button
               title="Export Imposed Sheet PDF"
               onClick={exportImposedPDF}

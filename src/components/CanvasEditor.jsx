@@ -1084,28 +1084,17 @@ const renderTemplate = useCallback(async (data) => {
       fabric.Image.fromURL(
         data.image,
         (img) => {
-          // Lock background image (not movable or selectable)
-          img.set({
-            customId: "templateBg",
-            selectable: false,
-            evented: false,
-            hasControls: false,
-            hasBorders: false,
-            lockMovementX: true,
-            lockMovementY: true,
-          });
-
-          // Fit image to canvas size
+          // Fit to canvas
           img.scaleToWidth(w);
           img.scaleToHeight(h);
 
-          // Set as canvas background
+          // ✅ Only set as background (not added as object)
           canvas.setBackgroundImage(
             img,
             canvas.renderAll.bind(canvas),
             {
               originX: "left",
-              originY: "top",
+              originY: "top"
             }
           );
 
@@ -1121,7 +1110,6 @@ const renderTemplate = useCallback(async (data) => {
     canvas.loadFromJSON(data.canvasJson, () => {
       canvas.getObjects().forEach((o) => {
         if (
-          o.customId === "templateBg" ||
           o.customId === "templateText" ||
           o.customId === "logo" ||
           o.customId === "signature" ||

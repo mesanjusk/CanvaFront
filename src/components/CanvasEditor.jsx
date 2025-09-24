@@ -1100,14 +1100,12 @@ const renderTemplate = useCallback(async (data) => {
   if (data?.canvasJson) {
     canvas.loadFromJSON(data.canvasJson, () => {
       canvas.getObjects().forEach(o => {
-        if (o.type === "i-text" && (!o.customId || /text/i.test(o.customId))) o.customId = "templateText";
-        if (o.customId === "frameSlot" || (o.type === "path" && ["#7c3aed", "rgb(124,58,237)"].includes(o.stroke))) {
-          o.customId = "frameSlot";
-        }
-         // ✅ Lock only the background image
-     if (o.customId === "templateBg") {
-      o.set({ selectable: false, evented: false });
-     }
+       canvas.getObjects().forEach(o => {
+  if (o.customId === "templateBg" || o.customId === "templateText" || o.customId === "logo" || o.customId === "signature" || o.customId === "frameSlot") {
+    o.set({ selectable: false, evented: false }); 
+  }
+});
+
       });
       cacheTemplatePlaceholders(canvas);
       canvas.requestRenderAll();
@@ -1174,8 +1172,8 @@ if (nameObj) {
   // ✅ Update existing object
   nameObj.set({
     text: name,
-    selectable: false,
-    evented: false
+    selectable: true,
+    evented: true
   });
 } else {
   // ✅ If not found, create a new text object

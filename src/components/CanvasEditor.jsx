@@ -1063,7 +1063,7 @@ const renderTemplate = useCallback(async (data) => {
   if (!canvas) return;
 
   // Remove previous template-layer objects
-  const templateIds = ["frameSlot","templateText","logo","signature","templateBg"];
+  const templateIds = ["frameSlot", "templateText", "logo", "signature", "templateBg"];
   canvas.getObjects()
     .filter(o => o?.customId && templateIds.includes(o.customId))
     .forEach(o => canvas.remove(o));
@@ -1077,7 +1077,7 @@ const renderTemplate = useCallback(async (data) => {
   setTplSize({ w, h });
   setCanvasSize?.(w, h);
 
-  // Background as fixed (use setBackgroundImage)
+  // Set background as fixed
   if (data?.image) {
     await new Promise(resolve => {
       fabric.Image.fromURL(data.image, img => {
@@ -1098,86 +1098,94 @@ const renderTemplate = useCallback(async (data) => {
     });
   }
 
-  // ✅ call this BEFORE loadFromJSON to lock the canvas itself
-canvas.selection = false;      // no marquee drag
-canvas.defaultCursor = "default";
+  // Disable marquee selection
+  canvas.selection = false;
+  canvas.defaultCursor = "default";
 
-// Load template JSON but remove any templateBg object (we already set background)
-if (data?.canvasJson) {
-  let json = typeof data.canvasJson === "string"
-    ? JSON.parse(data.canvasJson)
-    : data.canvasJson;
+  // Load template JSON (remove any background object)
+  if (data?.canvasJson) {
+    let json = typeof data.canvasJson === "string" ? JSON.parse(data.canvasJson) : data.canvasJson;
+    if (json.objects) json.objects = json.objects.filter(o => o.customId !== "templateBg");
 
-  if (json.objects) {
-    json.objects = json.objects.filter(o => o.customId !== "templateBg");
+    canvas.loadFromJSON(json, () => {
+      canvas.getObjects().forEach(o => {
+
+        switch (o.customId) {
+
+          // Fixed template objects
+          case "frameSlot":
+          case "templateText":
+            o.set({
+              selectable: false,
+              evented: false,
+              hasControls: false,
+              hasBorders: false,
+              lockMovementX: true,
+              lockMovementY: true,
+            });
+            o._originalLeft = o.left;
+            o._originalTop  = o.top;
+            o.skipTargetFind = true;
+            break;
+
+          // Editable & movable student name
+          case "studentName":
+            o.set({
+              selectable: true,
+              evented: true,
+              editable: true,
+              hasControls: true,
+              lockMovementX: false,
+              lockMovementY: false,
+            });
+            o.skipTargetFind = false;
+            break;
+
+          // Movable logos, signatures, and student photo group
+          case "logo":
+          case "signature":
+          case "studentPhotoGroup":
+            o.set({
+              selectable: true,
+              evented: true,
+              hasControls: true,
+              lockMovementX: false,
+              lockMovementY: false,
+              lockUniScaling: false,
+            });
+            o.skipTargetFind = false;
+            break;
+
+          default:
+            o.set({
+              selectable: false,
+              evented: false,
+              lockMovementX: true,
+              lockMovementY: true,
+            });
+            o.skipTargetFind = true;
+        }
+      });
+
+      cacheTemplatePlaceholders(canvas);
+      canvas.requestRenderAll();
+    });
   }
 
-  canvas.loadFromJSON(json, () => {
-    canvas.getObjects().forEach(o => {
-      switch (o.customId) {
-        // 🔒 Fixed placeholders
-        case "frameSlot":
-        case "templateText":
-          o.set({
-            selectable: false,
-            evented: false,
-            hasControls: false,
-            lockMovementX: true,
-            lockMovementY: true,
-          });
-          o.skipTargetFind = true;
-          break;
-
-        // ✅ Movable/resizable
-        case "logo":
-        case "signature":
-        case "studentPhotoGroup":
-          o.set({
-            selectable: true,
-            evented: true,
-            hasControls: true,
-            lockMovementX: false,
-            lockMovementY: false,
-            lockUniScaling: false,
-          });
-          o.skipTargetFind = false;
-          break;
-
-        // ✅ Editable *and* movable text
-        case "studentName":
-          o.set({
-            selectable: true,
-            evented: true,
-            editable: true,        // allow text editing
-            hasControls: true,
-            lockMovementX: false,
-            lockMovementY: false,
-          });
-          o.skipTargetFind = false;
-          break;
-      }
-    });
-
-    cacheTemplatePlaceholders(canvas);
-    canvas.requestRenderAll();
+  // Prevent dragging empty canvas
+  canvas.on("mouse:down", e => {
+    if (!e.target) canvas.discardActiveObject();
   });
-}
 
-// ✅ Extra safety: prevent panning the whole canvas
-canvas.on("mouse:down", e => {
-  if (!e.target) canvas.discardActiveObject(); // click-drag on empty space does nothing
-});
-
-
-  // Optional static logo/signature (locked)
+  // Load optional logo/signature
   if (showLogo && selectedInstitute?.logo) {
     loadTemplateAsset("logo", selectedInstitute.logo, canvas);
   }
   if (showSignature && selectedInstitute?.signature) {
     loadTemplateAsset("signature", selectedInstitute.signature, canvas);
   }
-}, [canvas, selectedInstitute, showLogo, showSignature]);
 
+}, [canvas, selectedInstitute, showLogo, showSignature]);
 
 /* ======================= 3. Load template by ID ======================= */
 const loadTemplateById = useCallback(async id => {

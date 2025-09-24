@@ -1150,41 +1150,55 @@ useEffect(() => {
   const currentStudent = bulkMode
     ? filteredStudents.find(s => s?.uuid === bulkList[bulkIndex]) || null
     : selectedStudent;
+
   if (!canvas || !currentStudent) return;
 
   // ---- remove old student-specific objects ----
   canvas.getObjects().forEach(o => {
-    if (o.customId === "studentPhotoGroup") {
-    canvas.remove(o);
+    if (["studentName", "studentPhoto"].includes(o.customId)) {
+      canvas.remove(o);
     }
   });
 
-  // ---- student name ----
-  const name = `${currentStudent.firstName || ""} ${currentStudent.lastName || ""}`.trim();
-  let nameObj = canvas.getObjects().find(o => o.customId === "studentName");
-  if (nameObj) {
-    nameObj.set({ text: name });
-    canvas.requestRenderAll();
-  } else {
-    const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
-    if (!frameSlot) return;
-    nameObj = new fabric.Text(name, {
-      left: frameSlot.left + frameSlot.width / 2,
-      top:  frameSlot.top  + frameSlot.height + 10,
-      fontSize: 28,
-      fill: "#000",
-      fontFamily: "Arial",
-      fontWeight: "bold",
-      originX: "center",
-      originY: "top",
-      selectable: true,
-      evented: true,
-      customId: "studentName"
-    });
-    canvas.add(nameObj);
-  }
+// Compute display name
+const name = `${currentStudent.firstName || ""} ${currentStudent.lastName || ""}`.trim();
 
-  // ---- student photo with movable frame ----
+// Try to find existing template text object
+let nameObj = canvas.getObjects().find(o => o.customId === "studentName" || o.customId === "templateText");
+
+if (nameObj) {
+  // ✅ Update existing object
+  nameObj.set({
+    text: name,
+    selectable: false,
+    evented: false
+  });
+} else {
+  // ✅ If not found, create a new text object
+  const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
+  if (!frameSlot) return; // can't position name without frame
+
+  nameObj = new fabric.Text(name, {
+    left: frameSlot.left + frameSlot.width / 2,
+    top: frameSlot.top + frameSlot.height + 10,
+    fontSize: 28,
+    fill: "#000",
+    fontFamily: "Arial",
+    fontWeight: "bold",
+    originX: "center",
+    originY: "top",
+    selectable: false,
+    evented: false,
+    customId: "studentName"
+  });
+  canvas.add(nameObj);
+}
+
+// Render
+canvas.requestRenderAll();
+
+
+  // ---- frame slot for photo ----
   const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
   if (!frameSlot) return;
 
@@ -1194,71 +1208,77 @@ useEffect(() => {
     return () => clearTimeout(t);
   }
 
+  // ---- student photo ----
   const photoUrl = Array.isArray(currentStudent.photo)
     ? currentStudent.photo[0]
     : currentStudent.photo;
   if (!photoUrl) return;
 
   const perStudent = studentLayoutsRef.current?.[currentStudent.uuid]?.studentPhotoProps;
-  const saved = perStudent ?? getSavedProps("studentPhoto") ?? {};
+  const savedPhoto = perStudent ?? getSavedProps("studentPhoto") ?? {};
 
   safeLoadImage(photoUrl, img => {
     if (!img) return;
 
-    // ----- make a mask shape without absolutePositioned -----
-    let clipShape;
-    if (frameSlot.type === "path" && frameSlot.path) {
-      clipShape = new fabric.Path(frameSlot.path, {
-        originX: "center",
-        originY: "center",
-        left: 0,
-        top: 0,
-        scaleX: frameSlot.scaleX || 1,
-        scaleY: frameSlot.scaleY || 1
-      });
-    } else if (frameSlot.type === "polygon" && frameSlot.points) {
-      clipShape = new fabric.Polygon(frameSlot.points, {
-        originX: "center",
-        originY: "center",
-        left: 0,
-        top: 0,
-        scaleX: frameSlot.scaleX || 1,
-        scaleY: frameSlot.scaleY || 1
-      });
-    } else {
-      clipShape = new fabric.Rect({
-        width: bounds.width,
-        height: bounds.height,
-        originX: "center",
-        originY: "center",
-        left: 0,
-        top: 0
-      });
-    }
+  let clipPath;
+if (frameSlot.type === "path" && frameSlot.path) {
+  // Case 1: Path-based frame
+  clipPath = new fabric.Path(frameSlot.path, {
+    originX: "center",
+    originY: "center",
+    left: 0,
+    top: 0,
+    scaleX: frameSlot.scaleX || 1,
+    scaleY: frameSlot.scaleY || 1,
+  });
+} else if (frameSlot.type === "polygon" && frameSlot.points) {
+  // ✅ Case 2: Polygon (your hexagon frame)
+  clipPath = new fabric.Polygon(frameSlot.points, {
+    originX: "center",
+    originY: "center",
+    left: 0,
+    top: 0,
+    scaleX: frameSlot.scaleX || 1,
+    scaleY: frameSlot.scaleY || 1,
+  });
+} else {
+  // Fallback rectangle
+  clipPath = new fabric.Rect({
+    width: bounds.width,
+    height: bounds.height,
+    originX: "center",
+    originY: "center",
+    left: 0,
+    top: 0
+  });
+}
+
 
     const scale = Math.max(bounds.width / img.width, bounds.height / img.height);
+
     img.set({
       originX: "center",
       originY: "center",
-      left: 0,
-      top: 0,
-      scaleX: saved.scaleX ?? scale,
-      scaleY: saved.scaleY ?? scale,
-      angle:  saved.angle  ?? 0,
+      left:   0,
+      top:    0,
+      scaleX: savedPhoto.scaleX ?? scale,
+      scaleY: savedPhoto.scaleY ?? scale,
+      angle:  savedPhoto.angle  ?? 0,
       selectable: false,
-      evented: false
+      evented: false,
     });
 
-    // ---- group frame + photo so they move together ----
+
+      // ---- group frame + photo so they move together ----
     const photoGroup = new fabric.Group([img], {
-      clipPath: clipShape,
+      clipPath: clipPath,
       originX: "center",
       originY: "center",
-      left:   saved.left ?? bounds.left + bounds.width  / 2,
-      top:    saved.top  ?? bounds.top  + bounds.height / 2,
-      scaleX: saved.groupScaleX ?? 1,
-      scaleY: saved.groupScaleY ?? 1,
-      angle:  saved.groupAngle  ?? 0,
+      left:   savedPhoto.left ?? bounds.left + bounds.width  / 2,
+      top:    savedPhoto.top  ?? bounds.top  + bounds.height / 2,
+      scaleX: savedPhoto.groupScaleX ?? 1,
+      scaleY: savedPhoto.groupScaleY ?? 1,
+      angle:  savedPhoto.groupAngle  ?? 0,
       selectable: true,
       evented: true,
       hasControls: true,
@@ -1266,12 +1286,12 @@ useEffect(() => {
       customId: "studentPhotoGroup"
     });
 
-    // save group transform
+    // Persist per-student transform
     const persist = () => {
       const uuid = currentStudent.uuid;
       if (!studentLayoutsRef.current[uuid]) studentLayoutsRef.current[uuid] = {};
       studentLayoutsRef.current[uuid].studentPhotoProps = {
-        left: photoGroup.left,
+       left: photoGroup.left,
         top: photoGroup.top,
         scaleX: photoGroup.scaleX,
         scaleY: photoGroup.scaleY,
@@ -1286,7 +1306,7 @@ useEffect(() => {
     canvas.add(photoGroup);
     canvas.setActiveObject(photoGroup);
 
-    // Hide the original frame outline so only mask shows
+    // hide the purple stroke so only the photo shows
     frameSlot.set({ visible: false, selectable: false, evented: false });
 
     studentObjectsRef.current.push(photoGroup);

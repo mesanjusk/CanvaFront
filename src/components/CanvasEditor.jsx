@@ -1062,13 +1062,13 @@ function cacheTemplatePlaceholders(canvas) {
 const renderTemplate = useCallback(async (data) => {
   if (!canvas) return;
 
-  // Remove previous template-layer objects
+  // ----- 1️⃣ Remove previous template-layer objects -----
   const templateIds = ["frameSlot", "templateText", "logo", "signature", "templateBg"];
   canvas.getObjects()
     .filter(o => o?.customId && templateIds.includes(o.customId))
     .forEach(o => canvas.remove(o));
 
-  // Resize canvas
+  // ----- 2️⃣ Resize canvas -----
   const parent = stageRef.current;
   const w = Number(data?.width) || parent.offsetWidth || 600;
   const h = Number(data?.height) || parent.offsetHeight || 400;
@@ -1077,7 +1077,7 @@ const renderTemplate = useCallback(async (data) => {
   setTplSize({ w, h });
   setCanvasSize?.(w, h);
 
-  // Set background as fixed
+  // ----- 3️⃣ Load template background -----
   if (data?.image) {
     await new Promise(resolve => {
       fabric.Image.fromURL(data.image, img => {
@@ -1090,29 +1090,26 @@ const renderTemplate = useCallback(async (data) => {
           hasBorders: false,
           lockMovementX: true,
           lockMovementY: true,
-          customId: "templateBg"
+          customId: "templateBg",
         });
-        canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), { originX: "left", originY: "top" });
+        canvas.add(img); // add as object to maintain z-order
+        canvas.sendToBack(img);
         resolve();
       }, { crossOrigin: "anonymous" });
     });
   }
 
-  // Disable marquee selection
-  canvas.selection = false;
+  // ----- 4️⃣ Disable marquee selection for fixed objects -----
+  canvas.selection = true; // enable object selection for movable objects
   canvas.defaultCursor = "default";
 
-  // Load template JSON (remove any background object)
+  // ----- 5️⃣ Load template JSON -----
   if (data?.canvasJson) {
-    let json = typeof data.canvasJson === "string" ? JSON.parse(data.canvasJson) : data.canvasJson;
-    if (json.objects) json.objects = json.objects.filter(o => o.customId !== "templateBg");
-
+    const json = typeof data.canvasJson === "string" ? JSON.parse(data.canvasJson) : data.canvasJson;
+    
     canvas.loadFromJSON(json, () => {
       canvas.getObjects().forEach(o => {
-
         switch (o.customId) {
-
-          // Fixed template objects
           case "frameSlot":
           case "templateText":
             o.set({
@@ -1123,45 +1120,43 @@ const renderTemplate = useCallback(async (data) => {
               lockMovementX: true,
               lockMovementY: true,
             });
-            o._originalLeft = o.left;
-            o._originalTop  = o.top;
-            o.skipTargetFind = true;
             break;
 
-          // Editable & movable student name
           case "studentName":
             if (o.type !== "i-text") {
-          const newText = new fabric.IText(o.text, {
-            left: o.left,
-            top: o.top,
-            fontSize: o.fontSize || 28,
-            fill: o.fill || "#000",
-            fontFamily: o.fontFamily || "Arial",
-            fontWeight: o.fontWeight || "bold",
-            originX: o.originX || "center",
-            originY: o.originY || "top",
-            selectable: true,
-            evented: true,
-            editable: true,
-            hasControls: true,
-            customId: "studentName",
-          });
-          canvas.remove(o);
-          canvas.add(newText);
-        } else {
-          o.set({
-            selectable: true,
-            evented: true,
-            editable: true,
-            hasControls: true,
-            lockMovementX: false,
-            lockMovementY: false,
-          });
-        }
-            o.skipTargetFind = false;
+              const newText = new fabric.IText(o.text, {
+                left: o.left,
+                top: o.top,
+                fontSize: o.fontSize || 28,
+                fill: o.fill || "#000",
+                fontFamily: o.fontFamily || "Arial",
+                fontWeight: o.fontWeight || "bold",
+                originX: o.originX || "center",
+                originY: o.originY || "top",
+                selectable: true,
+                evented: true,
+                editable: true,
+                hasControls: true,
+                lockMovementX: false,
+                lockMovementY: false,
+                customId: "studentName",
+              });
+              canvas.remove(o);
+              canvas.add(newText);
+              canvas.bringToFront(newText);
+            } else {
+              o.set({
+                selectable: true,
+                evented: true,
+                editable: true,
+                hasControls: true,
+                lockMovementX: false,
+                lockMovementY: false,
+              });
+              canvas.bringToFront(o);
+            }
             break;
 
-          // Movable logos, signatures, and student photo group
           case "logo":
           case "signature":
           case "studentPhotoGroup":
@@ -1173,7 +1168,18 @@ const renderTemplate = useCallback(async (data) => {
               lockMovementY: false,
               lockUniScaling: false,
             });
-            o.skipTargetFind = false;
+            break;
+
+          case "templateBg":
+            o.set({
+              selectable: false,
+              evented: false,
+              hasControls: false,
+              hasBorders: false,
+              lockMovementX: true,
+              lockMovementY: true,
+            });
+            canvas.sendToBack(o);
             break;
 
           default:
@@ -1183,7 +1189,6 @@ const renderTemplate = useCallback(async (data) => {
               lockMovementX: true,
               lockMovementY: true,
             });
-            o.skipTargetFind = true;
         }
       });
 
@@ -1192,20 +1197,20 @@ const renderTemplate = useCallback(async (data) => {
     });
   }
 
-  // Prevent dragging empty canvas
+  // ----- 6️⃣ Prevent dragging empty canvas -----
   canvas.on("mouse:down", e => {
     if (!e.target) canvas.discardActiveObject();
   });
 
-  // Load optional logo/signature
+  // ----- 7️⃣ Load optional logo/signature -----
   if (showLogo && selectedInstitute?.logo) {
     loadTemplateAsset("logo", selectedInstitute.logo, canvas);
   }
   if (showSignature && selectedInstitute?.signature) {
     loadTemplateAsset("signature", selectedInstitute.signature, canvas);
   }
-
 }, [canvas, selectedInstitute, showLogo, showSignature]);
+
 
 /* ======================= 3. Load template by ID ======================= */
 const loadTemplateById = useCallback(async id => {
@@ -1260,7 +1265,11 @@ if (nameObj) {
   nameObj.set({
     text: name,
     selectable: true,
-    evented: true
+    evented: true,
+    lockMovementX: false,
+    lockMovementY: false,
+    hasControls: true,
+    editable: true
   });
 } else {
   // ✅ If not found, create a new text object
@@ -1288,6 +1297,7 @@ if (nameObj) {
 }
 
 // Render
+canvas.setActiveObject(nameObj);
 canvas.requestRenderAll();
 
 

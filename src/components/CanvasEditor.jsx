@@ -1130,14 +1130,34 @@ const renderTemplate = useCallback(async (data) => {
 
           // Editable & movable student name
           case "studentName":
-            o.set({
-              selectable: true,
-              evented: true,
-              editable: true,
-              hasControls: true,
-              lockMovementX: false,
-              lockMovementY: false,
-            });
+            if (o.type !== "i-text") {
+          const newText = new fabric.IText(o.text, {
+            left: o.left,
+            top: o.top,
+            fontSize: o.fontSize || 28,
+            fill: o.fill || "#000",
+            fontFamily: o.fontFamily || "Arial",
+            fontWeight: o.fontWeight || "bold",
+            originX: o.originX || "center",
+            originY: o.originY || "top",
+            selectable: true,
+            evented: true,
+            editable: true,
+            hasControls: true,
+            customId: "studentName",
+          });
+          canvas.remove(o);
+          canvas.add(newText);
+        } else {
+          o.set({
+            selectable: true,
+            evented: true,
+            editable: true,
+            hasControls: true,
+            lockMovementX: false,
+            lockMovementY: false,
+          });
+        }
             o.skipTargetFind = false;
             break;
 

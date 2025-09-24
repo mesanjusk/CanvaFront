@@ -1077,10 +1077,6 @@ const renderTemplate = useCallback(async (data) => {
   setTplSize({ w, h });
   setCanvasSize?.(w, h);
 
-  // No marquee selection (ok to keep), BUT DO NOT disable hit-testing globally:
-  canvas.selection = false;
-  // <-- REMOVE: canvas.skipTargetFind = true;
-
   // Background as fixed (use setBackgroundImage)
   if (data?.image) {
     await new Promise(resolve => {
@@ -1102,56 +1098,63 @@ const renderTemplate = useCallback(async (data) => {
     });
   }
 
-  // Load template JSON but remove any templateBg object (we already set background)
+  // ✅ call this BEFORE loadFromJSON to lock the canvas itself
+canvas.selection = false;      // no marquee drag
+canvas.defaultCursor = "default";
+
+// Load template JSON but remove any templateBg object (we already set background)
 if (data?.canvasJson) {
   let json = typeof data.canvasJson === "string"
     ? JSON.parse(data.canvasJson)
     : data.canvasJson;
 
-  // remove any saved templateBg object (background is already set)
   if (json.objects) {
     json.objects = json.objects.filter(o => o.customId !== "templateBg");
   }
 
   canvas.loadFromJSON(json, () => {
     canvas.getObjects().forEach(o => {
-      if (o.customId === "frameSlot" || o.customId === "templateText") {
-        // 🔒 keep placeholders locked
-        o.set({
-          selectable: false,
-          evented: false,
-          hasControls: false,
-          hasBorders: false,
-          lockMovementX: true,
-          lockMovementY: true,
-        });
-        o.skipTargetFind = true; // ignore hit-testing
-      }
+      switch (o.customId) {
+        // 🔒 Fixed placeholders
+        case "frameSlot":
+        case "templateText":
+          o.set({
+            selectable: false,
+            evented: false,
+            hasControls: false,
+            lockMovementX: true,
+            lockMovementY: true,
+          });
+          o.skipTargetFind = true;
+          break;
 
-      if (o.customId === "logo" || o.customId === "signature") {
-        // ✅ make logo & signature movable/resizable
-        o.set({
-          selectable: true,
-          evented: true,
-          hasControls: true,
-          hasBorders: true,
-          lockMovementX: false,
-          lockMovementY: false,
-          lockUniScaling: false,
-        });
-        o.skipTargetFind = false;
-      }
+        // ✅ Movable/resizable
+        case "logo":
+        case "signature":
+        case "studentPhotoGroup":
+          o.set({
+            selectable: true,
+            evented: true,
+            hasControls: true,
+            lockMovementX: false,
+            lockMovementY: false,
+            lockUniScaling: false,
+          });
+          o.skipTargetFind = false;
+          break;
 
-      if (o.customId === "studentName" || o.customId === "studentPhotoGroup") {
-        // ✅ in case these were stored in JSON, allow full movement
-        o.set({
-          selectable: true,
-          evented: true,
-          hasControls: true,
-          lockMovementX: false,
-          lockMovementY: false,
-        });
-        o.skipTargetFind = false;
+        // ✅ Editable *and* movable text
+        case "studentName":
+          o.set({
+            selectable: true,
+            evented: true,
+            editable: true,        // allow text editing
+            hasControls: true,
+            lockMovementX: false,
+            lockMovementY: false,
+          });
+          o.skipTargetFind = false;
+          break;
       }
     });
 
@@ -1159,6 +1162,11 @@ if (data?.canvasJson) {
     canvas.requestRenderAll();
   });
 }
+
+// ✅ Extra safety: prevent panning the whole canvas
+canvas.on("mouse:down", e => {
+  if (!e.target) canvas.discardActiveObject(); // click-drag on empty space does nothing
+});
 
 
   // Optional static logo/signature (locked)

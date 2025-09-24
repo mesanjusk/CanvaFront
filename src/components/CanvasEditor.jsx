@@ -1104,6 +1104,10 @@ const renderTemplate = useCallback(async (data) => {
         if (o.customId === "frameSlot" || (o.type === "path" && ["#7c3aed", "rgb(124,58,237)"].includes(o.stroke))) {
           o.customId = "frameSlot";
         }
+         // ✅ Lock only the background image
+     if (o.customId === "templateBg") {
+      o.set({ selectable: false, evented: false });
+     }
       });
       cacheTemplatePlaceholders(canvas);
       canvas.requestRenderAll();
@@ -1187,8 +1191,8 @@ if (nameObj) {
     fontWeight: "bold",
     originX: "center",
     originY: "top",
-    selectable: false,
-    evented: false,
+    selectable: true,
+    evented: true,
     customId: "studentName"
   });
   canvas.add(nameObj);

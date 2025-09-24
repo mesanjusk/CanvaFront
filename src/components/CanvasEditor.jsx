@@ -1154,8 +1154,8 @@ useEffect(() => {
 
   // ---- remove old student-specific objects ----
   canvas.getObjects().forEach(o => {
-    if (["studentName", "studentPhotoGroup"].includes(o.customId)) {
-      canvas.remove(o);
+    if (o.customId === "studentPhotoGroup") {
+    canvas.remove(o);
     }
   });
 
@@ -1164,6 +1164,7 @@ useEffect(() => {
   let nameObj = canvas.getObjects().find(o => o.customId === "studentName");
   if (nameObj) {
     nameObj.set({ text: name });
+    canvas.requestRenderAll();
   } else {
     const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
     if (!frameSlot) return;
@@ -1176,8 +1177,8 @@ useEffect(() => {
       fontWeight: "bold",
       originX: "center",
       originY: "top",
-      selectable: false,
-      evented: false,
+      selectable: true,
+      evented: true,
       customId: "studentName"
     });
     canvas.add(nameObj);

@@ -1059,17 +1059,16 @@ function cacheTemplatePlaceholders(canvas) {
   }
 }
 
-/* ======================= 2. Render Template (Fixed Template Layer) ======================= */
 const renderTemplate = useCallback(async (data) => {
   if (!canvas) return;
 
-  // 1️⃣ Remove any old template-layer objects
-  const templateIds = ["frameSlot", "templateText", "logo", "signature", "templateBg"];
+  // Remove any previous template-layer objects
+  const templateIds = ["frameSlot","templateText","logo","signature","templateBg"];
   canvas.getObjects()
     .filter(o => o?.customId && templateIds.includes(o.customId))
     .forEach(o => canvas.remove(o));
 
-  // 2️⃣ Resize and lock canvas size (not selectable / not movable as a whole)
+  // Fix canvas size
   const parent = stageRef.current;
   const w = Number(data?.width)  || parent.offsetWidth  || 600;
   const h = Number(data?.height) || parent.offsetHeight || 400;
@@ -1078,15 +1077,17 @@ const renderTemplate = useCallback(async (data) => {
   setTplSize({ w, h });
   setCanvasSize?.(w, h);
 
-  // Keep selection box off (no multi-select marquee)
-  canvas.selection = false;
+  // 🔑 Key locks
+  canvas.selection     = false;  // no marquee
+  canvas.skipTargetFind = true;  // **disable hit-testing** on background/template
+  canvas.defaultCursor = "default";
 
-  // 3️⃣ Fixed background image
+  // Fixed background
   if (data?.image) {
     await new Promise(resolve => {
       fabric.Image.fromURL(
         data.image,
-        (img) => {
+        img => {
           img.scaleToWidth(w);
           img.scaleToHeight(h);
           img.set({
@@ -1098,11 +1099,10 @@ const renderTemplate = useCallback(async (data) => {
             lockMovementY: true,
             customId: "templateBg"
           });
-          canvas.setBackgroundImage(
-            img,
-            canvas.renderAll.bind(canvas),
-            { originX: "left", originY: "top" }
-          );
+          canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
+            originX: "left",
+            originY: "top"
+          });
           resolve();
         },
         { crossOrigin: "anonymous" }
@@ -1110,20 +1110,19 @@ const renderTemplate = useCallback(async (data) => {
     });
   }
 
-  // 4️⃣ Load template JSON and lock all placeholder objects
+  // Load and immediately lock placeholders
   if (data?.canvasJson) {
     let json = typeof data.canvasJson === "string"
       ? JSON.parse(data.canvasJson)
       : data.canvasJson;
 
     if (json.objects) {
-      // remove any saved templateBg object (we already set background above)
       json.objects = json.objects.filter(o => o.customId !== "templateBg");
     }
 
     canvas.loadFromJSON(json, () => {
       canvas.getObjects().forEach(o => {
-        if (["templateText", "logo", "signature", "frameSlot"].includes(o.customId)) {
+        if (["templateText","logo","signature","frameSlot"].includes(o.customId)) {
           o.set({
             selectable: false,
             evented: false,
@@ -1134,20 +1133,18 @@ const renderTemplate = useCallback(async (data) => {
           });
         }
       });
-
       cacheTemplatePlaceholders(canvas);
       canvas.requestRenderAll();
     });
   }
 
-  // 5️⃣ Optional static assets (they are locked too)
+  // Optional static logo/signature (also locked)
   if (showLogo && selectedInstitute?.logo) {
     loadTemplateAsset("logo", selectedInstitute.logo, canvas, { locked: true });
   }
   if (showSignature && selectedInstitute?.signature) {
     loadTemplateAsset("signature", selectedInstitute.signature, canvas, { locked: true });
   }
-
 }, [canvas, selectedInstitute, showLogo, showSignature]);
 
 

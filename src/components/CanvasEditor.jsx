@@ -1249,7 +1249,7 @@ useEffect(() => {
     });
 
     // ---- group frame + photo so they move together ----
-    const photoGroup = new fabric.Group([img, clipShape], {
+    const photoGroup = new fabric.Group([img], {
       clipPath: clipShape,
       originX: "center",
       originY: "center",

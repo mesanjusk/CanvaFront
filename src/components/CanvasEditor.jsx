@@ -1059,17 +1059,17 @@ function cacheTemplatePlaceholders(canvas) {
   }
 }
 
-/* ======================= 2. Render Template ======================= */
+/* ======================= 2. Render Template (Fixed Template Layer) ======================= */
 const renderTemplate = useCallback(async (data) => {
   if (!canvas) return;
 
-  // --- Clean all old template objects (including templateBg) ---
+  // 1️⃣ Remove any old template-layer objects
   const templateIds = ["frameSlot", "templateText", "logo", "signature", "templateBg"];
   canvas.getObjects()
     .filter(o => o?.customId && templateIds.includes(o.customId))
     .forEach(o => canvas.remove(o));
 
-  /* ---- 1️⃣ Resize canvas ---- */
+  // 2️⃣ Resize and lock canvas size (not selectable / not movable as a whole)
   const parent = stageRef.current;
   const w = Number(data?.width)  || parent.offsetWidth  || 600;
   const h = Number(data?.height) || parent.offsetHeight || 400;
@@ -1078,7 +1078,10 @@ const renderTemplate = useCallback(async (data) => {
   setTplSize({ w, h });
   setCanvasSize?.(w, h);
 
-  /* ---- 2️⃣ Set background as fixed ---- */
+  // Keep selection box off (no multi-select marquee)
+  canvas.selection = false;
+
+  // 3️⃣ Fixed background image
   if (data?.image) {
     await new Promise(resolve => {
       fabric.Image.fromURL(
@@ -1086,20 +1089,19 @@ const renderTemplate = useCallback(async (data) => {
         (img) => {
           img.scaleToWidth(w);
           img.scaleToHeight(h);
-
-           // 🔒 Background only, not selectable
           img.set({
             selectable: false,
             evented: false,
+            hasControls: false,
+            hasBorders: false,
+            lockMovementX: true,
+            lockMovementY: true,
+            customId: "templateBg"
           });
-
           canvas.setBackgroundImage(
             img,
             canvas.renderAll.bind(canvas),
-            {
-              originX: "left",
-              originY: "top"
-            }
+            { originX: "left", originY: "top" }
           );
           resolve();
         },
@@ -1108,45 +1110,42 @@ const renderTemplate = useCallback(async (data) => {
     });
   }
 
-  /* ---- 3️⃣ Load JSON placeholders ---- */
+  // 4️⃣ Load template JSON and lock all placeholder objects
   if (data?.canvasJson) {
-    // ❌ Strip out templateBg before loading JSON
-    let json = typeof data.canvasJson === "string" ? JSON.parse(data.canvasJson) : data.canvasJson;
+    let json = typeof data.canvasJson === "string"
+      ? JSON.parse(data.canvasJson)
+      : data.canvasJson;
+
     if (json.objects) {
+      // remove any saved templateBg object (we already set background above)
       json.objects = json.objects.filter(o => o.customId !== "templateBg");
     }
 
     canvas.loadFromJSON(json, () => {
-      canvas.getObjects().forEach((o) => {
-        if (
-          o.customId === "templateText" ||
-          o.customId === "logo" ||
-          o.customId === "signature" ||
-          o.customId === "frameSlot"
-        ) {
+      canvas.getObjects().forEach(o => {
+        if (["templateText", "logo", "signature", "frameSlot"].includes(o.customId)) {
           o.set({
             selectable: false,
             evented: false,
             hasControls: false,
             hasBorders: false,
             lockMovementX: true,
-            lockMovementY: true,
+            lockMovementY: true
           });
         }
       });
+
       cacheTemplatePlaceholders(canvas);
       canvas.requestRenderAll();
     });
   }
 
-  // Optional: Logo
+  // 5️⃣ Optional static assets (they are locked too)
   if (showLogo && selectedInstitute?.logo) {
-    loadTemplateAsset("logo", selectedInstitute.logo, canvas);
+    loadTemplateAsset("logo", selectedInstitute.logo, canvas, { locked: true });
   }
-
-  // Optional: Signature
   if (showSignature && selectedInstitute?.signature) {
-    loadTemplateAsset("signature", selectedInstitute.signature, canvas);
+    loadTemplateAsset("signature", selectedInstitute.signature, canvas, { locked: true });
   }
 
 }, [canvas, selectedInstitute, showLogo, showSignature]);

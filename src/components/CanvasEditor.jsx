@@ -1062,88 +1062,111 @@ function cacheTemplatePlaceholders(canvas) {
 const renderTemplate = useCallback(async (data) => {
   if (!canvas) return;
 
-  // Remove any previous template-layer objects
+  // Remove previous template-layer objects
   const templateIds = ["frameSlot","templateText","logo","signature","templateBg"];
   canvas.getObjects()
     .filter(o => o?.customId && templateIds.includes(o.customId))
     .forEach(o => canvas.remove(o));
 
-  // Fix canvas size
+  // Resize canvas
   const parent = stageRef.current;
-  const w = Number(data?.width)  || parent.offsetWidth  || 600;
+  const w = Number(data?.width) || parent.offsetWidth || 600;
   const h = Number(data?.height) || parent.offsetHeight || 400;
   canvas.setWidth(w);
   canvas.setHeight(h);
   setTplSize({ w, h });
   setCanvasSize?.(w, h);
 
-  // 🔑 Key locks
-  canvas.selection     = false;  // no marquee
-  canvas.skipTargetFind = true;  // **disable hit-testing** on background/template
-  canvas.defaultCursor = "default";
+  // No marquee selection (ok to keep), BUT DO NOT disable hit-testing globally:
+  canvas.selection = false;
+  // <-- REMOVE: canvas.skipTargetFind = true;
 
-  // Fixed background
+  // Background as fixed (use setBackgroundImage)
   if (data?.image) {
     await new Promise(resolve => {
-      fabric.Image.fromURL(
-        data.image,
-        img => {
-          img.scaleToWidth(w);
-          img.scaleToHeight(h);
-          img.set({
-            selectable: false,
-            evented: false,
-            hasControls: false,
-            hasBorders: false,
-            lockMovementX: true,
-            lockMovementY: true,
-            customId: "templateBg"
-          });
-          canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
-            originX: "left",
-            originY: "top"
-          });
-          resolve();
-        },
-        { crossOrigin: "anonymous" }
-      );
+      fabric.Image.fromURL(data.image, img => {
+        img.scaleToWidth(w);
+        img.scaleToHeight(h);
+        img.set({
+          selectable: false,
+          evented: false,
+          hasControls: false,
+          hasBorders: false,
+          lockMovementX: true,
+          lockMovementY: true,
+          customId: "templateBg"
+        });
+        canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), { originX: "left", originY: "top" });
+        resolve();
+      }, { crossOrigin: "anonymous" });
     });
   }
 
-  // Load and immediately lock placeholders
-  if (data?.canvasJson) {
-    let json = typeof data.canvasJson === "string"
-      ? JSON.parse(data.canvasJson)
-      : data.canvasJson;
+  // Load template JSON but remove any templateBg object (we already set background)
+if (data?.canvasJson) {
+  let json = typeof data.canvasJson === "string"
+    ? JSON.parse(data.canvasJson)
+    : data.canvasJson;
 
-    if (json.objects) {
-      json.objects = json.objects.filter(o => o.customId !== "templateBg");
-    }
-
-    canvas.loadFromJSON(json, () => {
-      canvas.getObjects().forEach(o => {
-        if (["templateText","logo","signature","frameSlot"].includes(o.customId)) {
-          o.set({
-            selectable: false,
-            evented: false,
-            hasControls: false,
-            hasBorders: false,
-            lockMovementX: true,
-            lockMovementY: true
-          });
-        }
-      });
-      cacheTemplatePlaceholders(canvas);
-      canvas.requestRenderAll();
-    });
+  // remove any saved templateBg object (background is already set)
+  if (json.objects) {
+    json.objects = json.objects.filter(o => o.customId !== "templateBg");
   }
 
-  // Optional static logo/signature (also locked)
+  canvas.loadFromJSON(json, () => {
+    canvas.getObjects().forEach(o => {
+      if (o.customId === "frameSlot" || o.customId === "templateText") {
+        // 🔒 keep placeholders locked
+        o.set({
+          selectable: false,
+          evented: false,
+          hasControls: false,
+          hasBorders: false,
+          lockMovementX: true,
+          lockMovementY: true,
+        });
+        o.skipTargetFind = true; // ignore hit-testing
+      }
+
+      if (o.customId === "logo" || o.customId === "signature") {
+        // ✅ make logo & signature movable/resizable
+        o.set({
+          selectable: true,
+          evented: true,
+          hasControls: true,
+          hasBorders: true,
+          lockMovementX: false,
+          lockMovementY: false,
+          lockUniScaling: false,
+        });
+        o.skipTargetFind = false;
+      }
+
+      if (o.customId === "studentName" || o.customId === "studentPhotoGroup") {
+        // ✅ in case these were stored in JSON, allow full movement
+        o.set({
+          selectable: true,
+          evented: true,
+          hasControls: true,
+          lockMovementX: false,
+          lockMovementY: false,
+        });
+        o.skipTargetFind = false;
+      }
+    });
+
+    cacheTemplatePlaceholders(canvas);
+    canvas.requestRenderAll();
+  });
+}
+
+
+  // Optional static logo/signature (locked)
   if (showLogo && selectedInstitute?.logo) {
-    loadTemplateAsset("logo", selectedInstitute.logo, canvas, { locked: true });
+    loadTemplateAsset("logo", selectedInstitute.logo, canvas);
   }
   if (showSignature && selectedInstitute?.signature) {
-    loadTemplateAsset("signature", selectedInstitute.signature, canvas, { locked: true });
+    loadTemplateAsset("signature", selectedInstitute.signature, canvas);
   }
 }, [canvas, selectedInstitute, showLogo, showSignature]);
 

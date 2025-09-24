@@ -2093,8 +2093,8 @@ if (saved?.canvas) {
               <Images size={16} /> Template
             </button>
 
-           {/* Download + Export PDF (mobile scrollable toolbar) */}
-<div className="flex gap-2 overflow-x-auto sm:overflow-visible sm:flex-nowrap">
+        {/* Download + Export PDF (mobile + desktop) */}
+<div className="flex gap-2 sm:gap-2 overflow-x-auto sm:overflow-visible sm:flex-nowrap w-full sm:w-auto py-2 sm:py-0">
   {/* Download current */}
   <button
     title="Download PNG"
@@ -2113,6 +2113,7 @@ if (saved?.canvas) {
     <FileDown size={18} />
   </button>
 </div>
+
 
             <button
               title="Export Imposed Sheet PDF"

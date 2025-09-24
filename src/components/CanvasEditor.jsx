@@ -1269,6 +1269,8 @@ if (frameSlot.type === "path" && frameSlot.path) {
       angle:  savedPhoto.angle  ?? 0,
       selectable: true,
       evented: true,
+      hasControls: true,
+      lockUniScaling: false,
       customId: "studentPhoto",
       clipPath
     });

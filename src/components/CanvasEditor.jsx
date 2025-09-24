@@ -1615,7 +1615,11 @@ const gotoIndex = (idx) => {
   if (canvasRef.current && bulkList[bulkIndex]) {
     const objs = canvasRef.current.getObjects();
     objs
-      .filter((o) => o.customId === "studentPhoto")
+       .filter(
+      (o) =>
+        o.customId === "studentPhoto" ||
+        o.customId === "studentPhotoGroup" 
+    )
       .forEach((p) => canvasRef.current.remove(p));
     studentLayoutsRef.current[bulkList[bulkIndex]] = canvasRef.current.toJSON();
   }
@@ -1979,7 +1983,7 @@ if (saved?.canvas) {
             </div>
           )}
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 overflow-x-auto">
             <label className="text-xs">W</label>
             <input
               type="number"

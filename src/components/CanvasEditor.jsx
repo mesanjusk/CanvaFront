@@ -1064,12 +1064,12 @@ const renderTemplate = useCallback(async (data) => {
   if (!canvas) return;
 
   // Remove only template objects (leave student photo/name)
-  const templateIds = ["frameSlot", "templateText", "logo", "signature"];
+  const templateIds = ["frameSlot", "templateText", "logo", "signature", "templateBg"];
   canvas.getObjects()
     .filter(o => o?.customId && templateIds.includes(o.customId))
     .forEach(o => canvas.remove(o));
 
-   /* ---- 1️⃣  Resize canvas ---- */
+  /* ---- 1️⃣ Resize canvas ---- */
   const parent = stageRef.current;
   const w = Number(data?.width)  || parent.offsetWidth  || 600;
   const h = Number(data?.height) || parent.offsetHeight || 400;
@@ -1078,25 +1078,41 @@ const renderTemplate = useCallback(async (data) => {
   setTplSize({ w, h });
   setCanvasSize?.(w, h);
 
-   /* ---- 2️⃣ Set background as fixed ---- */
+  /* ---- 2️⃣ Set background as fixed ---- */
   if (data?.image) {
     await new Promise(resolve => {
       fabric.Image.fromURL(
         data.image,
         (img) => {
+          // Lock background image (not movable or selectable)
+          img.set({
+            customId: "templateBg",
+            selectable: false,
+            evented: false,
+            hasControls: false,
+            hasBorders: false,
+            lockMovementX: true,
+            lockMovementY: true,
+          });
+
+          // Fit image to canvas size
+          img.scaleToWidth(w);
+          img.scaleToHeight(h);
+
+          // Set as canvas background
           canvas.setBackgroundImage(
             img,
             canvas.renderAll.bind(canvas),
             {
-              scaleX: w / img.width,
-              scaleY: h / img.height,
               originX: "left",
               originY: "top",
-              crossOrigin: "anonymous"
             }
           );
+
           resolve();
-        }, { crossOrigin: "anonymous" });
+        },
+        { crossOrigin: "anonymous" }
+      );
     });
   }
 
@@ -1105,12 +1121,20 @@ const renderTemplate = useCallback(async (data) => {
     canvas.loadFromJSON(data.canvasJson, () => {
       canvas.getObjects().forEach((o) => {
         if (
+          o.customId === "templateBg" ||
           o.customId === "templateText" ||
           o.customId === "logo" ||
           o.customId === "signature" ||
           o.customId === "frameSlot"
         ) {
-          o.set({ selectable: false, evented: false });
+          o.set({
+            selectable: false,
+            evented: false,
+            hasControls: false,
+            hasBorders: false,
+            lockMovementX: true,
+            lockMovementY: true,
+          });
         }
       });
       cacheTemplatePlaceholders(canvas);
@@ -1119,12 +1143,17 @@ const renderTemplate = useCallback(async (data) => {
   }
 
   // Optional: Logo
-  if (showLogo && selectedInstitute?.logo) loadTemplateAsset("logo", selectedInstitute.logo, canvas);
+  if (showLogo && selectedInstitute?.logo) {
+    loadTemplateAsset("logo", selectedInstitute.logo, canvas);
+  }
 
   // Optional: Signature
-  if (showSignature && selectedInstitute?.signature) loadTemplateAsset("signature", selectedInstitute.signature, canvas);
+  if (showSignature && selectedInstitute?.signature) {
+    loadTemplateAsset("signature", selectedInstitute.signature, canvas);
+  }
 
 }, [canvas, selectedInstitute, showLogo, showSignature]);
+
 
 /* ======================= 3. Load template by ID ======================= */
 const loadTemplateById = useCallback(async id => {
@@ -2099,11 +2128,9 @@ if (saved?.canvas) {
               <Images size={16} /> Template
             </button>
 
-      {/* Download + Export PDF (mobile + desktop) */}
-<div className="flex gap-2 sm:gap-2 w-full sm:w-auto py-2 sm:py-0
-                overflow-x-auto sm:overflow-visible 
-                scrollbar-hide"> 
-  <div className="flex flex-nowrap">
+    {/* Toolbar wrapper */}
+<div className="w-full sm:w-auto overflow-x-auto sm:overflow-visible">
+  <div className="flex gap-2 px-2 sm:px-0">
     {/* Download current */}
     <button
       title="Download PNG"
@@ -2123,8 +2150,6 @@ if (saved?.canvas) {
     </button>
   </div>
 </div>
-
-
 
             <button
               title="Export Imposed Sheet PDF"

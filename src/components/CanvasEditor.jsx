@@ -1983,7 +1983,7 @@ if (saved?.canvas) {
             </div>
           )}
 
-          <div className="flex flex-wrap items-center gap-2 overflow-x-auto">
+          <div className="flex items-center gap-2">
             <label className="text-xs">W</label>
             <input
               type="number"
@@ -2093,23 +2093,27 @@ if (saved?.canvas) {
               <Images size={16} /> Template
             </button>
 
-            {/* Download current */}
-            <button
-              title="Download PNG"
-              onClick={downloadCurrentPNG}
-              className="p-2 rounded-full bg-green-600 text-white shadow hover:bg-green-700"
-            >
-              <Download size={18} />
-            </button>
+           {/* Download + Export PDF (mobile scrollable toolbar) */}
+<div className="flex gap-2 overflow-x-auto sm:overflow-visible sm:flex-nowrap">
+  {/* Download current */}
+  <button
+    title="Download PNG"
+    onClick={downloadCurrentPNG}
+    className="flex-shrink-0 p-2 rounded-full bg-green-600 text-white shadow hover:bg-green-700"
+  >
+    <Download size={18} />
+  </button>
 
-            {/* Export PDF */}
-            <button
-              title="Export PDF"
-              onClick={exportSinglePDF}
-              className="p-2 rounded-full bg-purple-600 text-white shadow hover:bg-purple-700"
-            >
-              <FileDown size={18} />
-            </button>
+  {/* Export PDF */}
+  <button
+    title="Export PDF"
+    onClick={exportSinglePDF}
+    className="flex-shrink-0 p-2 rounded-full bg-purple-600 text-white shadow hover:bg-purple-700"
+  >
+    <FileDown size={18} />
+  </button>
+</div>
+
             <button
               title="Export Imposed Sheet PDF"
               onClick={exportImposedPDF}

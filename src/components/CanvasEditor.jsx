@@ -1210,7 +1210,7 @@ if (showLogo && selectedInstitute?.logo) {
       const scale = 0.15; // small size (adjust as needed)
       img.set({
         customId: "logo",
-        originX: "left",
+        originX: "right",
         originY: "top",
         left: canvas.width - 10,   // 10px padding from right
         top: 10,                   // 10px padding from top
@@ -1236,7 +1236,7 @@ if (showSignature && selectedInstitute?.signature) {
       const scale = 0.15; // small size (adjust as needed)
       img.set({
         customId: "signature",
-        originX: "right",
+        originX: "left",
         originY: "bottom",
         left: 10,                    // 10px padding from left
         top: canvas.height - 10,     // 10px padding from bottom
@@ -1445,6 +1445,7 @@ useEffect(() => {
     photoGroup.on("rotating", persist);
 
     canvas.add(photoGroup);
+    canvas.bringToFront(photoGroup);
     canvas.setActiveObject(photoGroup);
 
     // अब frameSlot visible और selectable रहेगा

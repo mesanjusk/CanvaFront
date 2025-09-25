@@ -1341,46 +1341,58 @@ useEffect(() => {
   }
   if (nameObj) canvas.bringToFront(nameObj);
 
-  // === 2️⃣ Student Photo ===
-  const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
-  if (!frameSlot) return;
+ // ✅ Safe image loader that always returns a Fabric image
+function safeLoadImage(url, cb) {
+  fabric.Image.fromURL(
+    url,
+    (img) => {
+      if (img) cb(img);
+      else cb(null);
+    },
+    { crossOrigin: "anonymous" } // avoids tainted canvas
+  );
+}
 
-  // ✅ Frame 
-  frameSlot.set({
-    selectable: true,
-    evented: true,
-    hasControls: true,
-    lockMovementX: false,
-    lockMovementY: false,
-    lockUniScaling: false,
-  });
+// === 2️⃣ Student Photo ===
+const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
+if (!frameSlot) return;
 
-  const bounds = frameSlot.getBoundingRect(true);
-  const photoUrl = Array.isArray(currentStudent.photo)
-    ? currentStudent.photo[0]
-    : currentStudent.photo;
-  if (!photoUrl) return;
+// ✅ Frame stays editable
+frameSlot.set({
+  selectable: true,
+  evented: true,
+  hasControls: true,
+  lockMovementX: false,
+  lockMovementY: false,
+  lockUniScaling: false,
+});
 
-  const perStudent =
-    studentLayoutsRef.current?.[currentStudent.uuid]?.studentPhotoProps;
-  const savedPhoto = perStudent ?? getSavedProps("studentPhoto") ?? {};
+const bounds = frameSlot.getBoundingRect(true);
+const photoUrl = Array.isArray(currentStudent.photo)
+  ? currentStudent.photo[0]
+  : currentStudent.photo;
+if (!photoUrl) return;
 
-safeLoadImage(photoUrl, img => {
+const perStudent =
+  studentLayoutsRef.current?.[currentStudent.uuid]?.studentPhotoProps;
+const savedPhoto = perStudent ?? getSavedProps("studentPhoto") ?? {};
+
+safeLoadImage(photoUrl, (img) => {
   if (!img) return;
 
-  // --- Clone frame shape for clipPath ---
+  // --- Build clipPath ---
   let clipPath;
   if (frameSlot.type === "path" && frameSlot.path) {
     clipPath = new fabric.Path(frameSlot.path, {
       originX: "center",
       originY: "center",
-      absolutePositioned: true,   // ✅ critical
+      absolutePositioned: true,
     });
   } else if (frameSlot.type === "polygon" && frameSlot.points) {
     clipPath = new fabric.Polygon(frameSlot.points, {
       originX: "center",
       originY: "center",
-      absolutePositioned: true,   // ✅ critical
+      absolutePositioned: true,
     });
   } else {
     clipPath = new fabric.Rect({
@@ -1390,14 +1402,12 @@ safeLoadImage(photoUrl, img => {
       top: frameSlot.top,
       originX: "center",
       originY: "center",
-      absolutePositioned: true,   // ✅ critical
+      absolutePositioned: true,
     });
   }
 
-  // --- Image setup ---
-  const bounds = frameSlot.getBoundingRect(true);
+  // --- Setup image ---
   const baseScale = Math.max(bounds.width / img.width, bounds.height / img.height);
-
   img.set({
     originX: "center",
     originY: "center",
@@ -1406,8 +1416,7 @@ safeLoadImage(photoUrl, img => {
     scaleX: savedPhoto.scaleX ?? baseScale,
     scaleY: savedPhoto.scaleY ?? baseScale,
     angle: savedPhoto.angle ?? 0,
-
-    clipPath, // ✅ now positioned correctly
+    clipPath,
     selectable: true,
     evented: true,
     hasControls: true,
@@ -1417,15 +1426,55 @@ safeLoadImage(photoUrl, img => {
     customId: "studentPhoto",
   });
 
-  // --- Frame border/shape (visual only) ---
-  const frameShape = frameSlot.clone();
-  frameShape.set({
-    selectable: false,
-    evented: false,
-    customId: "studentFrame",
-  });
+  // --- Rebuild frame shape (instead of clone) ---
+  let frameShape;
+  if (frameSlot.type === "path" && frameSlot.path) {
+    frameShape = new fabric.Path(frameSlot.path, {
+      left: frameSlot.left,
+      top: frameSlot.top,
+      scaleX: frameSlot.scaleX,
+      scaleY: frameSlot.scaleY,
+      angle: frameSlot.angle,
+      fill: frameSlot.fill,
+      stroke: frameSlot.stroke,
+      strokeWidth: frameSlot.strokeWidth,
+      selectable: false,
+      evented: false,
+      customId: "studentFrame",
+    });
+  } else if (frameSlot.type === "polygon" && frameSlot.points) {
+    frameShape = new fabric.Polygon(frameSlot.points, {
+      left: frameSlot.left,
+      top: frameSlot.top,
+      scaleX: frameSlot.scaleX,
+      scaleY: frameSlot.scaleY,
+      angle: frameSlot.angle,
+      fill: frameSlot.fill,
+      stroke: frameSlot.stroke,
+      strokeWidth: frameSlot.strokeWidth,
+      selectable: false,
+      evented: false,
+      customId: "studentFrame",
+    });
+  } else {
+    frameShape = new fabric.Rect({
+      width: frameSlot.width,
+      height: frameSlot.height,
+      left: frameSlot.left,
+      top: frameSlot.top,
+      scaleX: frameSlot.scaleX,
+      scaleY: frameSlot.scaleY,
+      angle: frameSlot.angle,
+      fill: "transparent",
+      stroke: frameSlot.stroke,
+      strokeWidth: frameSlot.strokeWidth,
+      selectable: false,
+      evented: false,
+      customId: "studentFrame",
+    });
+  }
 
-  // --- Group them together ---
+  // --- Group photo + frame ---
   const frameGroup = new fabric.Group([img, frameShape], {
     originX: "center",
     originY: "center",
@@ -1441,13 +1490,12 @@ safeLoadImage(photoUrl, img => {
     customId: "studentFrameGroup",
   });
 
+  // Replace frame with group
   canvas.remove(frameSlot);
   canvas.add(frameGroup);
   canvas.setActiveObject(frameGroup);
   canvas.requestRenderAll();
 });
-
-
   
 
 }, [canvas, selectedStudent, bulkMode, bulkIndex, filteredStudents, bulkList]);

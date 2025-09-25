@@ -1345,7 +1345,7 @@ useEffect(() => {
   const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
   if (!frameSlot) return;
 
-  // ✅ Frame को भी editable/movable बनाएं
+  // ✅ Frame 
   frameSlot.set({
     selectable: true,
     evented: true,
@@ -1365,92 +1365,79 @@ useEffect(() => {
     studentLayoutsRef.current?.[currentStudent.uuid]?.studentPhotoProps;
   const savedPhoto = perStudent ?? getSavedProps("studentPhoto") ?? {};
 
-  safeLoadImage(photoUrl, img => {
-    if (!img) return;
+safeLoadImage(photoUrl, img => {
+  if (!img) return;
 
-    // ----- choose clipPath type -----
-    let clipPath;
-    if (frameSlot.type === "path" && frameSlot.path) {
-      clipPath = new fabric.Path(frameSlot.path, {
-        originX: "center",
-        originY: "center",
-        scaleX: frameSlot.scaleX || 1,
-        scaleY: frameSlot.scaleY || 1,
-      });
-    } else if (frameSlot.type === "polygon" && frameSlot.points) {
-      clipPath = new fabric.Polygon(frameSlot.points, {
-        originX: "center",
-        originY: "center",
-        scaleX: frameSlot.scaleX || 1,
-        scaleY: frameSlot.scaleY || 1,
-      });
-    } else {
-      clipPath = new fabric.Rect({
-        width: bounds.width,
-        height: bounds.height,
-        originX: "center",
-        originY: "center",
-      });
-    }
+  // use frameSlot itself as clipPath
+  const clipPath = frameSlot;
 
-    // scale to fill frame initially
-    const baseScale = Math.max(bounds.width / img.width, bounds.height / img.height);
-    img.set({
-      originX: "center",
-      originY: "center",
-      scaleX: savedPhoto.scaleX ?? baseScale,
-      scaleY: savedPhoto.scaleY ?? baseScale,
-      angle:  savedPhoto.angle  ?? 0,
-    });
+  // scale to fill frame initially
+  const baseScale = Math.max(bounds.width / img.width, bounds.height / img.height);
+  img.set({
+    originX: "center",
+    originY: "center",
+    left: savedPhoto.left ?? bounds.left + bounds.width / 2,
+    top: savedPhoto.top ?? bounds.top + bounds.height / 2,
+    scaleX: savedPhoto.scaleX ?? baseScale,
+    scaleY: savedPhoto.scaleY ?? baseScale,
+    angle:  savedPhoto.angle  ?? 0,
 
-    // ---- Group photo with clipPath ----
-    const photoGroup = new fabric.Group([img], {
-      clipPath,
-      originX: "center",
-      originY: "center",
-      left:   savedPhoto.left ?? bounds.left + bounds.width / 2,
-      top:    savedPhoto.top  ?? bounds.top  + bounds.height / 2,
-      scaleX: savedPhoto.groupScaleX ?? 1,
-      scaleY: savedPhoto.groupScaleY ?? 1,
-      angle:  savedPhoto.groupAngle  ?? 0,
-
-      // ✅ allow full editing of photo
-      selectable: true,
-      evented: true,
-      hasControls: true,
-      lockMovementX: false,
-      lockMovementY: false,
-      lockUniScaling: false,
-      customId: "studentPhotoGroup",
-    });
-
-    // persist per-student transform
-    const persist = () => {
-      const uuid = currentStudent.uuid;
-      studentLayoutsRef.current[uuid] = {
-        ...studentLayoutsRef.current[uuid],
-        studentPhotoProps: {
-          left: photoGroup.left,
-          top: photoGroup.top,
-          scaleX: photoGroup.scaleX,
-          scaleY: photoGroup.scaleY,
-          angle: photoGroup.angle,
-        },
-      };
-      saveProps("studentPhoto", studentLayoutsRef.current[uuid].studentPhotoProps);
-    };
-    photoGroup.on("modified", persist);
-    photoGroup.on("scaling",  persist);
-    photoGroup.on("moving",   persist);
-    photoGroup.on("rotating", persist);
-
-    canvas.add(photoGroup);
-    canvas.bringToFront(photoGroup);
-    canvas.setActiveObject(photoGroup);
-
-    // अब frameSlot visible और selectable रहेगा
-    canvas.requestRenderAll();
+    clipPath,
+    selectable: true,
+    evented: true,
+    hasControls: true,
+    lockMovementX: false,
+    lockMovementY: false,
+    lockUniScaling: false,
+    customId: "studentPhoto",
   });
+
+   // ✅ Persist photo changes
+  const persistPhoto = () => {
+    const uuid = currentStudent.uuid;
+    studentLayoutsRef.current[uuid] = {
+      ...studentLayoutsRef.current[uuid],
+      studentPhotoProps: {
+        left: img.left,
+        top: img.top,
+        scaleX: img.scaleX,
+        scaleY: img.scaleY,
+        angle: img.angle,
+      },
+    };
+    saveProps("studentPhoto", studentLayoutsRef.current[uuid].studentPhotoProps);
+  };
+  img.on("modified", persistPhoto);
+  img.on("scaling",  persistPhoto);
+  img.on("moving",   persistPhoto);
+  img.on("rotating", persistPhoto);
+
+  // ✅ Persist frame changes
+  const persistFrame = () => {
+    const uuid = currentStudent.uuid;
+    studentLayoutsRef.current[uuid] = {
+      ...studentLayoutsRef.current[uuid],
+      frameProps: {
+        left: frameSlot.left,
+        top: frameSlot.top,
+        scaleX: frameSlot.scaleX,
+        scaleY: frameSlot.scaleY,
+        angle: frameSlot.angle,
+      },
+    };
+    saveProps("frameSlot", studentLayoutsRef.current[uuid].frameProps);
+  };
+  frameSlot.on("modified", persistFrame);
+  frameSlot.on("scaling",  persistFrame);
+  frameSlot.on("moving",   persistFrame);
+  frameSlot.on("rotating", persistFrame);
+
+  canvas.add(img);
+  canvas.bringToFront(img);
+  canvas.setActiveObject(img);
+  canvas.requestRenderAll();
+});
+
 }, [canvas, selectedStudent, bulkMode, bulkIndex, filteredStudents, bulkList]);
 
 /* ======================= 5. Helper to load assets (logo/signature) ======================= */

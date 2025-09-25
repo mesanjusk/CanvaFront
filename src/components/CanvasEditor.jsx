@@ -1363,48 +1363,44 @@ const perStudent =
   studentLayoutsRef.current?.[currentStudent.uuid]?.studentPhotoProps;
 const savedPhoto = perStudent ?? getSavedProps("studentPhoto") ?? {};
 
+// --- Function to rebuild clipPath from current frameSlot ---
+function makeClipPath() {
+  if (frameSlot.type === "path" && frameSlot.path) {
+    return new fabric.Path(frameSlot.path, {
+      left: frameSlot.left,
+      top: frameSlot.top,
+      scaleX: frameSlot.scaleX,
+      scaleY: frameSlot.scaleY,
+      originX: "left",
+      originY: "top",
+      absolutePositioned: true,
+    });
+  } else if (frameSlot.type === "polygon" && frameSlot.points) {
+    return new fabric.Polygon(frameSlot.points, {
+      left: frameSlot.left,
+      top: frameSlot.top,
+      scaleX: frameSlot.scaleX,
+      scaleY: frameSlot.scaleY,
+      originX: "left",
+      originY: "top",
+      absolutePositioned: true,
+    });
+  } else {
+    return new fabric.Rect({
+      left: frameSlot.left,
+      top: frameSlot.top,
+      width: frameSlot.width * frameSlot.scaleX,
+      height: frameSlot.height * frameSlot.scaleY,
+      originX: "left",
+      originY: "top",
+      absolutePositioned: true,
+    });
+  }
+}
+
 safeLoadImage(photoUrl, (img) => {
   if (!img) return;
 
-  // --- Build clipPath from frameSlot ---
-  let clipPath;
-  if (frameSlot.type === "path" && frameSlot.path) {
-    clipPath = new fabric.Path(frameSlot.path, {
-      originX: "center",
-      originY: "center",
-      absolutePositioned: true,
-      stroke: null,
-      fill: "#000",
-      selectable: false,
-      evented: false,
-    });
-  } else if (frameSlot.type === "polygon" && frameSlot.points) {
-    clipPath = new fabric.Polygon(frameSlot.points, {
-      originX: "center",
-      originY: "center",
-      absolutePositioned: true,
-      stroke: null,
-      fill: "#000",
-      selectable: false,
-      evented: false,
-    });
-  } else {
-    clipPath = new fabric.Rect({
-      width: frameSlot.width * frameSlot.scaleX,
-      height: frameSlot.height * frameSlot.scaleY,
-      left: frameSlot.left,
-      top: frameSlot.top,
-      originX: "center",
-      originY: "center",
-      absolutePositioned: true,
-      stroke: null,
-      fill: "#000",
-      selectable: false,
-      evented: false,
-    });
-  }
-
-  // --- Setup photo ---
   const baseScale = Math.max(bounds.width / img.width, bounds.height / img.height);
   img.set({
     originX: "center",
@@ -1421,18 +1417,10 @@ safeLoadImage(photoUrl, (img) => {
     lockMovementY: false,
     lockUniScaling: false,
     customId: "studentPhoto",
+    clipPath: makeClipPath(),   // start clipped
   });
 
-  // ✅ Apply clipPath
-  clipPath.set({
-    left: img.left,
-    top: img.top,
-    originX: "center",
-    originY: "center",
-  });
-  img.clipPath = clipPath;
-
-  // --- Keep original frame outline visible ---
+  // Heart outline stays editable
   frameSlot.set({
     selectable: true,
     evented: true,
@@ -1440,14 +1428,37 @@ safeLoadImage(photoUrl, (img) => {
     lockUniScaling: false,
   });
 
-  // Replace old frame with photo + frame
+  // Add objects
   canvas.remove(frameSlot);
   canvas.add(img);
-  canvas.add(frameSlot); // outline always on top
+  canvas.add(frameSlot);
   canvas.bringToFront(frameSlot);
 
   canvas.setActiveObject(img);
   canvas.requestRenderAll();
+
+  // --- Toggle clipping on photo edit ---
+  canvas.on("selection:created", (e) => {
+    if (e.selected[0]?.customId === "studentPhoto") {
+      e.selected[0].clipPath = null; // full image when editing
+      canvas.requestRenderAll();
+    }
+  });
+
+  canvas.on("selection:cleared", () => {
+    if (img && !img.clipPath) {
+      img.clipPath = makeClipPath(); // restore clipping
+      canvas.requestRenderAll();
+    }
+  });
+
+  // --- Update clipPath whenever frameSlot moves/resizes ---
+  frameSlot.on("modified", () => {
+    if (img) {
+      img.clipPath = makeClipPath();
+      canvas.requestRenderAll();
+    }
+  });
 });
 
 }, [canvas, selectedStudent, bulkMode, bulkIndex, filteredStudents, bulkList]);

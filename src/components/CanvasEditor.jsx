@@ -1374,49 +1374,58 @@ safeLoadImage(photoUrl, img => {
     clipPath = new fabric.Path(frameSlot.path, {
       originX: "center",
       originY: "center",
+      absolutePositioned: true,   // ✅ critical
     });
   } else if (frameSlot.type === "polygon" && frameSlot.points) {
     clipPath = new fabric.Polygon(frameSlot.points, {
       originX: "center",
       originY: "center",
+      absolutePositioned: true,   // ✅ critical
     });
   } else {
     clipPath = new fabric.Rect({
-      width: frameSlot.width,
-      height: frameSlot.height,
+      width: frameSlot.width * frameSlot.scaleX,
+      height: frameSlot.height * frameSlot.scaleY,
+      left: frameSlot.left,
+      top: frameSlot.top,
       originX: "center",
       originY: "center",
+      absolutePositioned: true,   // ✅ critical
     });
   }
 
+  // --- Image setup ---
   const bounds = frameSlot.getBoundingRect(true);
   const baseScale = Math.max(bounds.width / img.width, bounds.height / img.height);
 
-  // --- Photo inside frame ---
   img.set({
     originX: "center",
     originY: "center",
+    left: bounds.left + bounds.width / 2,
+    top: bounds.top + bounds.height / 2,
     scaleX: savedPhoto.scaleX ?? baseScale,
     scaleY: savedPhoto.scaleY ?? baseScale,
-    left: savedPhoto.left ?? 0,
-    top: savedPhoto.top ?? 0,
-    clipPath,
-    selectable: true,   // ✅ allow editing photo separately
+    angle: savedPhoto.angle ?? 0,
+
+    clipPath, // ✅ now positioned correctly
+    selectable: true,
     evented: true,
     hasControls: true,
+    lockMovementX: false,
+    lockMovementY: false,
     lockUniScaling: false,
     customId: "studentPhoto",
   });
 
-  // --- Frame shape (for border/visibility) ---
+  // --- Frame border/shape (visual only) ---
   const frameShape = frameSlot.clone();
   frameShape.set({
-    selectable: false, // user can’t accidentally drag just the border
+    selectable: false,
     evented: false,
     customId: "studentFrame",
   });
 
-  // --- Group frame + photo ---
+  // --- Group them together ---
   const frameGroup = new fabric.Group([img, frameShape], {
     originX: "center",
     originY: "center",
@@ -1432,36 +1441,14 @@ safeLoadImage(photoUrl, img => {
     customId: "studentFrameGroup",
   });
 
-  // --- Persist edits ---
-  const persistGroup = () => {
-    const uuid = currentStudent.uuid;
-    studentLayoutsRef.current[uuid] = {
-      frameGroupProps: {
-        left: frameGroup.left,
-        top: frameGroup.top,
-        scaleX: frameGroup.scaleX,
-        scaleY: frameGroup.scaleY,
-        angle: frameGroup.angle,
-      },
-      studentPhotoProps: {
-        left: img.left,
-        top: img.top,
-        scaleX: img.scaleX,
-        scaleY: img.scaleY,
-        angle: img.angle,
-      }
-    };
-    saveProps("frameGroup", studentLayoutsRef.current[uuid]);
-  };
-  frameGroup.on("modified", persistGroup);
-  img.on("modified", persistGroup);
-
-  // --- Replace old frame with group ---
   canvas.remove(frameSlot);
   canvas.add(frameGroup);
   canvas.setActiveObject(frameGroup);
   canvas.requestRenderAll();
 });
+
+
+  
 
 }, [canvas, selectedStudent, bulkMode, bulkIndex, filteredStudents, bulkList]);
 

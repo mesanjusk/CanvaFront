@@ -1368,73 +1368,98 @@ useEffect(() => {
 safeLoadImage(photoUrl, img => {
   if (!img) return;
 
-  // use frameSlot itself as clipPath
-  const clipPath = frameSlot;
+  // --- Clone frame shape for clipPath ---
+  let clipPath;
+  if (frameSlot.type === "path" && frameSlot.path) {
+    clipPath = new fabric.Path(frameSlot.path, {
+      originX: "center",
+      originY: "center",
+    });
+  } else if (frameSlot.type === "polygon" && frameSlot.points) {
+    clipPath = new fabric.Polygon(frameSlot.points, {
+      originX: "center",
+      originY: "center",
+    });
+  } else {
+    clipPath = new fabric.Rect({
+      width: frameSlot.width,
+      height: frameSlot.height,
+      originX: "center",
+      originY: "center",
+    });
+  }
 
-  // scale to fill frame initially
+  const bounds = frameSlot.getBoundingRect(true);
   const baseScale = Math.max(bounds.width / img.width, bounds.height / img.height);
+
+  // --- Photo inside frame ---
   img.set({
     originX: "center",
     originY: "center",
-    left: savedPhoto.left ?? bounds.left + bounds.width / 2,
-    top: savedPhoto.top ?? bounds.top + bounds.height / 2,
     scaleX: savedPhoto.scaleX ?? baseScale,
     scaleY: savedPhoto.scaleY ?? baseScale,
-    angle:  savedPhoto.angle  ?? 0,
-
+    left: savedPhoto.left ?? 0,
+    top: savedPhoto.top ?? 0,
     clipPath,
-    selectable: true,
+    selectable: true,   // ✅ allow editing photo separately
     evented: true,
     hasControls: true,
-    lockMovementX: false,
-    lockMovementY: false,
     lockUniScaling: false,
     customId: "studentPhoto",
   });
 
-   // ✅ Persist photo changes
-  const persistPhoto = () => {
+  // --- Frame shape (for border/visibility) ---
+  const frameShape = frameSlot.clone();
+  frameShape.set({
+    selectable: false, // user can’t accidentally drag just the border
+    evented: false,
+    customId: "studentFrame",
+  });
+
+  // --- Group frame + photo ---
+  const frameGroup = new fabric.Group([img, frameShape], {
+    originX: "center",
+    originY: "center",
+    left: frameSlot.left,
+    top: frameSlot.top,
+    scaleX: frameSlot.scaleX,
+    scaleY: frameSlot.scaleY,
+    angle: frameSlot.angle,
+    selectable: true,
+    evented: true,
+    hasControls: true,
+    lockUniScaling: false,
+    customId: "studentFrameGroup",
+  });
+
+  // --- Persist edits ---
+  const persistGroup = () => {
     const uuid = currentStudent.uuid;
     studentLayoutsRef.current[uuid] = {
-      ...studentLayoutsRef.current[uuid],
+      frameGroupProps: {
+        left: frameGroup.left,
+        top: frameGroup.top,
+        scaleX: frameGroup.scaleX,
+        scaleY: frameGroup.scaleY,
+        angle: frameGroup.angle,
+      },
       studentPhotoProps: {
         left: img.left,
         top: img.top,
         scaleX: img.scaleX,
         scaleY: img.scaleY,
         angle: img.angle,
-      },
+      }
     };
-    saveProps("studentPhoto", studentLayoutsRef.current[uuid].studentPhotoProps);
+    saveProps("frameGroup", studentLayoutsRef.current[uuid]);
   };
-  img.on("modified", persistPhoto);
-  img.on("scaling",  persistPhoto);
-  img.on("moving",   persistPhoto);
-  img.on("rotating", persistPhoto);
+  frameGroup.on("modified", persistGroup);
+  img.on("modified", persistGroup);
 
-  // ✅ Persist frame changes
-  const persistFrame = () => {
-    const uuid = currentStudent.uuid;
-    studentLayoutsRef.current[uuid] = {
-      ...studentLayoutsRef.current[uuid],
-      frameProps: {
-        left: frameSlot.left,
-        top: frameSlot.top,
-        scaleX: frameSlot.scaleX,
-        scaleY: frameSlot.scaleY,
-        angle: frameSlot.angle,
-      },
-    };
-    saveProps("frameSlot", studentLayoutsRef.current[uuid].frameProps);
-  };
-  frameSlot.on("modified", persistFrame);
-  frameSlot.on("scaling",  persistFrame);
-  frameSlot.on("moving",   persistFrame);
-  frameSlot.on("rotating", persistFrame);
-
-  canvas.add(img);
-  canvas.bringToFront(img);
-  canvas.setActiveObject(img);
+  // --- Replace old frame with group ---
+  canvas.remove(frameSlot);
+  canvas.add(frameGroup);
+  canvas.setActiveObject(frameGroup);
   canvas.requestRenderAll();
 });
 

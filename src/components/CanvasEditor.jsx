@@ -1343,9 +1343,11 @@ useEffect(() => {
 
 // === Student Photo Loader ===
 function safeLoadImage(url, cb) {
-  fabric.Image.fromURL(url, (img) => cb(img || null), {
-    crossOrigin: "anonymous",
-  });
+  fabric.Image.fromURL(
+    url,
+    (img) => cb(img || null),
+    { crossOrigin: "anonymous" }
+  );
 }
 
 const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
@@ -1357,27 +1359,52 @@ const photoUrl = Array.isArray(currentStudent.photo)
   : currentStudent.photo;
 if (!photoUrl) return;
 
-const savedPhoto =
-  studentLayoutsRef.current?.[currentStudent.uuid]?.studentPhotoProps ?? {};
-
-// --- Build clipPath from frame ---
-function makeClipPathFromFrame(frame) {
-  const clone = fabric.util.object.clone(frame);
-  clone.set({
-    originX: "center",
-    originY: "center",
-    left: frame.left + frame.width * frame.scaleX / 2,
-    top: frame.top + frame.height * frame.scaleY / 2,
-    absolutePositioned: true,
-    evented: false,
-    selectable: false,
-  });
-  return clone;
-}
+const perStudent =
+  studentLayoutsRef.current?.[currentStudent.uuid]?.studentPhotoProps;
+const savedPhoto = perStudent ?? getSavedProps("studentPhoto") ?? {};
 
 safeLoadImage(photoUrl, (img) => {
   if (!img) return;
 
+  // --- Build clipPath from frameSlot ---
+  let clipPath;
+  if (frameSlot.type === "path" && frameSlot.path) {
+    clipPath = new fabric.Path(frameSlot.path, {
+      originX: "center",
+      originY: "center",
+      absolutePositioned: true,
+      stroke: null,
+      fill: "#000",          // mask only
+      selectable: false,
+      evented: false,
+    });
+  } else if (frameSlot.type === "polygon" && frameSlot.points) {
+    clipPath = new fabric.Polygon(frameSlot.points, {
+      originX: "center",
+      originY: "center",
+      absolutePositioned: true,
+      stroke: null,
+      fill: "#000",
+      selectable: false,
+      evented: false,
+    });
+  } else {
+    clipPath = new fabric.Rect({
+      width: frameSlot.width * frameSlot.scaleX,
+      height: frameSlot.height * frameSlot.scaleY,
+      left: frameSlot.left,
+      top: frameSlot.top,
+      originX: "center",
+      originY: "center",
+      absolutePositioned: true,
+      stroke: null,
+      fill: "#000",
+      selectable: false,
+      evented: false,
+    });
+  }
+
+  // --- Setup photo ---
   const baseScale = Math.max(bounds.width / img.width, bounds.height / img.height);
   img.set({
     originX: "center",
@@ -1387,47 +1414,31 @@ safeLoadImage(photoUrl, (img) => {
     scaleX: savedPhoto.scaleX ?? baseScale,
     scaleY: savedPhoto.scaleY ?? baseScale,
     angle: savedPhoto.angle ?? 0,
-    selectable: true,
+    selectable: true,      
     evented: true,
     hasControls: true,
+    lockMovementX: false,
+    lockMovementY: false,
     lockUniScaling: false,
     customId: "studentPhoto",
-    clipPath: makeClipPathFromFrame(frameSlot),
   });
 
+  // --- Keep original frame outline visible ---
   frameSlot.set({
-    selectable: true,
+    selectable: true,       // ✅ user can also edit/move frame
     evented: true,
     hasControls: true,
     lockUniScaling: false,
-    customId: "studentFrame",
   });
 
+  // Replace old frame with photo + frame
+  canvas.remove(frameSlot);
   canvas.add(img);
+  canvas.add(frameSlot); // outline always on top
   canvas.bringToFront(frameSlot);
-  canvas.setActiveObject(img);
+
+  canvas.setActiveObject(img); // default select photo
   canvas.requestRenderAll();
-
-  // --- Editing toggle ---
-  canvas.on("selection:created", (e) => {
-    if (e.selected[0]?.customId === "studentPhoto") {
-      e.selected[0].clipPath = null; // allow free editing
-      canvas.requestRenderAll();
-    }
-  });
-
-  canvas.on("selection:cleared", () => {
-    if (img && !img.clipPath) {
-      img.clipPath = makeClipPathFromFrame(frameSlot); // reapply clip
-      canvas.requestRenderAll();
-    }
-  });
-
-  // --- Keep clip in sync when frame moves ---
-  frameSlot.on("modified", () => {
-    img.clipPath = makeClipPathFromFrame(frameSlot);
-    canvas.requestRenderAll();
-  });
 });
 
 }, [canvas, selectedStudent, bulkMode, bulkIndex, filteredStudents, bulkList]);

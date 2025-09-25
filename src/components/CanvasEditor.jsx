@@ -1293,137 +1293,165 @@ useEffect(() => {
 
   if (!canvas || !currentStudent) return;
 
-  // ---- 1️⃣ Remove old student-specific objects ----
+  // --- Remove old student-specific objects ---
   canvas.getObjects().forEach(o => {
-    if (["studentName", "studentPhoto"].includes(o.customId)) {
+    if (["studentName", "studentPhotoGroup"].includes(o.customId)) {
       canvas.remove(o);
     }
   });
 
-  // ---- 2️⃣ FrameSlot (editable/movable) ----
-  const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
-  if (frameSlot) {
-    frameSlot.set({
-      selectable: true,
-      evented: true,
-      hasControls: true,
-      lockMovementX: false,
-      lockMovementY: false,
-      lockUniScaling: false,
-    });
-  }
-
-  // ---- 3️⃣ Student Name ----
+  // === 1️⃣ Student Name ===
   const name = `${currentStudent.firstName || ""} ${currentStudent.lastName || ""}`.trim();
-  if (frameSlot) {
-    const nameObj = new fabric.IText(name, {
-      left: frameSlot.left + (frameSlot.width * frameSlot.scaleX) / 2,
-      top: frameSlot.top + (frameSlot.height * frameSlot.scaleY) + 10,
-      fontSize: 28,
-      fill: "#000",
-      fontFamily: "Arial",
-      fontWeight: "bold",
-      originX: "center",
-      originY: "top",
+  let nameObj = canvas.getObjects().find(o =>
+    o.customId === "studentName" || o.customId === "templateText"
+  );
+
+  if (nameObj) {
+    nameObj.set({
+      text: name,
       selectable: true,
       evented: true,
       editable: true,
       hasControls: true,
       lockMovementX: false,
       lockMovementY: false,
-      customId: "studentName",
     });
-    canvas.add(nameObj);
-    canvas.bringToFront(nameObj);
+  } else {
+    const frameSlotTmp = canvas.getObjects().find(o => o.customId === "frameSlot");
+    if (frameSlotTmp) {
+      nameObj = new fabric.IText(name, {
+        left: frameSlotTmp.left + frameSlotTmp.width / 2,
+        top: frameSlotTmp.top + frameSlotTmp.height + 10,
+        fontSize: 28,
+        fill: "#000",
+        fontFamily: "Arial",
+        fontWeight: "bold",
+        originX: "center",
+        originY: "top",
+        selectable: true,
+        evented: true,
+        editable: true,
+        hasControls: true,
+        lockMovementX: false,
+        lockMovementY: false,
+        customId: "studentName"
+      });
+      canvas.add(nameObj);
+    }
   }
+  if (nameObj) canvas.bringToFront(nameObj);
 
-  // ---- 4️⃣ Student Photo ----
+  // === 2️⃣ Student Photo ===
+  const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
+  if (!frameSlot) return;
+
+  // ✅ Frame को भी editable/movable बनाएं
+  frameSlot.set({
+    selectable: true,
+    evented: true,
+    hasControls: true,
+    lockMovementX: false,
+    lockMovementY: false,
+    lockUniScaling: false,
+  });
+
+  const bounds = frameSlot.getBoundingRect(true);
   const photoUrl = Array.isArray(currentStudent.photo)
     ? currentStudent.photo[0]
     : currentStudent.photo;
+  if (!photoUrl) return;
 
-  if (!photoUrl || !frameSlot) return;
-
-  const savedPhoto = studentLayoutsRef.current?.[currentStudent.uuid]?.studentPhotoProps ?? {};
+  const perStudent =
+    studentLayoutsRef.current?.[currentStudent.uuid]?.studentPhotoProps;
+  const savedPhoto = perStudent ?? getSavedProps("studentPhoto") ?? {};
 
   safeLoadImage(photoUrl, img => {
     if (!img) return;
 
-    const frameLeft = frameSlot.left;
-    const frameTop = frameSlot.top;
-    const frameWidth = frameSlot.width * frameSlot.scaleX;
-    const frameHeight = frameSlot.height * frameSlot.scaleY;
-
-    // ---- ClipPath to match frame ----
+    // ----- choose clipPath type -----
     let clipPath;
     if (frameSlot.type === "path" && frameSlot.path) {
       clipPath = new fabric.Path(frameSlot.path, {
         originX: "center",
         originY: "center",
-        left: frameWidth / 2,
-        top: frameHeight / 2,
-        scaleX: 1,
-        scaleY: 1,
+        scaleX: frameSlot.scaleX || 1,
+        scaleY: frameSlot.scaleY || 1,
+      });
+    } else if (frameSlot.type === "polygon" && frameSlot.points) {
+      clipPath = new fabric.Polygon(frameSlot.points, {
+        originX: "center",
+        originY: "center",
+        scaleX: frameSlot.scaleX || 1,
+        scaleY: frameSlot.scaleY || 1,
       });
     } else {
       clipPath = new fabric.Rect({
-        width: frameWidth,
-        height: frameHeight,
+        width: bounds.width,
+        height: bounds.height,
         originX: "center",
         originY: "center",
-        left: frameWidth / 2,
-        top: frameHeight / 2,
       });
     }
 
-    const baseScale = Math.max(frameWidth / img.width, frameHeight / img.height);
-
+    // scale to fill frame initially
+    const baseScale = Math.max(bounds.width / img.width, bounds.height / img.height);
     img.set({
       originX: "center",
       originY: "center",
-      left: savedPhoto.left ?? frameLeft + frameWidth / 2,
-      top: savedPhoto.top ?? frameTop + frameHeight / 2,
       scaleX: savedPhoto.scaleX ?? baseScale,
       scaleY: savedPhoto.scaleY ?? baseScale,
-      angle: savedPhoto.angle ?? 0,
+      angle:  savedPhoto.angle  ?? 0,
+    });
+
+    // ---- Group photo with clipPath ----
+    const photoGroup = new fabric.Group([img], {
+      clipPath,
+      originX: "center",
+      originY: "center",
+      left:   savedPhoto.left ?? bounds.left + bounds.width / 2,
+      top:    savedPhoto.top  ?? bounds.top  + bounds.height / 2,
+      scaleX: savedPhoto.groupScaleX ?? 1,
+      scaleY: savedPhoto.groupScaleY ?? 1,
+      angle:  savedPhoto.groupAngle  ?? 0,
+
+      // ✅ allow full editing of photo
       selectable: true,
       evented: true,
       hasControls: true,
+      lockMovementX: false,
+      lockMovementY: false,
       lockUniScaling: false,
-      clipPath,
-      customId: "studentPhoto",
+      customId: "studentPhotoGroup",
     });
 
-    // ---- Persist per-student transform ----
+    // persist per-student transform
     const persist = () => {
-      studentLayoutsRef.current[currentStudent.uuid] = {
-        ...studentLayoutsRef.current[currentStudent.uuid],
+      const uuid = currentStudent.uuid;
+      studentLayoutsRef.current[uuid] = {
+        ...studentLayoutsRef.current[uuid],
         studentPhotoProps: {
-          left: img.left,
-          top: img.top,
-          scaleX: img.scaleX,
-          scaleY: img.scaleY,
-          angle: img.angle,
+          left: photoGroup.left,
+          top: photoGroup.top,
+          scaleX: photoGroup.scaleX,
+          scaleY: photoGroup.scaleY,
+          angle: photoGroup.angle,
         },
       };
-      saveProps("studentPhoto", studentLayoutsRef.current[currentStudent.uuid].studentPhotoProps);
+      saveProps("studentPhoto", studentLayoutsRef.current[uuid].studentPhotoProps);
     };
+    photoGroup.on("modified", persist);
+    photoGroup.on("scaling",  persist);
+    photoGroup.on("moving",   persist);
+    photoGroup.on("rotating", persist);
 
-    img.on("modified", persist);
-    img.on("scaling", persist);
-    img.on("moving", persist);
-    img.on("rotating", persist);
+    canvas.add(photoGroup);
+    canvas.bringToFront(photoGroup);
+    canvas.setActiveObject(photoGroup);
 
-    canvas.add(img);
-    canvas.bringToFront(img);
-    canvas.setActiveObject(img);
+    // अब frameSlot visible और selectable रहेगा
     canvas.requestRenderAll();
   });
-
 }, [canvas, selectedStudent, bulkMode, bulkIndex, filteredStudents, bulkList]);
-
-
-
 
 /* ======================= 5. Helper to load assets (logo/signature) ======================= */
 function loadTemplateAsset(id, url, canvas) {

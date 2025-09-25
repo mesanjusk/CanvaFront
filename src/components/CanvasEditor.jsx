@@ -1363,39 +1363,32 @@ const perStudent =
   studentLayoutsRef.current?.[currentStudent.uuid]?.studentPhotoProps;
 const savedPhoto = perStudent ?? getSavedProps("studentPhoto") ?? {};
 
-// --- Function to rebuild clipPath from current frameSlot ---
-function makeClipPath() {
-  if (frameSlot.type === "path" && frameSlot.path) {
-    return new fabric.Path(frameSlot.path, {
-      left: frameSlot.left,
-      top: frameSlot.top,
-      scaleX: frameSlot.scaleX,
-      scaleY: frameSlot.scaleY,
-      originX: "left",
-      originY: "top",
-      absolutePositioned: true,
-    });
-  } else if (frameSlot.type === "polygon" && frameSlot.points) {
-    return new fabric.Polygon(frameSlot.points, {
-      left: frameSlot.left,
-      top: frameSlot.top,
-      scaleX: frameSlot.scaleX,
-      scaleY: frameSlot.scaleY,
-      originX: "left",
-      originY: "top",
-      absolutePositioned: true,
-    });
+// --- Function to rebuild clipPath from frame ---
+function makeClipPathFromFrame(frame) {
+  let shape;
+  if (frame.type === "path" && frame.path) {
+    shape = new fabric.Path(frame.path);
+  } else if (frame.type === "polygon" && frame.points) {
+    shape = new fabric.Polygon(frame.points);
   } else {
-    return new fabric.Rect({
-      left: frameSlot.left,
-      top: frameSlot.top,
-      width: frameSlot.width * frameSlot.scaleX,
-      height: frameSlot.height * frameSlot.scaleY,
-      originX: "left",
-      originY: "top",
-      absolutePositioned: true,
+    shape = new fabric.Rect({
+      width: frame.width,
+      height: frame.height,
     });
   }
+
+  shape.set({
+    originX: "center",
+    originY: "center",
+    absolutePositioned: true,
+    left: frame.left + (frame.width * frame.scaleX) / 2,
+    top: frame.top + (frame.height * frame.scaleY) / 2,
+    scaleX: frame.scaleX,
+    scaleY: frame.scaleY,
+    angle: frame.angle,
+  });
+
+  return shape;
 }
 
 safeLoadImage(photoUrl, (img) => {
@@ -1413,51 +1406,58 @@ safeLoadImage(photoUrl, (img) => {
     selectable: true,
     evented: true,
     hasControls: true,
-    lockMovementX: false,
-    lockMovementY: false,
     lockUniScaling: false,
     customId: "studentPhoto",
-    clipPath: makeClipPath(),   // start clipped
+    clipPath: makeClipPathFromFrame(frameSlot),
   });
 
-  // Heart outline stays editable
+  // Frame editable
   frameSlot.set({
     selectable: true,
     evented: true,
     hasControls: true,
     lockUniScaling: false,
+    customId: "studentFrame",
   });
 
-  // Add objects
-  canvas.remove(frameSlot);
-  canvas.add(img);
-  canvas.add(frameSlot);
-  canvas.bringToFront(frameSlot);
+  // ✅ Group photo + frame so they move/resize together
+  const frameGroup = new fabric.Group([img, frameSlot], {
+    originX: "center",
+    originY: "center",
+    left: frameSlot.left,
+    top: frameSlot.top,
+    angle: frameSlot.angle,
+    selectable: true,
+    evented: true,
+    hasControls: true,
+    lockUniScaling: false,
+    customId: "studentFrameGroup",
+  });
 
+  canvas.remove(frameSlot);
+  canvas.add(frameGroup);
   canvas.setActiveObject(img);
   canvas.requestRenderAll();
 
-  // --- Toggle clipping on photo edit ---
+  // --- Toggle clipping during edit ---
   canvas.on("selection:created", (e) => {
     if (e.selected[0]?.customId === "studentPhoto") {
-      e.selected[0].clipPath = null; // full image when editing
+      e.selected[0].clipPath = null; // show full image
       canvas.requestRenderAll();
     }
   });
 
   canvas.on("selection:cleared", () => {
     if (img && !img.clipPath) {
-      img.clipPath = makeClipPath(); // restore clipping
+      img.clipPath = makeClipPathFromFrame(frameSlot);
       canvas.requestRenderAll();
     }
   });
 
-  // --- Update clipPath whenever frameSlot moves/resizes ---
-  frameSlot.on("modified", () => {
-    if (img) {
-      img.clipPath = makeClipPath();
-      canvas.requestRenderAll();
-    }
+  // --- Keep clipPath updated when frame moves ---
+  frameGroup.on("modified", () => {
+    img.clipPath = makeClipPathFromFrame(frameSlot);
+    canvas.requestRenderAll();
   });
 });
 

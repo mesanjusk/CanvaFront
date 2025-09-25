@@ -1374,7 +1374,7 @@ safeLoadImage(photoUrl, (img) => {
       originY: "center",
       absolutePositioned: true,
       stroke: null,
-      fill: "#000",          // mask only
+      fill: "#000",
       selectable: false,
       evented: false,
     });
@@ -1414,8 +1414,7 @@ safeLoadImage(photoUrl, (img) => {
     scaleX: savedPhoto.scaleX ?? baseScale,
     scaleY: savedPhoto.scaleY ?? baseScale,
     angle: savedPhoto.angle ?? 0,
-    clipPath,
-    selectable: true,       // ✅ editable
+    selectable: true,
     evented: true,
     hasControls: true,
     lockMovementX: false,
@@ -1424,9 +1423,18 @@ safeLoadImage(photoUrl, (img) => {
     customId: "studentPhoto",
   });
 
+  // ✅ Apply clipPath
+  clipPath.set({
+    left: img.left,
+    top: img.top,
+    originX: "center",
+    originY: "center",
+  });
+  img.clipPath = clipPath;
+
   // --- Keep original frame outline visible ---
   frameSlot.set({
-    selectable: true,       // ✅ user can also edit/move frame
+    selectable: true,
     evented: true,
     hasControls: true,
     lockUniScaling: false,
@@ -1438,7 +1446,7 @@ safeLoadImage(photoUrl, (img) => {
   canvas.add(frameSlot); // outline always on top
   canvas.bringToFront(frameSlot);
 
-  canvas.setActiveObject(img); // default select photo
+  canvas.setActiveObject(img);
   canvas.requestRenderAll();
 });
 

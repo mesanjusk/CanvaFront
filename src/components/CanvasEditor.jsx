@@ -1210,7 +1210,7 @@ if (showLogo && selectedInstitute?.logo) {
       const scale = 0.15; // small size (adjust as needed)
       img.set({
         customId: "logo",
-        originX: "right",
+        originX: "left",
         originY: "top",
         left: canvas.width - 10,   // 10px padding from right
         top: 10,                   // 10px padding from top
@@ -1236,7 +1236,7 @@ if (showSignature && selectedInstitute?.signature) {
       const scale = 0.15; // small size (adjust as needed)
       img.set({
         customId: "signature",
-        originX: "left",
+        originX: "right",
         originY: "bottom",
         left: 10,                    // 10px padding from left
         top: canvas.height - 10,     // 10px padding from bottom
@@ -1300,7 +1300,7 @@ useEffect(() => {
     }
   });
 
-  // === 1. Student Name ===
+  // === 1️⃣ Student Name ===
   const name = `${currentStudent.firstName || ""} ${currentStudent.lastName || ""}`.trim();
   let nameObj = canvas.getObjects().find(o =>
     o.customId === "studentName" || o.customId === "templateText"
@@ -1317,11 +1317,11 @@ useEffect(() => {
       lockMovementY: false,
     });
   } else {
-    const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
-    if (frameSlot) {
+    const frameSlotTmp = canvas.getObjects().find(o => o.customId === "frameSlot");
+    if (frameSlotTmp) {
       nameObj = new fabric.IText(name, {
-        left: frameSlot.left + frameSlot.width / 2,
-        top: frameSlot.top + frameSlot.height + 10,
+        left: frameSlotTmp.left + frameSlotTmp.width / 2,
+        top: frameSlotTmp.top + frameSlotTmp.height + 10,
         fontSize: 28,
         fill: "#000",
         fontFamily: "Arial",
@@ -1341,9 +1341,19 @@ useEffect(() => {
   }
   if (nameObj) canvas.bringToFront(nameObj);
 
-  // === 2. Student Photo ===
+  // === 2️⃣ Student Photo ===
   const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
   if (!frameSlot) return;
+
+  // ✅ Frame को भी editable/movable बनाएं
+  frameSlot.set({
+    selectable: true,
+    evented: true,
+    hasControls: true,
+    lockMovementX: false,
+    lockMovementY: false,
+    lockUniScaling: false,
+  });
 
   const bounds = frameSlot.getBoundingRect(true);
   const photoUrl = Array.isArray(currentStudent.photo)
@@ -1404,7 +1414,7 @@ useEffect(() => {
       scaleY: savedPhoto.groupScaleY ?? 1,
       angle:  savedPhoto.groupAngle  ?? 0,
 
-      // ✅ allow full editing
+      // ✅ allow full editing of photo
       selectable: true,
       evented: true,
       hasControls: true,
@@ -1436,10 +1446,12 @@ useEffect(() => {
 
     canvas.add(photoGroup);
     canvas.setActiveObject(photoGroup);
-    frameSlot.set({ visible: false, selectable: false, evented: false }); // hide frame border
+
+    // अब frameSlot visible और selectable रहेगा
     canvas.requestRenderAll();
   });
 }, [canvas, selectedStudent, bulkMode, bulkIndex, filteredStudents, bulkList]);
+
 
 
 

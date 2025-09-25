@@ -1343,11 +1343,9 @@ useEffect(() => {
 
 // === Student Photo Loader ===
 function safeLoadImage(url, cb) {
-  fabric.Image.fromURL(
-    url,
-    (img) => cb(img || null),
-    { crossOrigin: "anonymous" }
-  );
+  fabric.Image.fromURL(url, (img) => cb(img || null), {
+    crossOrigin: "anonymous",
+  });
 }
 
 const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
@@ -1359,36 +1357,22 @@ const photoUrl = Array.isArray(currentStudent.photo)
   : currentStudent.photo;
 if (!photoUrl) return;
 
-const perStudent =
-  studentLayoutsRef.current?.[currentStudent.uuid]?.studentPhotoProps;
-const savedPhoto = perStudent ?? getSavedProps("studentPhoto") ?? {};
+const savedPhoto =
+  studentLayoutsRef.current?.[currentStudent.uuid]?.studentPhotoProps ?? {};
 
-// --- Function to rebuild clipPath from frame ---
+// --- Build clipPath from frame ---
 function makeClipPathFromFrame(frame) {
-  let shape;
-  if (frame.type === "path" && frame.path) {
-    shape = new fabric.Path(frame.path);
-  } else if (frame.type === "polygon" && frame.points) {
-    shape = new fabric.Polygon(frame.points);
-  } else {
-    shape = new fabric.Rect({
-      width: frame.width,
-      height: frame.height,
-    });
-  }
-
-  shape.set({
+  const clone = fabric.util.object.clone(frame);
+  clone.set({
     originX: "center",
     originY: "center",
+    left: frame.left + frame.width * frame.scaleX / 2,
+    top: frame.top + frame.height * frame.scaleY / 2,
     absolutePositioned: true,
-    left: frame.left + (frame.width * frame.scaleX) / 2,
-    top: frame.top + (frame.height * frame.scaleY) / 2,
-    scaleX: frame.scaleX,
-    scaleY: frame.scaleY,
-    angle: frame.angle,
+    evented: false,
+    selectable: false,
   });
-
-  return shape;
+  return clone;
 }
 
 safeLoadImage(photoUrl, (img) => {
@@ -1411,7 +1395,6 @@ safeLoadImage(photoUrl, (img) => {
     clipPath: makeClipPathFromFrame(frameSlot),
   });
 
-  // Frame editable
   frameSlot.set({
     selectable: true,
     evented: true,
@@ -1420,42 +1403,28 @@ safeLoadImage(photoUrl, (img) => {
     customId: "studentFrame",
   });
 
-  // ✅ Group photo + frame so they move/resize together
-  const frameGroup = new fabric.Group([img, frameSlot], {
-    originX: "center",
-    originY: "center",
-    left: frameSlot.left,
-    top: frameSlot.top,
-    angle: frameSlot.angle,
-    selectable: true,
-    evented: true,
-    hasControls: true,
-    lockUniScaling: false,
-    customId: "studentFrameGroup",
-  });
-
-  canvas.remove(frameSlot);
-  canvas.add(frameGroup);
+  canvas.add(img);
+  canvas.bringToFront(frameSlot);
   canvas.setActiveObject(img);
   canvas.requestRenderAll();
 
-  // --- Toggle clipping during edit ---
+  // --- Editing toggle ---
   canvas.on("selection:created", (e) => {
     if (e.selected[0]?.customId === "studentPhoto") {
-      e.selected[0].clipPath = null; // show full image
+      e.selected[0].clipPath = null; // allow free editing
       canvas.requestRenderAll();
     }
   });
 
   canvas.on("selection:cleared", () => {
     if (img && !img.clipPath) {
-      img.clipPath = makeClipPathFromFrame(frameSlot);
+      img.clipPath = makeClipPathFromFrame(frameSlot); // reapply clip
       canvas.requestRenderAll();
     }
   });
 
-  // --- Keep clipPath updated when frame moves ---
-  frameGroup.on("modified", () => {
+  // --- Keep clip in sync when frame moves ---
+  frameSlot.on("modified", () => {
     img.clipPath = makeClipPathFromFrame(frameSlot);
     canvas.requestRenderAll();
   });

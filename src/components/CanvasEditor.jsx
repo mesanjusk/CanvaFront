@@ -1068,19 +1068,19 @@ const renderTemplate = useCallback(async (data) => {
     .filter(o => o?.customId && templateIds.includes(o.customId))
     .forEach(o => canvas.remove(o));
 
-  // Original template size
+  // Template size
   const tplW = Number(data?.width) || 1000;
   const tplH = Number(data?.height) || 1000;
 
-  // Container size (screen/mobile)
+  // Container size
   const container = document.getElementById("canvas-container");
   const maxW = container?.offsetWidth || window.innerWidth;
   const maxH = container?.offsetHeight || window.innerHeight;
 
-  // Scale factor so template fits container but keeps aspect ratio
+  // Scale factor to fit in container
   const scale = Math.min(maxW / tplW, maxH / tplH);
 
-  // Final scaled dimensions
+  // Final scaled size
   const scaledW = tplW * scale;
   const scaledH = tplH * scale;
 
@@ -1106,7 +1106,6 @@ const renderTemplate = useCallback(async (data) => {
             top: 0
           });
 
-          // ✅ Stretch background to fill canvas
           img.scaleToWidth(scaledW);
           img.scaleToHeight(scaledH);
           img.setCoords();
@@ -1124,7 +1123,6 @@ const renderTemplate = useCallback(async (data) => {
   if (data?.canvasJson) {
     canvas.loadFromJSON(data.canvasJson, () => {
       canvas.getObjects().forEach(o => {
-        // Assign customId
         if (o.type === "i-text" && (!o.customId || /text/i.test(o.customId))) {
           o.customId = "templateText";
         }
@@ -1135,7 +1133,6 @@ const renderTemplate = useCallback(async (data) => {
           o.customId = "frameSlot";
         }
 
-        // ✅ Scale & reposition objects
         o.scaleX *= scale;
         o.scaleY *= scale;
         o.left *= scale;
@@ -1148,12 +1145,12 @@ const renderTemplate = useCallback(async (data) => {
     });
   }
 
-  // === Logo ===
+  // Logo
   if (showLogo && selectedInstitute?.logo) {
     loadTemplateAsset("logo", selectedInstitute.logo, canvas);
   }
 
-  // === Signature ===
+  // Signature
   if (showSignature && selectedInstitute?.signature) {
     loadTemplateAsset("signature", selectedInstitute.signature, canvas);
   }
@@ -2258,13 +2255,13 @@ if (saved?.canvas) {
       <div className="flex flex-col items-center">
      <div
   id="canvas-container"
-  className="flex items-center justify-center w-full h-full bg-gray-100"
+  className="w-full h-screen flex items-center justify-center bg-gray-100"
 >
   <div
     ref={stageRef}
     style={{
       transform: `scale(${zoom})`,
-      transformOrigin: "center center",  
+      transformOrigin: "center center",
       width: `${tplSize.w}px`,
       height: `${tplSize.h}px`,
       overflow: "hidden",
@@ -2278,8 +2275,6 @@ if (saved?.canvas) {
     )}
   </div>
 </div>
-
-
 
 
        {bulkMode && (

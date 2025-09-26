@@ -1069,23 +1069,23 @@ const renderTemplate = useCallback(async (data) => {
     .filter(o => o?.customId && templateIds.includes(o.customId))
     .forEach(o => canvas.remove(o));
 
-  // Set canvas size
-  const w = Number(data?.width) || canvas.width;
-  const h = Number(data?.height) || canvas.height;
+  // ---- Safe canvas size (never fallback to 0) ----
+  const w = Number(data?.width)  || 600;   // give defaults for mobile
+  const h = Number(data?.height) || 400;
   setTplSize({ w, h });
   setCanvasSize?.(w, h);
 
-  // ✅ make sure Fabric canvas updates size
+  // Update Fabric canvas logical size
   canvas.setWidth(w);
   canvas.setHeight(h);
+  canvas.calcOffset();
 
-  // Add background
+  // ---- Add background ----
   if (data?.image) {
     await new Promise(resolve => {
       fabric.Image.fromURL(
         data.image,
         img => {
-          // scale background to fit canvas
           const scaleX = w / img.width;
           const scaleY = h / img.height;
 
@@ -1103,7 +1103,7 @@ const renderTemplate = useCallback(async (data) => {
             lockMovementY: true,
             lockScalingX: true,
             lockScalingY: true,
-            lockRotation: true
+            lockRotation: true,
           });
 
           canvas.add(img);
@@ -1116,13 +1116,19 @@ const renderTemplate = useCallback(async (data) => {
     });
   }
 
-  // Load canvas JSON placeholders
+  // ---- Load template JSON placeholders ----
   if (data?.canvasJson) {
-    canvas.loadFromJSON(data.canvasJson, () => {
-      canvas.getObjects().forEach(o => {
-        if (o.type === "i-text" && (!o.customId || /text/i.test(o.customId)))
-          o.customId = "templateText";
+    const json = typeof data.canvasJson === "string"
+      ? JSON.parse(data.canvasJson)
+      : data.canvasJson;
 
+    canvas.loadFromJSON(json, () => {
+      canvas.getObjects().forEach(o => {
+        // mark placeholder text
+        if (o.type === "i-text" && (!o.customId || /text/i.test(o.customId))) {
+          o.customId = "templateText";
+        }
+        // mark frame slot
         if (
           o.customId === "frameSlot" ||
           (o.type === "path" &&
@@ -1136,14 +1142,17 @@ const renderTemplate = useCallback(async (data) => {
     });
   }
 
-  // Optional: Logo
+  // ---- Optional: Logo & Signature ----
   if (showLogo && selectedInstitute?.logo)
     loadTemplateAsset("logo", selectedInstitute.logo, canvas);
 
-  // Optional: Signature
   if (showSignature && selectedInstitute?.signature)
     loadTemplateAsset("signature", selectedInstitute.signature, canvas);
+
+  // Final ensure render
+  canvas.requestRenderAll();
 }, [canvas, selectedInstitute, showLogo, showSignature]);
+
 
 
 /* ======================= 3. Load template by ID ======================= */
@@ -2241,20 +2250,31 @@ if (saved?.canvas) {
         className={`absolute bg-gray-100 top-14 left-0 right-0 ${isRightbarOpen ? "md:right-80" : "right-0"} bottom-14 md:bottom-16 overflow-auto flex items-center justify-center`}
       >
       <div className="flex flex-col items-center">
-        <div
-          ref={stageRef}
-          style={{
-    width: '100%',                       
-    maxWidth: `${tplSize.w * zoom}px`,    
-    aspectRatio: `${tplSize.w}/${tplSize.h}`,
+       <div
+  ref={stageRef}
+  style={{
+    width: '100%',                             
+    maxWidth: `${tplSize.w * zoom}px`,         
+    aspectRatio: `${tplSize.w}/${tplSize.h}`,   
+    minHeight: '200px',                         
   }}
-          className="shadow-lg border bg-white relative"
-        >
-          <CanvasArea ref={canvasRef} width={tplSize.w} height={tplSize.h} />
-          {showToolbar && activeObj && (
-            <SelectionToolbar activeObj={activeObj} canvas={canvas} />
-          )}
-        </div>
+  className="shadow-lg border bg-white relative"
+>
+  <CanvasArea
+    ref={canvasRef}
+    width={tplSize.w}
+    height={tplSize.h}
+    style={{
+      width: '100%',    
+      height: '100%',   
+      display: 'block', 
+    }}
+  />
+  {showToolbar && activeObj && (
+    <SelectionToolbar activeObj={activeObj} canvas={canvas} />
+  )}
+</div>
+
 
        {bulkMode && (
   <div className="mt-4 flex items-center justify-center gap-4">

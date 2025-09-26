@@ -1059,32 +1059,34 @@ function cacheTemplatePlaceholders(canvas) {
   }
 }
 
-/* ======================= 2. Render Template ======================= */
 const renderTemplate = useCallback(async (data) => {
   if (!canvas) return;
 
-  // ✅ Remove only template objects (keep student photo/name)
+  // Remove old template objects
   const templateIds = ["templateBg", "frameSlot", "templateText", "logo", "signature"];
   canvas.getObjects()
     .filter(o => o?.customId && templateIds.includes(o.customId))
     .forEach(o => canvas.remove(o));
 
-  // ✅ Detect available container size (important for mobile)
-  const container = document.getElementById("canvas-container"); // wrapper div
-  const containerW = container?.offsetWidth || window.innerWidth;
-  const containerH = container?.offsetHeight || window.innerHeight;
+  // Original template size
+  const tplW = Number(data?.width) || 1000;
+  const tplH = Number(data?.height) || 1000;
 
-  // ✅ Use template size but fallback to container/mobile size
-  const tplW = Number(data?.width) || canvas.width;
-  const tplH = Number(data?.height) || canvas.height;
+  // Container size (screen size on mobile)
+  const container = document.getElementById("canvas-container");
+  const maxW = container?.offsetWidth || window.innerWidth;
+  const maxH = container?.offsetHeight || window.innerHeight;
 
-  // ✅ Resize canvas properly
-  canvas.setWidth(containerW);
-  canvas.setHeight(containerH);
-  setTplSize({ w: tplW, h: tplH });
-  setCanvasSize?.(tplW, tplH);
+  // Scale factor so template fits inside container
+  const scale = Math.min(maxW / tplW, maxH / tplH);
 
-  // ✅ Background image with proper scaling
+  // Resize canvas
+  canvas.setWidth(tplW * scale);
+  canvas.setHeight(tplH * scale);
+  setTplSize({ w: tplW * scale, h: tplH * scale });
+  setCanvasSize?.(tplW * scale, tplH * scale);
+
+  // Background
   if (data?.image) {
     await new Promise(resolve => {
       fabric.Image.fromURL(
@@ -1095,15 +1097,12 @@ const renderTemplate = useCallback(async (data) => {
             evented: false,
             customId: "templateBg",
             originX: "left",
-            originY: "top"
+            originY: "top",
           });
 
-          // Scale background proportionally
-          const scaleX = canvas.width / img.width;
-          const scaleY = canvas.height / img.height;
-          const scale = Math.min(scaleX, scaleY);
+          img.scaleX = (tplW * scale) / img.width;
+          img.scaleY = (tplH * scale) / img.height;
 
-          img.scale(scale);
           canvas.add(img);
           img.sendToBack();
           resolve();
@@ -1113,7 +1112,7 @@ const renderTemplate = useCallback(async (data) => {
     });
   }
 
-  // ✅ Load template placeholders
+  // Load template objects
   if (data?.canvasJson) {
     canvas.loadFromJSON(data.canvasJson, () => {
       canvas.getObjects().forEach(o => {
@@ -1126,17 +1125,13 @@ const renderTemplate = useCallback(async (data) => {
         ) {
           o.customId = "frameSlot";
         }
-      });
 
-      // ✅ Scale all objects to fit mobile canvas
-      const scaleX = canvas.width / tplW;
-      const scaleY = canvas.height / tplH;
-      canvas.getObjects().forEach(obj => {
-        obj.scaleX *= scaleX;
-        obj.scaleY *= scaleY;
-        obj.left *= scaleX;
-        obj.top *= scaleY;
-        obj.setCoords();
+        // Scale and reposition objects
+        o.scaleX *= scale;
+        o.scaleY *= scale;
+        o.left *= scale;
+        o.top *= scale;
+        o.setCoords();
       });
 
       cacheTemplatePlaceholders(canvas);
@@ -1144,12 +1139,12 @@ const renderTemplate = useCallback(async (data) => {
     });
   }
 
-  // ✅ Logo
+  // Logo
   if (showLogo && selectedInstitute?.logo) {
     loadTemplateAsset("logo", selectedInstitute.logo, canvas);
   }
 
-  // ✅ Signature
+  // Signature
   if (showSignature && selectedInstitute?.signature) {
     loadTemplateAsset("signature", selectedInstitute.signature, canvas);
   }
@@ -2251,23 +2246,23 @@ if (saved?.canvas) {
         className={`absolute bg-gray-100 top-14 left-0 right-0 ${isRightbarOpen ? "md:right-80" : "right-0"} bottom-14 md:bottom-16 overflow-auto flex items-center justify-center`}
       >
       <div className="flex flex-col items-center">
-        <div
+      <div
+  id="canvas-container"
   ref={stageRef}
   style={{
-    transform: `scale(${zoom})`,
-    transformOrigin: "top left",
-    width: `${tplSize.w}px`,   // logical template width
-    height: `${tplSize.h}px`,  // logical template height
+    width: `${tplSize.w}px`,   
+    height: `${tplSize.h}px`, 
     overflow: "hidden",
   }}
   className="shadow-lg border bg-white relative"
 >
   <CanvasArea ref={canvasRef} width={tplSize.w} height={tplSize.h} />
-  
+
   {showToolbar && activeObj && (
     <SelectionToolbar activeObj={activeObj} canvas={canvas} />
   )}
 </div>
+
 
 
        {bulkMode && (

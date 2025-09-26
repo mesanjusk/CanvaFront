@@ -1059,120 +1059,57 @@ function cacheTemplatePlaceholders(canvas) {
   }
 }
 
+/* ======================= 2. Render Template ======================= */
 const renderTemplate = useCallback(async (data) => {
   if (!canvas) return;
 
-  // Remove old template objects
+  // Remove only template objects (leave student photo/name)
   const templateIds = ["templateBg", "frameSlot", "templateText", "logo", "signature"];
   canvas.getObjects()
     .filter(o => o?.customId && templateIds.includes(o.customId))
     .forEach(o => canvas.remove(o));
 
-  // Template size
-  const tplW = Number(data?.width) || 1000;
-  const tplH = Number(data?.height) || 1000;
+  // Set canvas size
+  const w = Number(data?.width) || canvas.width;
+  const h = Number(data?.height) || canvas.height;
+  setTplSize({ w, h });
+  setCanvasSize?.(w, h);
 
-  // Container size
-  const container = document.getElementById("canvas-container");
-  const maxW = container?.offsetWidth || window.innerWidth;
-  const maxH = container?.offsetHeight || window.innerHeight;
-
-  // Scale factor to fit in container
-  const scale = Math.min(maxW / tplW, maxH / tplH);
-
-  // Final scaled size
-  const scaledW = tplW * scale;
-  const scaledH = tplH * scale;
-
-  // Resize canvas
-  canvas.setWidth(scaledW);
-  canvas.setHeight(scaledH);
-  setTplSize({ w: scaledW, h: scaledH });
-  setCanvasSize?.(scaledW, scaledH);
-
-  // === Background using addTemplateBg ===
-  const addTemplateBg = (img) => {
-    try {
-      if (!img) return;
-      img.clone((bg) => {
-        if (!bg) return;
-        bg.scaleX = canvas.width / bg.width;
-        bg.scaleY = canvas.height / bg.height;
-        bg.set({
-          selectable: false,
-          evented: false,
-          customId: "templateBg",
-          left: 0,
-          top: 0,
-        });
-        canvas.add(bg);
-        bg.sendToBack();
-        bgRef.current = bg;
-        canvas.requestRenderAll();
-      });
-    } catch (e) {
-      console.warn("Template BG add failed:", e);
-    }
-  };
-
-  const safeLoadImage = (url, cb) => {
-    if (!url) return;
-    fabric.Image.fromURL(
-      url,
-      (img) => { try { cb && cb(img); } catch (e) { console.error(e); } },
-      { crossOrigin: "anonymous" }
-    );
-  };
-
+  // Add background
   if (data?.image) {
-    await new Promise((resolve) => {
-      safeLoadImage(data.image, (img) => {
-        addTemplateBg(img);
+    await new Promise(resolve => {
+      fabric.Image.fromURL(data.image, img => {
+        img.set({ selectable: false, evented: false, customId: "templateBg" });
+        img.scaleX = canvas.width / img.width;
+        img.scaleY = canvas.height / img.height;
+        canvas.add(img);
+        img.sendToBack();
         resolve();
-      });
+      }, { crossOrigin: "anonymous" });
     });
   }
 
-  // === Load template objects ===
+  // Load canvas JSON placeholders
   if (data?.canvasJson) {
     canvas.loadFromJSON(data.canvasJson, () => {
-      canvas.getObjects().forEach((o) => {
-        if (o.type === "i-text" && (!o.customId || /text/i.test(o.customId))) {
-          o.customId = "templateText";
-        }
-        if (
-          o.customId === "frameSlot" ||
-          (o.type === "path" && ["#7c3aed", "rgb(124,58,237)"].includes(o.stroke))
-        ) {
+      canvas.getObjects().forEach(o => {
+        if (o.type === "i-text" && (!o.customId || /text/i.test(o.customId))) o.customId = "templateText";
+        if (o.customId === "frameSlot" || (o.type === "path" && ["#7c3aed", "rgb(124,58,237)"].includes(o.stroke))) {
           o.customId = "frameSlot";
         }
-
-        // scale + reposition
-        o.scaleX *= scale;
-        o.scaleY *= scale;
-        o.left *= scale;
-        o.top *= scale;
-        o.setCoords();
       });
-
       cacheTemplatePlaceholders(canvas);
       canvas.requestRenderAll();
     });
   }
 
-  // Logo
-  if (showLogo && selectedInstitute?.logo) {
-    loadTemplateAsset("logo", selectedInstitute.logo, canvas);
-  }
+  // Optional: Logo
+  if (showLogo && selectedInstitute?.logo) loadTemplateAsset("logo", selectedInstitute.logo, canvas);
 
-  // Signature
-  if (showSignature && selectedInstitute?.signature) {
-    loadTemplateAsset("signature", selectedInstitute.signature, canvas);
-  }
+  // Optional: Signature
+  if (showSignature && selectedInstitute?.signature) loadTemplateAsset("signature", selectedInstitute.signature, canvas);
+
 }, [canvas, selectedInstitute, showLogo, showSignature]);
-
-
-
 
 /* ======================= 3. Load template by ID ======================= */
 const loadTemplateById = useCallback(async id => {
@@ -2269,19 +2206,20 @@ if (saved?.canvas) {
         className={`absolute bg-gray-100 top-14 left-0 right-0 ${isRightbarOpen ? "md:right-80" : "right-0"} bottom-14 md:bottom-16 overflow-auto flex items-center justify-center`}
       >
       <div className="flex flex-col items-center">
-     <div
-              ref={stageRef}
-              style={{
-                width: `${tplSize.w * zoom}px`,
-                height: `${tplSize.h * zoom}px`,
-              }}
-              className="shadow-lg border bg-white relative"
-            >
-              <CanvasArea ref={canvasRef} width={tplSize.w} height={tplSize.h} />
-              {showToolbar && activeObj && (
-                <SelectionToolbar activeObj={activeObj} canvas={canvas} />
-              )}
-            </div>
+        <div
+          ref={stageRef}
+          style={{
+            width: `${tplSize.w * zoom}px`,
+            height: `${tplSize.h * zoom}px`,
+          }}
+          className="shadow-lg border bg-white relative"
+        >
+          <CanvasArea ref={canvasRef} width={tplSize.w} height={tplSize.h} />
+          {showToolbar && activeObj && (
+            <SelectionToolbar activeObj={activeObj} canvas={canvas} />
+          )}
+        </div>
+
        {bulkMode && (
   <div className="mt-4 flex items-center justify-center gap-4">
     <button

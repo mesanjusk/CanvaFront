@@ -1059,44 +1059,33 @@ function cacheTemplatePlaceholders(canvas) {
   }
 }
 
-/* ======================= 2. Render Template ======================= */
 const renderTemplate = useCallback(async (data) => {
   if (!canvas) return;
 
-  // Remove only template objects (leave student photo/name)
+  // remove old template objects
   const templateIds = ["templateBg", "frameSlot", "templateText", "logo", "signature"];
   canvas.getObjects()
     .filter(o => o?.customId && templateIds.includes(o.customId))
     .forEach(o => canvas.remove(o));
 
-  // --- Safe canvas size & downscale for mobile ----
-  const baseW = Number(data?.width)  || canvas.width;
-  const baseH = Number(data?.height) || canvas.height;
-
-  // if phone, limit the largest side to ~1200px
-  let w = baseW, h = baseH;
-  if (window.innerWidth < 768) {
-    const maxSide = 1200;
-    const scale = Math.min(1, maxSide / Math.max(baseW, baseH));
-    w = baseW * scale;
-    h = baseH * scale;
-  }
-
-  setTplSize({ w, h });
+  // ---- keep ORIGINAL template size ----
+  const w = Number(data?.width)  || canvas.width;
+  const h = Number(data?.height) || canvas.height;
+  setTplSize({ w, h });            // store original size (for aspect ratio etc.)
   setCanvasSize?.(w, h);
+
+  // Fabric logical size stays at full template dimensions
   canvas.setWidth(w);
   canvas.setHeight(h);
   canvas.calcOffset();
 
-  // ---- Add background ----
+  // ---- add background ----
   if (data?.image) {
     await new Promise(resolve => {
       fabric.Image.fromURL(
         data.image,
         img => {
-          const scaleX = w / img.width;
-          const scaleY = h / img.height;
-
+          // Cover entire logical canvas
           img.set({
             customId: "templateBg",
             selectable: false,
@@ -1105,26 +1094,25 @@ const renderTemplate = useCallback(async (data) => {
             originY: "top",
             left: 0,
             top: 0,
-            scaleX,
-            scaleY,
+            scaleX: w / img.width,
+            scaleY: h / img.height,
             lockMovementX: true,
             lockMovementY: true,
             lockScalingX: true,
             lockScalingY: true,
             lockRotation: true,
           });
-
           canvas.add(img);
           img.sendToBack();
           canvas.requestRenderAll();
           resolve();
         },
-        { crossOrigin: "anonymous" } // needs CORS header on the image host
+        { crossOrigin: "anonymous" }
       );
     });
   }
 
-  // ---- Load template JSON placeholders ----
+  // ---- load placeholders ----
   if (data?.canvasJson) {
     const json = typeof data.canvasJson === "string"
       ? JSON.parse(data.canvasJson)
@@ -1148,7 +1136,6 @@ const renderTemplate = useCallback(async (data) => {
     });
   }
 
-  // ---- Optional: Logo & Signature ----
   if (showLogo && selectedInstitute?.logo)
     loadTemplateAsset("logo", selectedInstitute.logo, canvas);
 
@@ -2256,13 +2243,13 @@ if (saved?.canvas) {
         className={`absolute bg-gray-100 top-14 left-0 right-0 ${isRightbarOpen ? "md:right-80" : "right-0"} bottom-14 md:bottom-16 overflow-auto flex items-center justify-center`}
       >
       <div className="flex flex-col items-center">
-      <div
+    <div
   ref={stageRef}
   className="shadow-lg border bg-white relative"
   style={{
-    width: '100%',                               
-    maxWidth: `${tplSize.w * zoom}px`,           
-    aspectRatio: `${tplSize.w}/${tplSize.h}`,    
+    width: '100%',                                   // fill phone width
+    maxWidth: '100%',                                // never overflow
+    aspectRatio: `${tplSize.w}/${tplSize.h}`,        // preserve template ratio
     minHeight: '200px',
   }}
 >
@@ -2271,7 +2258,7 @@ if (saved?.canvas) {
     width={tplSize.w}
     height={tplSize.h}
     style={{
-      width: '100%',      
+      width: '100%',   // stretch HTML canvas to wrapper
       height: '100%',
       display: 'block',
     }}
@@ -2280,6 +2267,7 @@ if (saved?.canvas) {
     <SelectionToolbar activeObj={activeObj} canvas={canvas} />
   )}
 </div>
+
 
 
        {bulkMode && (

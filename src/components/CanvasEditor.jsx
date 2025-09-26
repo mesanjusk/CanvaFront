@@ -1391,36 +1391,30 @@ safeLoadImage(photoUrl, img => {
     top: bounds.top + bounds.height / 2,
     scaleX: savedPhoto.scaleX ?? baseScale,
     scaleY: savedPhoto.scaleY ?? baseScale,
-    angle:  savedPhoto.angle  ?? 0,
-    selectable: true,
-    evented: true,
-    hasControls: true,
-    lockUniScaling: false,
+    angle: savedPhoto.angle ?? 0,
+    selectable: false,   // ❌ Not selectable
+    evented: false,      // ❌ No events
+    hasControls: false,  // ❌ No resize handles
     customId: "studentPhoto",
-    clipPath: makeClipPath(frameSlot),   // ✅ mask initially
+    clipPath: makeClipPath(frameSlot),   // ✅ Always clipped
   });
 
-  frameSlot.set({ visible: false, selectable: false, evented: false });
+  // hide original frame shape, but keep it movable
+  frameSlot.set({ visible: true, selectable: true, evented: true });
+
+  // add photo below frame
   canvas.add(img);
-  canvas.setActiveObject(img);
+  canvas.sendToBack(img);
   canvas.requestRenderAll();
 
-  // --- Toggle clipping on edit ---
-  canvas.on("selection:created", e => {
-    if (e.selected[0]?.customId === "studentPhoto") {
-      e.selected[0].clipPath = null;  // show full image
-      canvas.requestRenderAll();
-    }
-  });
-  canvas.on("selection:updated", e => {
-    if (e.selected[0]?.customId === "studentPhoto") {
-      e.selected[0].clipPath = null;
-      canvas.requestRenderAll();
-    }
-  });
-  canvas.on("selection:cleared", () => {
-    if (img && !img.clipPath) {
-      img.clipPath = makeClipPath(frameSlot); // reapply heart mask
+  // 🔄 Keep photo inside frame whenever frame moves
+  frameSlot.on("moving", () => {
+    if (img && frameSlot) {
+      img.set({
+        left: frameSlot.left + (frameSlot.width * frameSlot.scaleX) / 2,
+        top: frameSlot.top + (frameSlot.height * frameSlot.scaleY) / 2,
+      });
+      img.clipPath = makeClipPath(frameSlot);
       canvas.requestRenderAll();
     }
   });

@@ -1063,53 +1063,98 @@ function cacheTemplatePlaceholders(canvas) {
 const renderTemplate = useCallback(async (data) => {
   if (!canvas) return;
 
-  // Remove only template objects (leave student photo/name)
+  // ✅ Remove only template objects (keep student photo/name)
   const templateIds = ["templateBg", "frameSlot", "templateText", "logo", "signature"];
   canvas.getObjects()
     .filter(o => o?.customId && templateIds.includes(o.customId))
     .forEach(o => canvas.remove(o));
 
-  // Set canvas size
-  const w = Number(data?.width) || canvas.width;
-  const h = Number(data?.height) || canvas.height;
-  setTplSize({ w, h });
-  setCanvasSize?.(w, h);
+  // ✅ Detect available container size (important for mobile)
+  const container = document.getElementById("canvas-container"); // wrapper div
+  const containerW = container?.offsetWidth || window.innerWidth;
+  const containerH = container?.offsetHeight || window.innerHeight;
 
-  // Add background
+  // ✅ Use template size but fallback to container/mobile size
+  const tplW = Number(data?.width) || canvas.width;
+  const tplH = Number(data?.height) || canvas.height;
+
+  // ✅ Resize canvas properly
+  canvas.setWidth(containerW);
+  canvas.setHeight(containerH);
+  setTplSize({ w: tplW, h: tplH });
+  setCanvasSize?.(tplW, tplH);
+
+  // ✅ Background image with proper scaling
   if (data?.image) {
     await new Promise(resolve => {
-      fabric.Image.fromURL(data.image, img => {
-        img.set({ selectable: false, evented: false, customId: "templateBg" });
-        img.scaleX = canvas.width / img.width;
-        img.scaleY = canvas.height / img.height;
-        canvas.add(img);
-        img.sendToBack();
-        resolve();
-      }, { crossOrigin: "anonymous" });
+      fabric.Image.fromURL(
+        data.image,
+        img => {
+          img.set({
+            selectable: false,
+            evented: false,
+            customId: "templateBg",
+            originX: "left",
+            originY: "top"
+          });
+
+          // Scale background proportionally
+          const scaleX = canvas.width / img.width;
+          const scaleY = canvas.height / img.height;
+          const scale = Math.min(scaleX, scaleY);
+
+          img.scale(scale);
+          canvas.add(img);
+          img.sendToBack();
+          resolve();
+        },
+        { crossOrigin: "anonymous" }
+      );
     });
   }
 
-  // Load canvas JSON placeholders
+  // ✅ Load template placeholders
   if (data?.canvasJson) {
     canvas.loadFromJSON(data.canvasJson, () => {
       canvas.getObjects().forEach(o => {
-        if (o.type === "i-text" && (!o.customId || /text/i.test(o.customId))) o.customId = "templateText";
-        if (o.customId === "frameSlot" || (o.type === "path" && ["#7c3aed", "rgb(124,58,237)"].includes(o.stroke))) {
+        if (o.type === "i-text" && (!o.customId || /text/i.test(o.customId))) {
+          o.customId = "templateText";
+        }
+        if (
+          o.customId === "frameSlot" ||
+          (o.type === "path" && ["#7c3aed", "rgb(124,58,237)"].includes(o.stroke))
+        ) {
           o.customId = "frameSlot";
         }
       });
+
+      // ✅ Scale all objects to fit mobile canvas
+      const scaleX = canvas.width / tplW;
+      const scaleY = canvas.height / tplH;
+      canvas.getObjects().forEach(obj => {
+        obj.scaleX *= scaleX;
+        obj.scaleY *= scaleY;
+        obj.left *= scaleX;
+        obj.top *= scaleY;
+        obj.setCoords();
+      });
+
       cacheTemplatePlaceholders(canvas);
       canvas.requestRenderAll();
     });
   }
 
-  // Optional: Logo
-  if (showLogo && selectedInstitute?.logo) loadTemplateAsset("logo", selectedInstitute.logo, canvas);
+  // ✅ Logo
+  if (showLogo && selectedInstitute?.logo) {
+    loadTemplateAsset("logo", selectedInstitute.logo, canvas);
+  }
 
-  // Optional: Signature
-  if (showSignature && selectedInstitute?.signature) loadTemplateAsset("signature", selectedInstitute.signature, canvas);
-
+  // ✅ Signature
+  if (showSignature && selectedInstitute?.signature) {
+    loadTemplateAsset("signature", selectedInstitute.signature, canvas);
+  }
 }, [canvas, selectedInstitute, showLogo, showSignature]);
+
 
 /* ======================= 3. Load template by ID ======================= */
 const loadTemplateById = useCallback(async id => {
@@ -2207,18 +2252,23 @@ if (saved?.canvas) {
       >
       <div className="flex flex-col items-center">
         <div
-          ref={stageRef}
-          style={{
-            width: `${tplSize.w * zoom}px`,
-            height: `${tplSize.h * zoom}px`,
-          }}
-          className="shadow-lg border bg-white relative"
-        >
-          <CanvasArea ref={canvasRef} width={tplSize.w} height={tplSize.h} />
-          {showToolbar && activeObj && (
-            <SelectionToolbar activeObj={activeObj} canvas={canvas} />
-          )}
-        </div>
+  ref={stageRef}
+  style={{
+    transform: `scale(${zoom})`,
+    transformOrigin: "top left",
+    width: `${tplSize.w}px`,   // logical template width
+    height: `${tplSize.h}px`,  // logical template height
+    overflow: "hidden",
+  }}
+  className="shadow-lg border bg-white relative"
+>
+  <CanvasArea ref={canvasRef} width={tplSize.w} height={tplSize.h} />
+  
+  {showToolbar && activeObj && (
+    <SelectionToolbar activeObj={activeObj} canvas={canvas} />
+  )}
+</div>
+
 
        {bulkMode && (
   <div className="mt-4 flex items-center justify-center gap-4">

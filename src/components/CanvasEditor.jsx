@@ -1345,7 +1345,7 @@ useEffect(() => {
   const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
   if (!frameSlot) return;
 
-  // ✅ Frame को भी editable/movable बनाएं
+  // ✅ Frame 
   frameSlot.set({
     selectable: true,
     evented: true,
@@ -1448,6 +1448,7 @@ useEffect(() => {
     canvas.bringToFront(photoGroup);
     canvas.setActiveObject(photoGroup);
 
+    // अब frameSlot visible और selectable रहेगा
     canvas.requestRenderAll();
   });
 }, [canvas, selectedStudent, bulkMode, bulkIndex, filteredStudents, bulkList]);

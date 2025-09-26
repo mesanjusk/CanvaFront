@@ -1059,75 +1059,42 @@ function cacheTemplatePlaceholders(canvas) {
   }
 }
 
+/* ======================= 2. Render Template ======================= */
 const renderTemplate = useCallback(async (data) => {
   if (!canvas) return;
 
-  // remove old template objects
+  // Remove only template objects (leave student photo/name)
   const templateIds = ["templateBg", "frameSlot", "templateText", "logo", "signature"];
   canvas.getObjects()
     .filter(o => o?.customId && templateIds.includes(o.customId))
     .forEach(o => canvas.remove(o));
 
-  // ---- keep ORIGINAL template size ----
-  const w = Number(data?.width)  || canvas.width;
+  // Set canvas size
+  const w = Number(data?.width) || canvas.width;
   const h = Number(data?.height) || canvas.height;
-  setTplSize({ w, h });            // store original size (for aspect ratio etc.)
+  setTplSize({ w, h });
   setCanvasSize?.(w, h);
 
-  // Fabric logical size stays at full template dimensions
-  canvas.setWidth(w);
-  canvas.setHeight(h);
-  canvas.calcOffset();
-
-  // ---- add background ----
+  // Add background
   if (data?.image) {
     await new Promise(resolve => {
-      fabric.Image.fromURL(
-        data.image,
-        img => {
-          // Cover entire logical canvas
-          img.set({
-            customId: "templateBg",
-            selectable: false,
-            evented: false,
-            originX: "left",
-            originY: "top",
-            left: 0,
-            top: 0,
-            scaleX: w / img.width,
-            scaleY: h / img.height,
-            lockMovementX: true,
-            lockMovementY: true,
-            lockScalingX: true,
-            lockScalingY: true,
-            lockRotation: true,
-          });
-          canvas.add(img);
-          img.sendToBack();
-          canvas.requestRenderAll();
-          resolve();
-        },
-        { crossOrigin: "anonymous" }
-      );
+      fabric.Image.fromURL(data.image, img => {
+        img.set({ selectable: false, evented: false, customId: "templateBg" });
+        img.scaleX = canvas.width / img.width;
+        img.scaleY = canvas.height / img.height;
+        canvas.add(img);
+        img.sendToBack();
+        resolve();
+      }, { crossOrigin: "anonymous" });
     });
   }
 
-  // ---- load placeholders ----
+  // Load canvas JSON placeholders
   if (data?.canvasJson) {
-    const json = typeof data.canvasJson === "string"
-      ? JSON.parse(data.canvasJson)
-      : data.canvasJson;
-
-    canvas.loadFromJSON(json, () => {
+    canvas.loadFromJSON(data.canvasJson, () => {
       canvas.getObjects().forEach(o => {
-        if (o.type === "i-text" && (!o.customId || /text/i.test(o.customId))) {
-          o.customId = "templateText";
-        }
-        if (
-          o.customId === "frameSlot" ||
-          (o.type === "path" &&
-            ["#7c3aed", "rgb(124,58,237)"].includes(o.stroke))
-        ) {
+        if (o.type === "i-text" && (!o.customId || /text/i.test(o.customId))) o.customId = "templateText";
+        if (o.customId === "frameSlot" || (o.type === "path" && ["#7c3aed", "rgb(124,58,237)"].includes(o.stroke))) {
           o.customId = "frameSlot";
         }
       });
@@ -1136,17 +1103,13 @@ const renderTemplate = useCallback(async (data) => {
     });
   }
 
-  if (showLogo && selectedInstitute?.logo)
-    loadTemplateAsset("logo", selectedInstitute.logo, canvas);
+  // Optional: Logo
+  if (showLogo && selectedInstitute?.logo) loadTemplateAsset("logo", selectedInstitute.logo, canvas);
 
-  if (showSignature && selectedInstitute?.signature)
-    loadTemplateAsset("signature", selectedInstitute.signature, canvas);
+  // Optional: Signature
+  if (showSignature && selectedInstitute?.signature) loadTemplateAsset("signature", selectedInstitute.signature, canvas);
 
-  canvas.requestRenderAll();
 }, [canvas, selectedInstitute, showLogo, showSignature]);
-
-
-
 
 /* ======================= 3. Load template by ID ======================= */
 const loadTemplateById = useCallback(async id => {
@@ -2243,32 +2206,19 @@ if (saved?.canvas) {
         className={`absolute bg-gray-100 top-14 left-0 right-0 ${isRightbarOpen ? "md:right-80" : "right-0"} bottom-14 md:bottom-16 overflow-auto flex items-center justify-center`}
       >
       <div className="flex flex-col items-center">
-    <div
-  ref={stageRef}
-  className="shadow-lg border bg-white relative"
-  style={{
-    width: '100%',                                   // fill phone width
-    maxWidth: '100%',                                // never overflow
-    aspectRatio: `${tplSize.w}/${tplSize.h}`,        // preserve template ratio
-    minHeight: '200px',
-  }}
->
-  <CanvasArea
-    ref={canvasRef}
-    width={tplSize.w}
-    height={tplSize.h}
-    style={{
-      width: '100%',   // stretch HTML canvas to wrapper
-      height: '100%',
-      display: 'block',
-    }}
-  />
-  {showToolbar && activeObj && (
-    <SelectionToolbar activeObj={activeObj} canvas={canvas} />
-  )}
-</div>
-
-
+        <div
+          ref={stageRef}
+          style={{
+            width: `${tplSize.w * zoom}px`,
+            height: `${tplSize.h * zoom}px`,
+          }}
+          className="shadow-lg border bg-white relative"
+        >
+          <CanvasArea ref={canvasRef} width={tplSize.w} height={tplSize.h} />
+          {showToolbar && activeObj && (
+            <SelectionToolbar activeObj={activeObj} canvas={canvas} />
+          )}
+        </div>
 
        {bulkMode && (
   <div className="mt-4 flex items-center justify-center gap-4">

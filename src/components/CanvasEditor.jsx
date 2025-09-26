@@ -1100,8 +1100,9 @@ const renderTemplate = useCallback(async (data) => {
             originY: "top",
           });
 
-          img.scaleX = (tplW * scale) / img.width;
-          img.scaleY = (tplH * scale) / img.height;
+         
+        img.scaleX = canvas.width / img.width;
+        img.scaleY = canvas.height / img.height;
 
           canvas.add(img);
           img.sendToBack();

@@ -1213,26 +1213,43 @@ canvas.requestRenderAll();
   safeLoadImage(photoUrl, img => {
     if (!img) return;
 
-    // clipPath matching the frameSlot
-    const clipPath = frameSlot.type === "path" && frameSlot.path
-      ? new fabric.Path(frameSlot.path, {
-          originX: "center",
-          originY: "center",
-          left: frameSlot.left,
-          top:  frameSlot.top,
-          scaleX: frameSlot.scaleX || 1,
-          scaleY: frameSlot.scaleY || 1,
-          absolutePositioned: true
-        })
-      : new fabric.Rect({
-          width:  bounds.width,
-          height: bounds.height,
-          originX: "center",
-          originY: "center",
-          left: bounds.left + bounds.width  / 2,
-          top:  bounds.top  + bounds.height / 2,
-          absolutePositioned: true
-        });
+   // clipPath matching the frameSlot
+let clipPath;
+if (frameSlot.type === "path" && frameSlot.path) {
+  clipPath = new fabric.Path(frameSlot.path, {
+    originX: "center",
+    originY: "center",
+    left: frameSlot.left,
+    top: frameSlot.top,
+    scaleX: frameSlot.scaleX || 1,
+    scaleY: frameSlot.scaleY || 1,
+    absolutePositioned: true
+  });
+} else if (frameSlot.type === "polygon" || frameSlot.type === "polyline") {
+  clipPath = new fabric[frameSlot.type.charAt(0).toUpperCase() + frameSlot.type.slice(1)](
+    frameSlot.points,
+    {
+      originX: "center",
+      originY: "center",
+      left: frameSlot.left,
+      top: frameSlot.top,
+      scaleX: frameSlot.scaleX || 1,
+      scaleY: frameSlot.scaleY || 1,
+      absolutePositioned: true
+    }
+  );
+} else {
+  clipPath = new fabric.Rect({
+    width:  bounds.width,
+    height: bounds.height,
+    originX: "center",
+    originY: "center",
+    left: bounds.left + bounds.width / 2,
+    top:  bounds.top  + bounds.height / 2,
+    absolutePositioned: true
+  });
+}
+
 
     const scale = Math.max(bounds.width / img.width, bounds.height / img.height);
 
@@ -1941,7 +1958,8 @@ if (saved?.canvas) {
             </div>
           )}
 
-          <div className="flex items-center gap-2">
+          <div className="w-full overflow-x-auto">
+  <div className="flex items-center gap-2 min-w-max px-2 py-1">
             <label className="text-xs">W</label>
             <input
               type="number"
@@ -2098,6 +2116,7 @@ if (saved?.canvas) {
                 <FileDown size={16} /> Download PDF (All)
               </button>
             )}
+          </div>
           </div>
         </header>
       )}

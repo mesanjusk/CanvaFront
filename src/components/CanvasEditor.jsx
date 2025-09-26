@@ -1069,13 +1069,21 @@ const renderTemplate = useCallback(async (data) => {
     .filter(o => o?.customId && templateIds.includes(o.customId))
     .forEach(o => canvas.remove(o));
 
-  // ---- Safe canvas size (never fallback to 0) ----
-  const w = Number(data?.width)  || canvas.width;
-  const h = Number(data?.height) || canvas.height;
+  // --- Safe canvas size & downscale for mobile ----
+  const baseW = Number(data?.width)  || canvas.width;
+  const baseH = Number(data?.height) || canvas.height;
+
+  // if phone, limit the largest side to ~1200px
+  let w = baseW, h = baseH;
+  if (window.innerWidth < 768) {
+    const maxSide = 1200;
+    const scale = Math.min(1, maxSide / Math.max(baseW, baseH));
+    w = baseW * scale;
+    h = baseH * scale;
+  }
+
   setTplSize({ w, h });
   setCanvasSize?.(w, h);
-
-  // Update Fabric canvas logical size
   canvas.setWidth(w);
   canvas.setHeight(h);
   canvas.calcOffset();
@@ -1111,7 +1119,7 @@ const renderTemplate = useCallback(async (data) => {
           canvas.requestRenderAll();
           resolve();
         },
-        { crossOrigin: "anonymous" }
+        { crossOrigin: "anonymous" } // needs CORS header on the image host
       );
     });
   }
@@ -1124,11 +1132,9 @@ const renderTemplate = useCallback(async (data) => {
 
     canvas.loadFromJSON(json, () => {
       canvas.getObjects().forEach(o => {
-        // mark placeholder text
         if (o.type === "i-text" && (!o.customId || /text/i.test(o.customId))) {
           o.customId = "templateText";
         }
-        // mark frame slot
         if (
           o.customId === "frameSlot" ||
           (o.type === "path" &&
@@ -1149,9 +1155,9 @@ const renderTemplate = useCallback(async (data) => {
   if (showSignature && selectedInstitute?.signature)
     loadTemplateAsset("signature", selectedInstitute.signature, canvas);
 
-  // Final ensure render
   canvas.requestRenderAll();
 }, [canvas, selectedInstitute, showLogo, showSignature]);
+
 
 
 
@@ -2250,24 +2256,24 @@ if (saved?.canvas) {
         className={`absolute bg-gray-100 top-14 left-0 right-0 ${isRightbarOpen ? "md:right-80" : "right-0"} bottom-14 md:bottom-16 overflow-auto flex items-center justify-center`}
       >
       <div className="flex flex-col items-center">
-       <div
+      <div
   ref={stageRef}
-  style={{
-    width: '100%',                             
-    maxWidth: `${tplSize.w * zoom}px`,         
-    aspectRatio: `${tplSize.w}/${tplSize.h}`,   
-    minHeight: '200px',                         
-  }}
   className="shadow-lg border bg-white relative"
+  style={{
+    width: '100%',                               
+    maxWidth: `${tplSize.w * zoom}px`,           
+    aspectRatio: `${tplSize.w}/${tplSize.h}`,    
+    minHeight: '200px',
+  }}
 >
   <CanvasArea
     ref={canvasRef}
     width={tplSize.w}
     height={tplSize.h}
     style={{
-      width: '100%',    
-      height: '100%',   
-      display: 'block', 
+      width: '100%',      
+      height: '100%',
+      display: 'block',
     }}
   />
   {showToolbar && activeObj && (

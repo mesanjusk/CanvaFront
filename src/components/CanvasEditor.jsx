@@ -1059,204 +1059,57 @@ function cacheTemplatePlaceholders(canvas) {
   }
 }
 
+/* ======================= 2. Render Template ======================= */
 const renderTemplate = useCallback(async (data) => {
   if (!canvas) return;
 
-  // ----- 1️⃣ Remove previous template-layer objects -----
-  const templateIds = ["frameSlot", "templateText", "logo", "signature", "templateBg"];
+  // Remove only template objects (leave student photo/name)
+  const templateIds = ["templateBg", "frameSlot", "templateText", "logo", "signature"];
   canvas.getObjects()
     .filter(o => o?.customId && templateIds.includes(o.customId))
     .forEach(o => canvas.remove(o));
 
-  // ----- 2️⃣ Resize canvas -----
-  const parent = stageRef.current;
-  const w = Number(data?.width) || parent.offsetWidth || 600;
-  const h = Number(data?.height) || parent.offsetHeight || 400;
-  canvas.setWidth(w);
-  canvas.setHeight(h);
+  // Set canvas size
+  const w = Number(data?.width) || canvas.width;
+  const h = Number(data?.height) || canvas.height;
   setTplSize({ w, h });
   setCanvasSize?.(w, h);
 
-  // ----- 3️⃣ Load template background -----
+  // Add background
   if (data?.image) {
     await new Promise(resolve => {
       fabric.Image.fromURL(data.image, img => {
-        img.scaleToWidth(w);
-        img.scaleToHeight(h);
-        img.set({
-          selectable: false,
-          evented: false,
-          hasControls: false,
-          hasBorders: false,
-          lockMovementX: true,
-          lockMovementY: true,
-          customId: "templateBg",
-        });
-        canvas.add(img); // add as object to maintain z-order
-        canvas.sendToBack(img);
+        img.set({ selectable: false, evented: false, customId: "templateBg" });
+        img.scaleX = canvas.width / img.width;
+        img.scaleY = canvas.height / img.height;
+        canvas.add(img);
+        img.sendToBack();
         resolve();
       }, { crossOrigin: "anonymous" });
     });
   }
 
-  // ----- 4️⃣ Disable marquee selection for fixed objects -----
-  canvas.selection = true; // enable object selection for movable objects
-  canvas.defaultCursor = "default";
-
-  // ----- 5️⃣ Load template JSON -----
+  // Load canvas JSON placeholders
   if (data?.canvasJson) {
-    const json = typeof data.canvasJson === "string" ? JSON.parse(data.canvasJson) : data.canvasJson;
-    
-    canvas.loadFromJSON(json, () => {
+    canvas.loadFromJSON(data.canvasJson, () => {
       canvas.getObjects().forEach(o => {
-        switch (o.customId) {
-          case "frameSlot":
-          case "templateText":
-            o.set({
-              selectable: false,
-              evented: false,
-              hasControls: false,
-              hasBorders: false,
-              lockMovementX: true,
-              lockMovementY: true,
-            });
-            break;
-
-          case "studentName":
-            if (o.type !== "i-text") {
-              const newText = new fabric.IText(o.text, {
-                left: o.left,
-                top: o.top,
-                fontSize: o.fontSize || 28,
-                fill: o.fill || "#000",
-                fontFamily: o.fontFamily || "Arial",
-                fontWeight: o.fontWeight || "bold",
-                originX: o.originX || "center",
-                originY: o.originY || "top",
-                selectable: true,
-                evented: true,
-                editable: true,
-                hasControls: true,
-                lockMovementX: false,
-                lockMovementY: false,
-                customId: "studentName",
-              });
-              canvas.remove(o);
-              canvas.add(newText);
-              canvas.bringToFront(newText);
-            } else {
-              o.set({
-                selectable: true,
-                evented: true,
-                editable: true,
-                hasControls: true,
-                lockMovementX: false,
-                lockMovementY: false,
-              });
-              canvas.bringToFront(o);
-            }
-            break;
-
-          case "logo":
-          case "signature":
-          case "studentPhotoGroup":
-            o.set({
-              selectable: true,
-              evented: true,
-              hasControls: true,
-              lockMovementX: false,
-              lockMovementY: false,
-              lockUniScaling: false,
-            });
-            break;
-
-          case "templateBg":
-            o.set({
-              selectable: false,
-              evented: false,
-              hasControls: false,
-              hasBorders: false,
-              lockMovementX: true,
-              lockMovementY: true,
-            });
-            canvas.sendToBack(o);
-            break;
-
-          default:
-            o.set({
-              selectable: false,
-              evented: false,
-              lockMovementX: true,
-              lockMovementY: true,
-            });
+        if (o.type === "i-text" && (!o.customId || /text/i.test(o.customId))) o.customId = "templateText";
+        if (o.customId === "frameSlot" || (o.type === "path" && ["#7c3aed", "rgb(124,58,237)"].includes(o.stroke))) {
+          o.customId = "frameSlot";
         }
       });
-
       cacheTemplatePlaceholders(canvas);
       canvas.requestRenderAll();
     });
   }
 
-  // ----- 6️⃣ Prevent dragging empty canvas -----
-  canvas.on("mouse:down", e => {
-    if (!e.target) canvas.discardActiveObject();
-  });
+  // Optional: Logo
+  if (showLogo && selectedInstitute?.logo) loadTemplateAsset("logo", selectedInstitute.logo, canvas);
 
-// ----- 7️⃣ Load optional logo / signature with fixed placement -----
-if (showLogo && selectedInstitute?.logo) {
-  fabric.Image.fromURL(
-    selectedInstitute.logo,
-    img => {
-      const scale = 0.15; // small size (adjust as needed)
-      img.set({
-        customId: "logo",
-        originX: "right",
-        originY: "top",
-        left: canvas.width - 10,   // 10px padding from right
-        top: 10,                   // 10px padding from top
-        scaleX: scale,
-        scaleY: scale,
-        selectable: true,
-        evented: true,
-        hasControls: true,
-        lockUniScaling: false,
-      });
-      canvas.add(img);
-      canvas.bringToFront(img);
-      canvas.requestRenderAll();
-    },
-    { crossOrigin: "anonymous" }
-  );
-}
-
-if (showSignature && selectedInstitute?.signature) {
-  fabric.Image.fromURL(
-    selectedInstitute.signature,
-    img => {
-      const scale = 0.15; // small size (adjust as needed)
-      img.set({
-        customId: "signature",
-        originX: "left",
-        originY: "bottom",
-        left: 10,                    // 10px padding from left
-        top: canvas.height - 10,     // 10px padding from bottom
-        scaleX: scale,
-        scaleY: scale,
-        selectable: true,
-        evented: true,
-        hasControls: true,
-        lockUniScaling: false,
-      });
-      canvas.add(img);
-      canvas.bringToFront(img);
-      canvas.requestRenderAll();
-    },
-    { crossOrigin: "anonymous" }
-  );
-}
+  // Optional: Signature
+  if (showSignature && selectedInstitute?.signature) loadTemplateAsset("signature", selectedInstitute.signature, canvas);
 
 }, [canvas, selectedInstitute, showLogo, showSignature]);
-
 
 /* ======================= 3. Load template by ID ======================= */
 const loadTemplateById = useCallback(async id => {
@@ -1293,132 +1146,136 @@ useEffect(() => {
 
   if (!canvas || !currentStudent) return;
 
-  // --- Remove old student-specific objects ---
+  // ---- remove old student-specific objects ----
   canvas.getObjects().forEach(o => {
-    if (["studentName", "studentPhotoGroup"].includes(o.customId)) {
+    if (["studentName", "studentPhoto"].includes(o.customId)) {
       canvas.remove(o);
     }
   });
 
-  // === 1. Student Name ===
-  const name = `${currentStudent.firstName || ""} ${currentStudent.lastName || ""}`.trim();
-  let nameObj = canvas.getObjects().find(o =>
-    o.customId === "studentName" || o.customId === "templateText"
-  );
+// Compute display name
+const name = `${currentStudent.firstName || ""} ${currentStudent.lastName || ""}`.trim();
 
-  if (nameObj) {
-    nameObj.set({
-      text: name,
-      selectable: true,
-      evented: true,
-      editable: true,
-      hasControls: true,
-      lockMovementX: false,
-      lockMovementY: false,
-    });
-  } else {
-    const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
-    if (frameSlot) {
-      nameObj = new fabric.IText(name, {
-        left: frameSlot.left + frameSlot.width / 2,
-        top: frameSlot.top + frameSlot.height + 10,
-        fontSize: 28,
-        fill: "#000",
-        fontFamily: "Arial",
-        fontWeight: "bold",
-        originX: "center",
-        originY: "top",
-        selectable: true,
-        evented: true,
-        editable: true,
-        hasControls: true,
-        lockMovementX: false,
-        lockMovementY: false,
-        customId: "studentName"
-      });
-      canvas.add(nameObj);
-    }
-  }
-  if (nameObj) canvas.bringToFront(nameObj);
+// Try to find existing template text object
+let nameObj = canvas.getObjects().find(o => o.customId === "studentName" || o.customId === "templateText");
 
-// === 2. Student Photo ===
-const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
-if (!frameSlot) return;
-
-const bounds = frameSlot.getBoundingRect(true);
-const photoUrl = Array.isArray(currentStudent.photo)
-  ? currentStudent.photo[0]
-  : currentStudent.photo;
-if (!photoUrl) return;
-
-const perStudent =
-  studentLayoutsRef.current?.[currentStudent.uuid]?.studentPhotoProps;
-const savedPhoto = perStudent ?? getSavedProps("studentPhoto") ?? {};
-
-// --- function to rebuild clipPath based on frame ---
-function makeClipPath(frame) {
-  let clip;
-  if (frame.type === "path" && frame.path) {
-    clip = new fabric.Path(frame.path);
-  } else if (frame.type === "polygon" && frame.points) {
-    clip = new fabric.Polygon(frame.points);
-  } else {
-    clip = new fabric.Rect({
-      width: frame.width * frame.scaleX,
-      height: frame.height * frame.scaleY,
-    });
-  }
-  clip.set({
-    originX: "center",
-    originY: "center",
-    left: frame.left + (frame.width * frame.scaleX) / 2,
-    top: frame.top + (frame.height * frame.scaleY) / 2,
-    absolutePositioned: true,
-    evented: false,
+if (nameObj) {
+  // ✅ Update existing object
+  nameObj.set({
+    text: name,
     selectable: false,
+    evented: false
   });
-  return clip;
+} else {
+  // ✅ If not found, create a new text object
+  const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
+  if (!frameSlot) return; // can't position name without frame
+
+  nameObj = new fabric.Text(name, {
+    left: frameSlot.left + frameSlot.width / 2,
+    top: frameSlot.top + frameSlot.height + 10,
+    fontSize: 28,
+    fill: "#000",
+    fontFamily: "Arial",
+    fontWeight: "bold",
+    originX: "center",
+    originY: "top",
+    selectable: false,
+    evented: false,
+    customId: "studentName"
+  });
+  canvas.add(nameObj);
 }
 
-safeLoadImage(photoUrl, img => {
-  if (!img) return;
+// Render
+canvas.requestRenderAll();
 
-  const baseScale = Math.max(bounds.width / img.width, bounds.height / img.height);
-  img.set({
-    originX: "center",
-    originY: "center",
-    left: bounds.left + bounds.width / 2,
-    top: bounds.top + bounds.height / 2,
-    scaleX: savedPhoto.scaleX ?? baseScale,
-    scaleY: savedPhoto.scaleY ?? baseScale,
-    angle: savedPhoto.angle ?? 0,
-    selectable: false,   // ❌ Not selectable
-    evented: false,      // ❌ No events
-    hasControls: false,  // ❌ No resize handles
-    customId: "studentPhoto",
-    clipPath: makeClipPath(frameSlot),   // ✅ Always clipped
-  });
 
-  // allow moving the frame, keep photo masked
-  frameSlot.set({ visible: true, selectable: true, evented: true });
+  // ---- frame slot for photo ----
+  const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
+  if (!frameSlot) return;
 
-  // add photo below frame
-  canvas.add(img);
-  canvas.sendToBack(img);
-  canvas.requestRenderAll();
+  const bounds = frameSlot.getBoundingRect(true);
+  if (!bounds.width || !bounds.height) {
+    const t = setTimeout(() => setSelectedStudent(s => ({ ...s })), 30);
+    return () => clearTimeout(t);
+  }
 
-  // 🔄 Keep photo inside frame whenever frame moves
-  frameSlot.on("moving", () => {
+  // ---- student photo ----
+  const photoUrl = Array.isArray(currentStudent.photo)
+    ? currentStudent.photo[0]
+    : currentStudent.photo;
+  if (!photoUrl) return;
+
+  const perStudent = studentLayoutsRef.current?.[currentStudent.uuid]?.studentPhotoProps;
+  const savedPhoto = perStudent ?? getSavedProps("studentPhoto") ?? {};
+
+  safeLoadImage(photoUrl, img => {
+    if (!img) return;
+
+    // clipPath matching the frameSlot
+    const clipPath = frameSlot.type === "path" && frameSlot.path
+      ? new fabric.Path(frameSlot.path, {
+          originX: "center",
+          originY: "center",
+          left: frameSlot.left,
+          top:  frameSlot.top,
+          scaleX: frameSlot.scaleX || 1,
+          scaleY: frameSlot.scaleY || 1,
+          absolutePositioned: true
+        })
+      : new fabric.Rect({
+          width:  bounds.width,
+          height: bounds.height,
+          originX: "center",
+          originY: "center",
+          left: bounds.left + bounds.width  / 2,
+          top:  bounds.top  + bounds.height / 2,
+          absolutePositioned: true
+        });
+
+    const scale = Math.max(bounds.width / img.width, bounds.height / img.height);
+
     img.set({
-      left: frameSlot.left + (frameSlot.width * frameSlot.scaleX) / 2,
-      top: frameSlot.top + (frameSlot.height * frameSlot.scaleY) / 2,
+      originX: "center",
+      originY: "center",
+      left:   savedPhoto.left   ?? bounds.left + bounds.width  / 2,
+      top:    savedPhoto.top    ?? bounds.top  + bounds.height / 2,
+      scaleX: savedPhoto.scaleX ?? scale,
+      scaleY: savedPhoto.scaleY ?? scale,
+      angle:  savedPhoto.angle  ?? 0,
+      selectable: true,
+      evented: true,
+      customId: "studentPhoto",
+      clipPath
     });
-    img.clipPath = makeClipPath(frameSlot);
+
+    // Persist per-student transform
+    const persist = () => {
+      const uuid = currentStudent.uuid;
+      if (!studentLayoutsRef.current[uuid]) studentLayoutsRef.current[uuid] = {};
+      studentLayoutsRef.current[uuid].studentPhotoProps = {
+        left: img.left,
+        top: img.top,
+        scaleX: img.scaleX,
+        scaleY: img.scaleY,
+        angle: img.angle
+      };
+      saveProps("studentPhoto", studentLayoutsRef.current[uuid].studentPhotoProps);
+    };
+    img.on("modified", persist);
+    img.on("scaling",  persist);
+    img.on("moving",   persist);
+
+    canvas.add(img);
+    img.moveTo(canvas.getObjects().indexOf(frameSlot) + 1);
+
+    // hide the purple stroke so only the photo shows
+    frameSlot.set({ stroke: null, selectable: false, evented: false });
+
+    studentObjectsRef.current.push(img);
     canvas.requestRenderAll();
   });
-});
-
-
 }, [canvas, selectedStudent, bulkMode, bulkIndex, filteredStudents, bulkList]);
 
 
@@ -1720,11 +1577,7 @@ const gotoIndex = (idx) => {
   if (canvasRef.current && bulkList[bulkIndex]) {
     const objs = canvasRef.current.getObjects();
     objs
-       .filter(
-      (o) =>
-        o.customId === "studentPhoto" ||
-        o.customId === "studentPhotoGroup" 
-    )
+      .filter((o) => o.customId === "studentPhoto")
       .forEach((p) => canvasRef.current.remove(p));
     studentLayoutsRef.current[bulkList[bulkIndex]] = canvasRef.current.toJSON();
   }
@@ -2088,7 +1941,7 @@ if (saved?.canvas) {
             </div>
           )}
 
-          <div className="flex items-center gap-2 overflow-x-auto p-2">
+          <div className="flex items-center gap-2">
             <label className="text-xs">W</label>
             <input
               type="number"
@@ -2198,25 +2051,23 @@ if (saved?.canvas) {
               <Images size={16} /> Template
             </button>
 
-   
-    {/* Download current */}
-    <button
-      title="Download PNG"
-      onClick={downloadCurrentPNG}
-      className="flex-shrink-0 p-2 rounded-full bg-green-600 text-white shadow hover:bg-green-700"
-    >
-      <Download size={18} />
-    </button>
+            {/* Download current */}
+            <button
+              title="Download PNG"
+              onClick={downloadCurrentPNG}
+              className="p-2 rounded-full bg-green-600 text-white shadow hover:bg-green-700"
+            >
+              <Download size={18} />
+            </button>
 
-    {/* Export PDF */}
-    <button
-      title="Export PDF"
-      onClick={exportSinglePDF}
-      className="flex-shrink-0 p-2 rounded-full bg-purple-600 text-white shadow hover:bg-purple-700"
-    >
-      <FileDown size={18} />
-    </button>
-  
+            {/* Export PDF */}
+            <button
+              title="Export PDF"
+              onClick={exportSinglePDF}
+              className="p-2 rounded-full bg-purple-600 text-white shadow hover:bg-purple-700"
+            >
+              <FileDown size={18} />
+            </button>
             <button
               title="Export Imposed Sheet PDF"
               onClick={exportImposedPDF}
@@ -2333,7 +2184,7 @@ if (saved?.canvas) {
       {/* CENTER / Canva-like viewport */}
       <main
         ref={viewportRef}
-        className={`absolute bg-gray-100 top-14 left-0 right-0 bottom-0 ${isRightbarOpen ? "md:right-80" : "right-0"} overflow-auto flex items-center justify-center`}
+        className={`absolute bg-gray-100 top-14 left-0 right-0 ${isRightbarOpen ? "md:right-80" : "right-0"} bottom-14 md:bottom-16 overflow-auto flex items-center justify-center`}
       >
       <div className="flex flex-col items-center">
         <div

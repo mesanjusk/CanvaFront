@@ -2244,9 +2244,10 @@ if (saved?.canvas) {
         <div
           ref={stageRef}
           style={{
-            width: `${tplSize.w * zoom}px`,
-            height: `${tplSize.h * zoom}px`,
-          }}
+    width: '100%',                       
+    maxWidth: `${tplSize.w * zoom}px`,    
+    aspectRatio: `${tplSize.w}/${tplSize.h}`,
+  }}
           className="shadow-lg border bg-white relative"
         >
           <CanvasArea ref={canvasRef} width={tplSize.w} height={tplSize.h} />

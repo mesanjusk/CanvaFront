@@ -1075,17 +1075,44 @@ const renderTemplate = useCallback(async (data) => {
   setTplSize({ w, h });
   setCanvasSize?.(w, h);
 
+  // ✅ make sure Fabric canvas updates size
+  canvas.setWidth(w);
+  canvas.setHeight(h);
+
   // Add background
   if (data?.image) {
     await new Promise(resolve => {
-      fabric.Image.fromURL(data.image, img => {
-        img.set({ selectable: false, evented: false, customId: "templateBg" });
-        img.scaleX = canvas.width / img.width;
-        img.scaleY = canvas.height / img.height;
-        canvas.add(img);
-        img.sendToBack();
-        resolve();
-      }, { crossOrigin: "anonymous" });
+      fabric.Image.fromURL(
+        data.image,
+        img => {
+          // scale background to fit canvas
+          const scaleX = w / img.width;
+          const scaleY = h / img.height;
+
+          img.set({
+            customId: "templateBg",
+            selectable: false,
+            evented: false,
+            originX: "left",
+            originY: "top",
+            left: 0,
+            top: 0,
+            scaleX,
+            scaleY,
+            lockMovementX: true,
+            lockMovementY: true,
+            lockScalingX: true,
+            lockScalingY: true,
+            lockRotation: true
+          });
+
+          canvas.add(img);
+          img.sendToBack();
+          canvas.requestRenderAll();
+          resolve();
+        },
+        { crossOrigin: "anonymous" }
+      );
     });
   }
 
@@ -1093,8 +1120,14 @@ const renderTemplate = useCallback(async (data) => {
   if (data?.canvasJson) {
     canvas.loadFromJSON(data.canvasJson, () => {
       canvas.getObjects().forEach(o => {
-        if (o.type === "i-text" && (!o.customId || /text/i.test(o.customId))) o.customId = "templateText";
-        if (o.customId === "frameSlot" || (o.type === "path" && ["#7c3aed", "rgb(124,58,237)"].includes(o.stroke))) {
+        if (o.type === "i-text" && (!o.customId || /text/i.test(o.customId)))
+          o.customId = "templateText";
+
+        if (
+          o.customId === "frameSlot" ||
+          (o.type === "path" &&
+            ["#7c3aed", "rgb(124,58,237)"].includes(o.stroke))
+        ) {
           o.customId = "frameSlot";
         }
       });
@@ -1104,12 +1137,14 @@ const renderTemplate = useCallback(async (data) => {
   }
 
   // Optional: Logo
-  if (showLogo && selectedInstitute?.logo) loadTemplateAsset("logo", selectedInstitute.logo, canvas);
+  if (showLogo && selectedInstitute?.logo)
+    loadTemplateAsset("logo", selectedInstitute.logo, canvas);
 
   // Optional: Signature
-  if (showSignature && selectedInstitute?.signature) loadTemplateAsset("signature", selectedInstitute.signature, canvas);
-
+  if (showSignature && selectedInstitute?.signature)
+    loadTemplateAsset("signature", selectedInstitute.signature, canvas);
 }, [canvas, selectedInstitute, showLogo, showSignature]);
+
 
 /* ======================= 3. Load template by ID ======================= */
 const loadTemplateById = useCallback(async id => {

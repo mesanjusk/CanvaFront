@@ -1399,7 +1399,7 @@ safeLoadImage(photoUrl, img => {
     clipPath: makeClipPath(frameSlot),   // ✅ Always clipped
   });
 
-  // hide original frame shape, but keep it movable
+  // allow moving the frame, keep photo masked
   frameSlot.set({ visible: true, selectable: true, evented: true });
 
   // add photo below frame
@@ -1409,21 +1409,15 @@ safeLoadImage(photoUrl, img => {
 
   // 🔄 Keep photo inside frame whenever frame moves
   frameSlot.on("moving", () => {
-    if (img && frameSlot) {
-      img.set({
-        left: frameSlot.left + (frameSlot.width * frameSlot.scaleX) / 2,
-        top: frameSlot.top + (frameSlot.height * frameSlot.scaleY) / 2,
-      });
-      img.clipPath = makeClipPath(frameSlot);
-      canvas.requestRenderAll();
-    }
+    img.set({
+      left: frameSlot.left + (frameSlot.width * frameSlot.scaleX) / 2,
+      top: frameSlot.top + (frameSlot.height * frameSlot.scaleY) / 2,
+    });
+    img.clipPath = makeClipPath(frameSlot);
+    canvas.requestRenderAll();
   });
 });
 
-// --- add photo ---
-canvas.add(img);
-canvas.sendToBack(img);
-canvas.requestRenderAll();
 
 }, [canvas, selectedStudent, bulkMode, bulkIndex, filteredStudents, bulkList]);
 

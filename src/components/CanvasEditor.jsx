@@ -1072,19 +1072,23 @@ const renderTemplate = useCallback(async (data) => {
   const tplW = Number(data?.width) || 1000;
   const tplH = Number(data?.height) || 1000;
 
-  // Container size (screen size on mobile)
+  // Container size (screen/mobile)
   const container = document.getElementById("canvas-container");
   const maxW = container?.offsetWidth || window.innerWidth;
   const maxH = container?.offsetHeight || window.innerHeight;
 
-  // Scale factor so template fits inside container
+  // Scale factor so template fits container but keeps aspect ratio
   const scale = Math.min(maxW / tplW, maxH / tplH);
 
+  // Final scaled dimensions
+  const scaledW = tplW * scale;
+  const scaledH = tplH * scale;
+
   // Resize canvas
-  canvas.setWidth(tplW * scale);
-  canvas.setHeight(tplH * scale);
-  setTplSize({ w: tplW * scale, h: tplH * scale });
-  setCanvasSize?.(tplW * scale, tplH * scale);
+  canvas.setWidth(scaledW);
+  canvas.setHeight(scaledH);
+  setTplSize({ w: scaledW, h: scaledH });
+  setCanvasSize?.(scaledW, scaledH);
 
   // Background
   if (data?.image) {
@@ -1097,12 +1101,12 @@ const renderTemplate = useCallback(async (data) => {
             evented: false,
             customId: "templateBg",
             originX: "left",
-            originY: "top",
+            originY: "top"
           });
 
-         
-        img.scaleX = canvas.width / img.width;
-        img.scaleY = canvas.height / img.height;
+          // Stretch to fit full canvas
+          img.scaleX = scaledW / img.width;
+          img.scaleY = scaledH / img.height;
 
           canvas.add(img);
           img.sendToBack();
@@ -1127,7 +1131,7 @@ const renderTemplate = useCallback(async (data) => {
           o.customId = "frameSlot";
         }
 
-        // Scale and reposition objects
+        // Scale & reposition objects to match canvas scaling
         o.scaleX *= scale;
         o.scaleY *= scale;
         o.left *= scale;
@@ -1150,6 +1154,7 @@ const renderTemplate = useCallback(async (data) => {
     loadTemplateAsset("signature", selectedInstitute.signature, canvas);
   }
 }, [canvas, selectedInstitute, showLogo, showSignature]);
+
 
 
 /* ======================= 3. Load template by ID ======================= */
@@ -2247,22 +2252,29 @@ if (saved?.canvas) {
         className={`absolute bg-gray-100 top-14 left-0 right-0 ${isRightbarOpen ? "md:right-80" : "right-0"} bottom-14 md:bottom-16 overflow-auto flex items-center justify-center`}
       >
       <div className="flex flex-col items-center">
-      <div
+     <div
   id="canvas-container"
-  ref={stageRef}
-  style={{
-    width: `${tplSize.w}px`,   
-    height: `${tplSize.h}px`, 
-    overflow: "hidden",
-  }}
-  className="shadow-lg border bg-white relative"
+  className="flex items-center justify-center w-full h-full bg-gray-100"
 >
-  <CanvasArea ref={canvasRef} width={tplSize.w} height={tplSize.h} />
+  <div
+    ref={stageRef}
+    style={{
+      transform: `scale(${zoom})`,
+      transformOrigin: "center center",  
+      width: `${tplSize.w}px`,
+      height: `${tplSize.h}px`,
+      overflow: "hidden",
+    }}
+    className="shadow-lg border bg-white relative"
+  >
+    <CanvasArea ref={canvasRef} width={tplSize.w} height={tplSize.h} />
 
-  {showToolbar && activeObj && (
-    <SelectionToolbar activeObj={activeObj} canvas={canvas} />
-  )}
+    {showToolbar && activeObj && (
+      <SelectionToolbar activeObj={activeObj} canvas={canvas} />
+    )}
+  </div>
 </div>
+
 
 
 

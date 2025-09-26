@@ -1070,8 +1070,8 @@ const renderTemplate = useCallback(async (data) => {
     .forEach(o => canvas.remove(o));
 
   // ---- Safe canvas size (never fallback to 0) ----
-  const w = Number(data?.width)  || 600;   // give defaults for mobile
-  const h = Number(data?.height) || 400;
+  const w = Number(data?.width)  || canvas.width;
+  const h = Number(data?.height) || canvas.height;
   setTplSize({ w, h });
   setCanvasSize?.(w, h);
 

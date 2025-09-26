@@ -1090,7 +1090,7 @@ const renderTemplate = useCallback(async (data) => {
   setTplSize({ w: scaledW, h: scaledH });
   setCanvasSize?.(scaledW, scaledH);
 
-  // Background
+  // === Background ===
   if (data?.image) {
     await new Promise(resolve => {
       fabric.Image.fromURL(
@@ -1101,12 +1101,15 @@ const renderTemplate = useCallback(async (data) => {
             evented: false,
             customId: "templateBg",
             originX: "left",
-            originY: "top"
+            originY: "top",
+            left: 0,
+            top: 0
           });
 
-          // Stretch to fit full canvas
-          img.scaleX = scaledW / img.width;
-          img.scaleY = scaledH / img.height;
+          // ✅ Stretch background to fill canvas
+          img.scaleToWidth(scaledW);
+          img.scaleToHeight(scaledH);
+          img.setCoords();
 
           canvas.add(img);
           img.sendToBack();
@@ -1117,10 +1120,11 @@ const renderTemplate = useCallback(async (data) => {
     });
   }
 
-  // Load template objects
+  // === Load template objects ===
   if (data?.canvasJson) {
     canvas.loadFromJSON(data.canvasJson, () => {
       canvas.getObjects().forEach(o => {
+        // Assign customId
         if (o.type === "i-text" && (!o.customId || /text/i.test(o.customId))) {
           o.customId = "templateText";
         }
@@ -1131,7 +1135,7 @@ const renderTemplate = useCallback(async (data) => {
           o.customId = "frameSlot";
         }
 
-        // Scale & reposition objects to match canvas scaling
+        // ✅ Scale & reposition objects
         o.scaleX *= scale;
         o.scaleY *= scale;
         o.left *= scale;
@@ -1144,12 +1148,12 @@ const renderTemplate = useCallback(async (data) => {
     });
   }
 
-  // Logo
+  // === Logo ===
   if (showLogo && selectedInstitute?.logo) {
     loadTemplateAsset("logo", selectedInstitute.logo, canvas);
   }
 
-  // Signature
+  // === Signature ===
   if (showSignature && selectedInstitute?.signature) {
     loadTemplateAsset("signature", selectedInstitute.signature, canvas);
   }

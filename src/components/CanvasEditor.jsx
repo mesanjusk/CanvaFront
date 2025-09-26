@@ -1341,106 +1341,115 @@ useEffect(() => {
   }
   if (nameObj) canvas.bringToFront(nameObj);
 
-// === Student Photo Loader ===
-function safeLoadImage(url, cb) {
-  fabric.Image.fromURL(
-    url,
-    (img) => cb(img || null),
-    { crossOrigin: "anonymous" }
-  );
-}
+  // === 2️⃣ Student Photo ===
+  const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
+  if (!frameSlot) return;
 
-const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
-if (!frameSlot) return;
-
-const bounds = frameSlot.getBoundingRect(true);
-const photoUrl = Array.isArray(currentStudent.photo)
-  ? currentStudent.photo[0]
-  : currentStudent.photo;
-if (!photoUrl) return;
-
-const perStudent =
-  studentLayoutsRef.current?.[currentStudent.uuid]?.studentPhotoProps;
-const savedPhoto = perStudent ?? getSavedProps("studentPhoto") ?? {};
-
-safeLoadImage(photoUrl, (img) => {
-  if (!img) return;
-
-  // --- Build clipPath from frameSlot ---
-  let clipPath;
-  if (frameSlot.type === "path" && frameSlot.path) {
-    clipPath = new fabric.Path(frameSlot.path, {
-      originX: "center",
-      originY: "center",
-      absolutePositioned: true,
-      stroke: null,
-      fill: "#000",          // mask only
-      selectable: false,
-      evented: false,
-    });
-  } else if (frameSlot.type === "polygon" && frameSlot.points) {
-    clipPath = new fabric.Polygon(frameSlot.points, {
-      originX: "center",
-      originY: "center",
-      absolutePositioned: true,
-      stroke: null,
-      fill: "#000",
-      selectable: false,
-      evented: false,
-    });
-  } else {
-    clipPath = new fabric.Rect({
-      width: frameSlot.width * frameSlot.scaleX,
-      height: frameSlot.height * frameSlot.scaleY,
-      left: frameSlot.left,
-      top: frameSlot.top,
-      originX: "center",
-      originY: "center",
-      absolutePositioned: true,
-      stroke: null,
-      fill: "#000",
-      selectable: false,
-      evented: false,
-    });
-  }
-
-  // --- Setup photo ---
-  const baseScale = Math.max(bounds.width / img.width, bounds.height / img.height);
-  img.set({
-    originX: "center",
-    originY: "center",
-    left: bounds.left + bounds.width / 2,
-    top: bounds.top + bounds.height / 2,
-    scaleX: savedPhoto.scaleX ?? baseScale,
-    scaleY: savedPhoto.scaleY ?? baseScale,
-    angle: savedPhoto.angle ?? 0,
-    selectable: true,      
+  // ✅ Frame को भी editable/movable बनाएं
+  frameSlot.set({
+    selectable: true,
     evented: true,
     hasControls: true,
     lockMovementX: false,
     lockMovementY: false,
     lockUniScaling: false,
-    customId: "studentPhoto",
   });
 
-  // --- Keep original frame outline visible ---
-  frameSlot.set({
-    selectable: true,       // ✅ user can also edit/move frame
-    evented: true,
-    hasControls: true,
-    lockUniScaling: false,
+  const bounds = frameSlot.getBoundingRect(true);
+  const photoUrl = Array.isArray(currentStudent.photo)
+    ? currentStudent.photo[0]
+    : currentStudent.photo;
+  if (!photoUrl) return;
+
+  const perStudent =
+    studentLayoutsRef.current?.[currentStudent.uuid]?.studentPhotoProps;
+  const savedPhoto = perStudent ?? getSavedProps("studentPhoto") ?? {};
+
+  safeLoadImage(photoUrl, img => {
+    if (!img) return;
+
+    // ----- choose clipPath type -----
+    let clipPath;
+    if (frameSlot.type === "path" && frameSlot.path) {
+      clipPath = new fabric.Path(frameSlot.path, {
+        originX: "center",
+        originY: "center",
+        scaleX: frameSlot.scaleX || 1,
+        scaleY: frameSlot.scaleY || 1,
+      });
+    } else if (frameSlot.type === "polygon" && frameSlot.points) {
+      clipPath = new fabric.Polygon(frameSlot.points, {
+        originX: "center",
+        originY: "center",
+        scaleX: frameSlot.scaleX || 1,
+        scaleY: frameSlot.scaleY || 1,
+      });
+    } else {
+      clipPath = new fabric.Rect({
+        width: bounds.width,
+        height: bounds.height,
+        originX: "center",
+        originY: "center",
+      });
+    }
+
+    // scale to fill frame initially
+    const baseScale = Math.max(bounds.width / img.width, bounds.height / img.height);
+    img.set({
+      originX: "center",
+      originY: "center",
+      scaleX: savedPhoto.scaleX ?? baseScale,
+      scaleY: savedPhoto.scaleY ?? baseScale,
+      angle:  savedPhoto.angle  ?? 0,
+    });
+
+    // ---- Group photo with clipPath ----
+    const photoGroup = new fabric.Group([img], {
+      clipPath,
+      originX: "center",
+      originY: "center",
+      left:   savedPhoto.left ?? bounds.left + bounds.width / 2,
+      top:    savedPhoto.top  ?? bounds.top  + bounds.height / 2,
+      scaleX: savedPhoto.groupScaleX ?? 1,
+      scaleY: savedPhoto.groupScaleY ?? 1,
+      angle:  savedPhoto.groupAngle  ?? 0,
+
+      // ✅ allow full editing of photo
+      selectable: true,
+      evented: true,
+      hasControls: true,
+      lockMovementX: false,
+      lockMovementY: false,
+      lockUniScaling: false,
+      customId: "studentPhotoGroup",
+    });
+
+    // persist per-student transform
+    const persist = () => {
+      const uuid = currentStudent.uuid;
+      studentLayoutsRef.current[uuid] = {
+        ...studentLayoutsRef.current[uuid],
+        studentPhotoProps: {
+          left: photoGroup.left,
+          top: photoGroup.top,
+          scaleX: photoGroup.scaleX,
+          scaleY: photoGroup.scaleY,
+          angle: photoGroup.angle,
+        },
+      };
+      saveProps("studentPhoto", studentLayoutsRef.current[uuid].studentPhotoProps);
+    };
+    photoGroup.on("modified", persist);
+    photoGroup.on("scaling",  persist);
+    photoGroup.on("moving",   persist);
+    photoGroup.on("rotating", persist);
+
+    canvas.add(photoGroup);
+    canvas.bringToFront(photoGroup);
+    canvas.setActiveObject(photoGroup);
+
+    canvas.requestRenderAll();
   });
-
-  // Replace old frame with photo + frame
-  canvas.remove(frameSlot);
-  canvas.add(img);
-  canvas.add(frameSlot); // outline always on top
-  canvas.bringToFront(frameSlot);
-
-  canvas.setActiveObject(img); // default select photo
-  canvas.requestRenderAll();
-});
-
 }, [canvas, selectedStudent, bulkMode, bulkIndex, filteredStudents, bulkList]);
 
 /* ======================= 5. Helper to load assets (logo/signature) ======================= */

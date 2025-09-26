@@ -1420,6 +1420,11 @@ safeLoadImage(photoUrl, img => {
   });
 });
 
+// --- add photo ---
+canvas.add(img);
+canvas.sendToBack(img);
+canvas.requestRenderAll();
+
 }, [canvas, selectedStudent, bulkMode, bulkIndex, filteredStudents, bulkList]);
 
 

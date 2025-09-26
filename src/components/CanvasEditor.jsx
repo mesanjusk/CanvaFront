@@ -1341,104 +1341,91 @@ useEffect(() => {
   }
   if (nameObj) canvas.bringToFront(nameObj);
 
-  // === 2. Student Photo ===
-  const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
-  if (!frameSlot) return;
+// === 2. Student Photo ===
+const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
+if (!frameSlot) return;
 
-  const bounds = frameSlot.getBoundingRect(true);
-  const photoUrl = Array.isArray(currentStudent.photo)
-    ? currentStudent.photo[0]
-    : currentStudent.photo;
-  if (!photoUrl) return;
+const bounds = frameSlot.getBoundingRect(true);
+const photoUrl = Array.isArray(currentStudent.photo)
+  ? currentStudent.photo[0]
+  : currentStudent.photo;
+if (!photoUrl) return;
 
-  const perStudent =
-    studentLayoutsRef.current?.[currentStudent.uuid]?.studentPhotoProps;
-  const savedPhoto = perStudent ?? getSavedProps("studentPhoto") ?? {};
+const perStudent =
+  studentLayoutsRef.current?.[currentStudent.uuid]?.studentPhotoProps;
+const savedPhoto = perStudent ?? getSavedProps("studentPhoto") ?? {};
 
-  safeLoadImage(photoUrl, img => {
-    if (!img) return;
-
-    // ----- choose clipPath type -----
-    let clipPath;
-    if (frameSlot.type === "path" && frameSlot.path) {
-      clipPath = new fabric.Path(frameSlot.path, {
-        originX: "center",
-        originY: "center",
-        scaleX: frameSlot.scaleX || 1,
-        scaleY: frameSlot.scaleY || 1,
-      });
-    } else if (frameSlot.type === "polygon" && frameSlot.points) {
-      clipPath = new fabric.Polygon(frameSlot.points, {
-        originX: "center",
-        originY: "center",
-        scaleX: frameSlot.scaleX || 1,
-        scaleY: frameSlot.scaleY || 1,
-      });
-    } else {
-      clipPath = new fabric.Rect({
-        width: bounds.width,
-        height: bounds.height,
-        originX: "center",
-        originY: "center",
-      });
-    }
-
-    // scale to fill frame initially
-    const baseScale = Math.max(bounds.width / img.width, bounds.height / img.height);
-    img.set({
-      originX: "center",
-      originY: "center",
-      scaleX: savedPhoto.scaleX ?? baseScale,
-      scaleY: savedPhoto.scaleY ?? baseScale,
-      angle:  savedPhoto.angle  ?? 0,
+// --- function to rebuild clipPath based on frame ---
+function makeClipPath(frame) {
+  let clip;
+  if (frame.type === "path" && frame.path) {
+    clip = new fabric.Path(frame.path);
+  } else if (frame.type === "polygon" && frame.points) {
+    clip = new fabric.Polygon(frame.points);
+  } else {
+    clip = new fabric.Rect({
+      width: frame.width * frame.scaleX,
+      height: frame.height * frame.scaleY,
     });
-
-    // ---- Group photo with clipPath ----
-    const photoGroup = new fabric.Group([img], {
-      clipPath,
-      originX: "center",
-      originY: "center",
-      left:   savedPhoto.left ?? bounds.left + bounds.width / 2,
-      top:    savedPhoto.top  ?? bounds.top  + bounds.height / 2,
-      scaleX: savedPhoto.groupScaleX ?? 1,
-      scaleY: savedPhoto.groupScaleY ?? 1,
-      angle:  savedPhoto.groupAngle  ?? 0,
-
-      // ✅ allow full editing
-      selectable: true,
-      evented: true,
-      hasControls: true,
-      lockMovementX: false,
-      lockMovementY: false,
-      lockUniScaling: false,
-      customId: "studentPhotoGroup",
-    });
-
-    // persist per-student transform
-    const persist = () => {
-      const uuid = currentStudent.uuid;
-      studentLayoutsRef.current[uuid] = {
-        ...studentLayoutsRef.current[uuid],
-        studentPhotoProps: {
-          left: photoGroup.left,
-          top: photoGroup.top,
-          scaleX: photoGroup.scaleX,
-          scaleY: photoGroup.scaleY,
-          angle: photoGroup.angle,
-        },
-      };
-      saveProps("studentPhoto", studentLayoutsRef.current[uuid].studentPhotoProps);
-    };
-    photoGroup.on("modified", persist);
-    photoGroup.on("scaling",  persist);
-    photoGroup.on("moving",   persist);
-    photoGroup.on("rotating", persist);
-
-    canvas.add(photoGroup);
-    canvas.setActiveObject(photoGroup);
-    frameSlot.set({ visible: false, selectable: false, evented: false }); // hide frame border
-    canvas.requestRenderAll();
+  }
+  clip.set({
+    originX: "center",
+    originY: "center",
+    left: frame.left + (frame.width * frame.scaleX) / 2,
+    top: frame.top + (frame.height * frame.scaleY) / 2,
+    absolutePositioned: true,
+    evented: false,
+    selectable: false,
   });
+  return clip;
+}
+
+safeLoadImage(photoUrl, img => {
+  if (!img) return;
+
+  const baseScale = Math.max(bounds.width / img.width, bounds.height / img.height);
+  img.set({
+    originX: "center",
+    originY: "center",
+    left: bounds.left + bounds.width / 2,
+    top: bounds.top + bounds.height / 2,
+    scaleX: savedPhoto.scaleX ?? baseScale,
+    scaleY: savedPhoto.scaleY ?? baseScale,
+    angle:  savedPhoto.angle  ?? 0,
+    selectable: true,
+    evented: true,
+    hasControls: true,
+    lockUniScaling: false,
+    customId: "studentPhoto",
+    clipPath: makeClipPath(frameSlot),   // ✅ mask initially
+  });
+
+  frameSlot.set({ visible: false, selectable: false, evented: false });
+  canvas.add(img);
+  canvas.setActiveObject(img);
+  canvas.requestRenderAll();
+
+  // --- Toggle clipping on edit ---
+  canvas.on("selection:created", e => {
+    if (e.selected[0]?.customId === "studentPhoto") {
+      e.selected[0].clipPath = null;  // show full image
+      canvas.requestRenderAll();
+    }
+  });
+  canvas.on("selection:updated", e => {
+    if (e.selected[0]?.customId === "studentPhoto") {
+      e.selected[0].clipPath = null;
+      canvas.requestRenderAll();
+    }
+  });
+  canvas.on("selection:cleared", () => {
+    if (img && !img.clipPath) {
+      img.clipPath = makeClipPath(frameSlot); // reapply heart mask
+      canvas.requestRenderAll();
+    }
+  });
+});
+
 }, [canvas, selectedStudent, bulkMode, bulkIndex, filteredStudents, bulkList]);
 
 

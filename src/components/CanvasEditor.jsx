@@ -1300,7 +1300,7 @@ useEffect(() => {
     }
   });
 
-  // === 1️⃣ Student Name ===
+  // === 1. Student Name ===
   const name = `${currentStudent.firstName || ""} ${currentStudent.lastName || ""}`.trim();
   let nameObj = canvas.getObjects().find(o =>
     o.customId === "studentName" || o.customId === "templateText"
@@ -1317,11 +1317,11 @@ useEffect(() => {
       lockMovementY: false,
     });
   } else {
-    const frameSlotTmp = canvas.getObjects().find(o => o.customId === "frameSlot");
-    if (frameSlotTmp) {
+    const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
+    if (frameSlot) {
       nameObj = new fabric.IText(name, {
-        left: frameSlotTmp.left + frameSlotTmp.width / 2,
-        top: frameSlotTmp.top + frameSlotTmp.height + 10,
+        left: frameSlot.left + frameSlot.width / 2,
+        top: frameSlot.top + frameSlot.height + 10,
         fontSize: 28,
         fill: "#000",
         fontFamily: "Arial",
@@ -1341,19 +1341,9 @@ useEffect(() => {
   }
   if (nameObj) canvas.bringToFront(nameObj);
 
-  // === 2️⃣ Student Photo ===
+  // === 2. Student Photo ===
   const frameSlot = canvas.getObjects().find(o => o.customId === "frameSlot");
   if (!frameSlot) return;
-
-  // ✅ Frame 
-  frameSlot.set({
-    selectable: true,
-    evented: true,
-    hasControls: true,
-    lockMovementX: false,
-    lockMovementY: false,
-    lockUniScaling: false,
-  });
 
   const bounds = frameSlot.getBoundingRect(true);
   const photoUrl = Array.isArray(currentStudent.photo)
@@ -1414,7 +1404,7 @@ useEffect(() => {
       scaleY: savedPhoto.groupScaleY ?? 1,
       angle:  savedPhoto.groupAngle  ?? 0,
 
-      // ✅ allow full editing of photo
+      // ✅ allow full editing
       selectable: true,
       evented: true,
       hasControls: true,
@@ -1445,13 +1435,13 @@ useEffect(() => {
     photoGroup.on("rotating", persist);
 
     canvas.add(photoGroup);
-    canvas.bringToFront(photoGroup);
     canvas.setActiveObject(photoGroup);
-
-    // अब frameSlot visible और selectable रहेगा
+    frameSlot.set({ visible: false, selectable: false, evented: false }); // hide frame border
     canvas.requestRenderAll();
   });
 }, [canvas, selectedStudent, bulkMode, bulkIndex, filteredStudents, bulkList]);
+
+
 
 /* ======================= 5. Helper to load assets (logo/signature) ======================= */
 function loadTemplateAsset(id, url, canvas) {

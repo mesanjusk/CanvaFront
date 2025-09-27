@@ -1059,57 +1059,113 @@ function cacheTemplatePlaceholders(canvas) {
   }
 }
 
-/* ======================= 2. Render Template ======================= */
+/* ======================= 2. Render Template (with debug logs) ======================= */
 const renderTemplate = useCallback(async (data) => {
-  if (!canvas) return;
+  if (!canvas) {
+    console.warn("[renderTemplate] ❌ No canvas instance");
+    return;
+  }
+
+  console.log("[renderTemplate] 🚀 Rendering template", data);
 
   // Remove only template objects (leave student photo/name)
   const templateIds = ["templateBg", "frameSlot", "templateText", "logo", "signature"];
-  canvas.getObjects()
-    .filter(o => o?.customId && templateIds.includes(o.customId))
-    .forEach(o => canvas.remove(o));
+  const removed = canvas.getObjects()
+    .filter(o => o?.customId && templateIds.includes(o.customId));
+  removed.forEach(o => canvas.remove(o));
+  console.log(`[renderTemplate] 🗑 Removed ${removed.length} old template objects`);
 
-  // Set canvas size
-  const w = Number(data?.width) || canvas.width;
-  const h = Number(data?.height) || canvas.height;
+  // ----- Fix: Handle mobile pixel ratio -----
+  const dpr = window.devicePixelRatio || 1;
+  const w = Number(data?.width) || canvas.getWidth();
+  const h = Number(data?.height) || canvas.getHeight();
+
+  console.log(`[renderTemplate] 📐 Canvas size: w=${w}, h=${h}, dpr=${dpr}`);
+
+  canvas.setWidth(w * dpr);
+  canvas.setHeight(h * dpr);
+  canvas.setZoom(dpr); // ensures proper scaling
   setTplSize({ w, h });
   setCanvasSize?.(w, h);
 
-  // Add background
+  console.log("[renderTemplate] ✅ Canvas resized");
+
+  // ----- Add background image -----
   if (data?.image) {
+    console.log("[renderTemplate] 🌄 Loading background:", data.image);
     await new Promise(resolve => {
-      fabric.Image.fromURL(data.image, img => {
-        img.set({ selectable: false, evented: false, customId: "templateBg" });
-        img.scaleX = canvas.width / img.width;
-        img.scaleY = canvas.height / img.height;
-        canvas.add(img);
-        img.sendToBack();
-        resolve();
-      }, { crossOrigin: "anonymous" });
+      fabric.Image.fromURL(
+        data.image,
+        img => {
+          if (!img) {
+            console.error("[renderTemplate] ❌ Background image failed to load");
+            return resolve();
+          }
+
+          console.log(`[renderTemplate] ✅ Image loaded (w=${img.width}, h=${img.height})`);
+
+          img.set({
+            selectable: false,
+            evented: false,
+            customId: "templateBg"
+          });
+
+          img.scaleToWidth(w);
+          img.scaleToHeight(h);
+
+          console.log(`[renderTemplate] 🔍 Image scaled to: w=${w}, h=${h}`);
+
+          canvas.add(img);
+          img.sendToBack();
+          canvas.requestRenderAll();
+          resolve();
+        },
+        { crossOrigin: "anonymous" }
+      );
     });
   }
 
-  // Load canvas JSON placeholders
+  // ----- Load placeholders from JSON -----
   if (data?.canvasJson) {
-    canvas.loadFromJSON(data.canvasJson, () => {
-      canvas.getObjects().forEach(o => {
-        if (o.type === "i-text" && (!o.customId || /text/i.test(o.customId))) o.customId = "templateText";
-        if (o.customId === "frameSlot" || (o.type === "path" && ["#7c3aed", "rgb(124,58,237)"].includes(o.stroke))) {
-          o.customId = "frameSlot";
-        }
+    console.log("[renderTemplate] 📂 Loading canvasJson");
+    await new Promise(resolve => {
+      canvas.loadFromJSON(data.canvasJson, () => {
+        console.log("[renderTemplate] ✅ canvasJson loaded");
+
+        canvas.getObjects().forEach(o => {
+          if (o.type === "i-text" && (!o.customId || /text/i.test(o.customId))) {
+            o.customId = "templateText";
+            console.log("[renderTemplate] ✍ Found text placeholder");
+          }
+          if (o.customId === "frameSlot" ||
+              (o.type === "path" && ["#7c3aed", "rgb(124,58,237)"].includes(o.stroke))) {
+            o.customId = "frameSlot";
+            console.log("[renderTemplate] 🎯 Found frame slot");
+          }
+        });
+
+        cacheTemplatePlaceholders(canvas);
+        canvas.requestRenderAll();
+        resolve();
       });
-      cacheTemplatePlaceholders(canvas);
-      canvas.requestRenderAll();
     });
   }
 
-  // Optional: Logo
-  if (showLogo && selectedInstitute?.logo) loadTemplateAsset("logo", selectedInstitute.logo, canvas);
+  // ----- Optional logo/signature -----
+  if (showLogo && selectedInstitute?.logo) {
+    console.log("[renderTemplate] 🏫 Adding logo");
+    loadTemplateAsset("logo", selectedInstitute.logo, canvas);
+  }
 
-  // Optional: Signature
-  if (showSignature && selectedInstitute?.signature) loadTemplateAsset("signature", selectedInstitute.signature, canvas);
+  if (showSignature && selectedInstitute?.signature) {
+    console.log("[renderTemplate] ✒ Adding signature");
+    loadTemplateAsset("signature", selectedInstitute.signature, canvas);
+  }
+
+  console.log("[renderTemplate] 🎉 Finished rendering template");
 
 }, [canvas, selectedInstitute, showLogo, showSignature]);
+
 
 /* ======================= 3. Load template by ID ======================= */
 const loadTemplateById = useCallback(async id => {

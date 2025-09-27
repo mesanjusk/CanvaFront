@@ -1063,38 +1063,63 @@ function cacheTemplatePlaceholders(canvas) {
 const renderTemplate = useCallback(async (data) => {
   if (!canvas) return;
 
-  // Remove only template objects (leave student photo/name)
+  // 1️⃣ Remove old template objects only
   const templateIds = ["templateBg", "frameSlot", "templateText", "logo", "signature"];
   canvas.getObjects()
     .filter(o => o?.customId && templateIds.includes(o.customId))
     .forEach(o => canvas.remove(o));
 
-  // Set canvas size
-  const w = Number(data?.width) || canvas.width;
-  const h = Number(data?.height) || canvas.height;
+  // 2️⃣ Determine correct size
+  const w = Number(data?.width) || window.innerWidth * 0.9; // fallback for mobile
+  const h = Number(data?.height) || window.innerHeight * 0.9;
   setTplSize({ w, h });
+
+  // Make sure both the <canvas> element and Fabric stage are updated
+  canvas.setWidth(w);
+  canvas.setHeight(h);
   setCanvasSize?.(w, h);
 
-  // Add background
+  // 3️⃣ Add background image
   if (data?.image) {
     await new Promise(resolve => {
-      fabric.Image.fromURL(data.image, img => {
-        img.set({ selectable: false, evented: false, customId: "templateBg" });
-        img.scaleX = canvas.width / img.width;
-        img.scaleY = canvas.height / img.height;
-        canvas.add(img);
-        img.sendToBack();
-        resolve();
-      }, { crossOrigin: "anonymous" });
+      fabric.Image.fromURL(
+        data.image,
+        img => {
+          img.set({
+            selectable: false,
+            evented: false,
+            customId: "templateBg",
+            left: 0,
+            top: 0,
+            originX: "left",
+            originY: "top"
+          });
+
+          // scale to new canvas size
+          const scaleX = w / img.width;
+          const scaleY = h / img.height;
+          img.set({ scaleX, scaleY });
+
+          canvas.add(img);
+          img.sendToBack();
+          resolve();
+        },
+        { crossOrigin: "anonymous" }
+      );
     });
   }
 
-  // Load canvas JSON placeholders
+  // 4️⃣ Load template JSON placeholders
   if (data?.canvasJson) {
     canvas.loadFromJSON(data.canvasJson, () => {
       canvas.getObjects().forEach(o => {
-        if (o.type === "i-text" && (!o.customId || /text/i.test(o.customId))) o.customId = "templateText";
-        if (o.customId === "frameSlot" || (o.type === "path" && ["#7c3aed", "rgb(124,58,237)"].includes(o.stroke))) {
+        if (o.type === "i-text" && (!o.customId || /text/i.test(o.customId))) {
+          o.customId = "templateText";
+        }
+        if (
+          o.customId === "frameSlot" ||
+          (o.type === "path" && ["#7c3aed", "rgb(124,58,237)"].includes(o.stroke))
+        ) {
           o.customId = "frameSlot";
         }
       });
@@ -1103,13 +1128,18 @@ const renderTemplate = useCallback(async (data) => {
     });
   }
 
-  // Optional: Logo
-  if (showLogo && selectedInstitute?.logo) loadTemplateAsset("logo", selectedInstitute.logo, canvas);
+  // 5️⃣ Optional assets
+  if (showLogo && selectedInstitute?.logo) {
+    loadTemplateAsset("logo", selectedInstitute.logo, canvas);
+  }
+  if (showSignature && selectedInstitute?.signature) {
+    loadTemplateAsset("signature", selectedInstitute.signature, canvas);
+  }
 
-  // Optional: Signature
-  if (showSignature && selectedInstitute?.signature) loadTemplateAsset("signature", selectedInstitute.signature, canvas);
-
+  // Force one final render (helps on mobile Safari)
+  canvas.requestRenderAll();
 }, [canvas, selectedInstitute, showLogo, showSignature]);
+
 
 /* ======================= 3. Load template by ID ======================= */
 const loadTemplateById = useCallback(async id => {

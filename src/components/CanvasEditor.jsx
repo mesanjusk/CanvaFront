@@ -90,6 +90,75 @@ const setGradientFill = (obj, colors = ["#ff6b6b", "#845ef7"]) => {
   obj.set("fill", grad);
 };
 
+const readPath = (source, path) =>
+  path.split(".").reduce((acc, key) => (acc == null ? undefined : acc[key]), source);
+
+const parsePositiveNumber = (value) => {
+  const num = Number(value);
+  return Number.isFinite(num) && num > 0 ? Math.round(num) : null;
+};
+
+const extractTemplateSize = (meta = {}) => {
+  const widthPaths = [
+    "width",
+    "w",
+    "canvasWidth",
+    "canvas_width",
+    "canvas_size.width",
+    "canvasSize.width",
+    "size.width",
+    "dimensions.width",
+  ];
+  const heightPaths = [
+    "height",
+    "h",
+    "canvasHeight",
+    "canvas_height",
+    "canvas_size.height",
+    "canvasSize.height",
+    "size.height",
+    "dimensions.height",
+  ];
+
+  const width = widthPaths.reduce((acc, path) => acc ?? parsePositiveNumber(readPath(meta, path)), null);
+  const height = heightPaths.reduce((acc, path) => acc ?? parsePositiveNumber(readPath(meta, path)), null);
+
+  return { width, height };
+};
+
+const parseMaybeJSON = (input) => {
+  if (!input) return null;
+  if (typeof input === "string") {
+    try {
+      return JSON.parse(input);
+    } catch (err) {
+      console.warn("Failed to parse template JSON", err);
+      return null;
+    }
+  }
+  if (typeof input === "object") return input;
+  return null;
+};
+
+const extractCanvasJsonFromMeta = (meta = {}) => {
+  return (
+    parseMaybeJSON(meta.canvasJson) ||
+    parseMaybeJSON(meta.canvas_json) ||
+    parseMaybeJSON(meta.layout) ||
+    parseMaybeJSON(meta.canvas) ||
+    parseMaybeJSON(meta.data) ||
+    null
+  );
+};
+
+const pickTemplatePreview = (meta = {}) =>
+  meta.backgroundImage ||
+  meta.image ||
+  meta.previewImage ||
+  meta.thumbnail ||
+  meta.coverImage ||
+  null;
+
 /* ====== Center guides (existing) ====== */
 const useSmartGuides = (canvasRef, enable = true, tolerance = 8) => {
   const showV = useRef(false);
@@ -440,75 +509,55 @@ const handleUpload = (e) => {
     });
   };
 
-  const handleTemplateSelect = useCallback((templateMeta) => {
-    if (!templateMeta) return;
+  const handleCreateBlankCanvas = useCallback(
+    (rawWidth, rawHeight) => {
+      const widthValue = rawWidth ?? Number(blankWidth);
+      const heightValue = rawHeight ?? Number(blankHeight);
 
-    const widthCandidate =
-      templateMeta?.width ??
-      templateMeta?.w ??
-      templateMeta?.canvasWidth ??
-      templateMeta?.canvas_size?.width ??
-      templateMeta?.canvasSize?.width ??
-      templateMeta?.size?.width;
-    const heightCandidate =
-      templateMeta?.height ??
-      templateMeta?.h ??
-      templateMeta?.canvasHeight ??
-      templateMeta?.canvas_size?.height ??
-      templateMeta?.canvasSize?.height ??
-      templateMeta?.size?.height;
+      const width = Number(widthValue);
+      const height = Number(heightValue);
 
-    const width = Number(widthCandidate);
-    const height = Number(heightCandidate);
+      if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) {
+        toast.error("Enter a valid canvas size");
+        return;
+      }
 
-    if (Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0) {
       const w = Math.round(width);
       const h = Math.round(height);
+
+      setBlankWidth(String(w));
+      setBlankHeight(String(h));
+      setActiveTemplateId(null);
+      setTemplateImage(null);
       setTplSize({ w, h });
       setCanvasSize?.(w, h);
-    }
+      setZoom(1);
 
-    loadTemplateById(templateMeta._id || templateMeta.id);
-  }, [loadTemplateById, setCanvasSize]);
+      if (canvas) {
+        canvas.discardActiveObject();
+        canvas.clear();
+        canvas.setBackgroundColor("#ffffff", () => {});
+        canvas.setWidth(w);
+        canvas.setHeight(h);
+        canvas.setZoom(1);
+        canvas.requestRenderAll();
+      }
 
-  const handleCreateBlankCanvas = useCallback(() => {
-    const width = Number(blankWidth);
-    const height = Number(blankHeight);
+      resetHistory();
+      saveHistoryDebounced();
+      setRightPanel(null);
+      setIsRightbarOpen(false);
+    },
+    [blankWidth, blankHeight, canvas, resetHistory, saveHistoryDebounced, setCanvasSize]
+  );
 
-    if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) {
-      toast.error("Enter a valid canvas size");
-      return;
-    }
-
-    const w = Math.round(width);
-    const h = Math.round(height);
-
-    setActiveTemplateId(null);
-    setTemplateImage(null);
-    setTplSize({ w, h });
-    setCanvasSize?.(w, h);
-    setZoom(1);
-
-    if (canvas) {
-      canvas.discardActiveObject();
-      canvas.clear();
-      canvas.setBackgroundColor("#ffffff", () => {});
-      canvas.setWidth(w);
-      canvas.setHeight(h);
-      canvas.setZoom(1);
-      canvas.requestRenderAll();
-    }
-
-    resetHistory();
-    saveHistoryDebounced();
-    setRightPanel(null);
-    setIsRightbarOpen(false);
-  }, [blankWidth, blankHeight, canvas, resetHistory, saveHistoryDebounced, setCanvasSize]);
-
-  const handleBlankCanvasSubmit = useCallback((event) => {
-    event.preventDefault();
-    handleCreateBlankCanvas();
-  }, [handleCreateBlankCanvas]);
+  const handleBlankCanvasSubmit = useCallback(
+    (event) => {
+      event.preventDefault();
+      handleCreateBlankCanvas();
+    },
+    [handleCreateBlankCanvas]
+  );
 
   // data
   const [allStudents, setStudents] = useState([]);
@@ -1193,75 +1242,183 @@ function cacheTemplatePlaceholders(canvas) {
 }
 
 /* ======================= 2. Render Template ======================= */
-const renderTemplate = useCallback(async (data) => {
-  if (!canvas) return;
+const renderTemplate = useCallback(
+  async (data = {}) => {
+    if (!canvas) return;
 
-  // Remove only template objects (leave student photo/name)
-  const templateIds = ["templateBg", "frameSlot", "templateText", "logo", "signature"];
-  canvas.getObjects()
-    .filter(o => o?.customId && templateIds.includes(o.customId))
-    .forEach(o => canvas.remove(o));
+    const { width, height } = extractTemplateSize(data);
+    const canvasJson = extractCanvasJsonFromMeta(data);
+    const previewImage = pickTemplatePreview(data);
+    const targetWidth = width ?? canvas.getWidth();
+    const targetHeight = height ?? canvas.getHeight();
 
-  // Set canvas size
-  const w = Number(data?.width) || canvas.width;
-  const h = Number(data?.height) || canvas.height;
-  setTplSize({ w, h });
-  setCanvasSize?.(w, h);
+    if (width && height) {
+      setTplSize({ w: width, h: height });
+      setCanvasSize?.(width, height);
+      canvas.setWidth(width);
+      canvas.setHeight(height);
+    }
 
-  // Add background
-  if (data?.image) {
-    await new Promise(resolve => {
-      fabric.Image.fromURL(data.image, img => {
-        img.set({ selectable: false, evented: false, customId: "templateBg" });
-        img.scaleX = canvas.width / img.width;
-        img.scaleY = canvas.height / img.height;
-        canvas.add(img);
-        img.sendToBack();
-        resolve();
-      }, { crossOrigin: "anonymous" });
-    });
-  }
+    canvas.discardActiveObject();
 
-  // Load canvas JSON placeholders
-  if (data?.canvasJson) {
-    canvas.loadFromJSON(data.canvasJson, () => {
-      canvas.getObjects().forEach(o => {
-        if (o.type === "i-text" && (!o.customId || /text/i.test(o.customId))) o.customId = "templateText";
-        if (o.customId === "frameSlot" || (o.type === "path" && ["#7c3aed", "rgb(124,58,237)"].includes(o.stroke))) {
-          o.customId = "frameSlot";
-        }
+    const templateIds = ["templateBg", "frameSlot", "templateText", "logo", "signature"];
+    canvas
+      .getObjects()
+      .filter((o) => o?.customId && templateIds.includes(o.customId))
+      .forEach((o) => canvas.remove(o));
+
+    canvas.setBackgroundColor("#ffffff", () => {});
+
+    if (previewImage) {
+      await new Promise((resolve) => {
+        fabric.Image.fromURL(
+          previewImage,
+          (img) => {
+            img.set({
+              selectable: false,
+              evented: false,
+              customId: "templateBg",
+              originX: "left",
+              originY: "top",
+              left: 0,
+              top: 0,
+            });
+            img.scaleX = targetWidth / img.width;
+            img.scaleY = targetHeight / img.height;
+            canvas.add(img);
+            img.sendToBack();
+            resolve();
+          },
+          { crossOrigin: "anonymous" }
+        );
       });
-      cacheTemplatePlaceholders(canvas);
+    }
+
+    if (canvasJson) {
+      await new Promise((resolve) => {
+        canvas.loadFromJSON(canvasJson, () => {
+          canvas.getObjects().forEach((o) => {
+            if (o.type === "i-text" && (!o.customId || /text/i.test(o.customId))) {
+              o.customId = "templateText";
+            }
+            if (
+              o.customId === "frameSlot" ||
+              (o.type === "path" && ["#7c3aed", "rgb(124,58,237)"].includes(o.stroke))
+            ) {
+              o.customId = "frameSlot";
+            }
+          });
+          cacheTemplatePlaceholders(canvas);
+          canvas.requestRenderAll();
+          resolve();
+        });
+      });
+    } else {
       canvas.requestRenderAll();
-    });
-  }
+    }
 
-  // Optional: Logo
-  if (showLogo && selectedInstitute?.logo) loadTemplateAsset("logo", selectedInstitute.logo, canvas);
+    if (showLogo && selectedInstitute?.logo) {
+      loadTemplateAsset("logo", selectedInstitute.logo, canvas);
+    }
 
-  // Optional: Signature
-  if (showSignature && selectedInstitute?.signature) loadTemplateAsset("signature", selectedInstitute.signature, canvas);
+    if (showSignature && selectedInstitute?.signature) {
+      loadTemplateAsset("signature", selectedInstitute.signature, canvas);
+    }
 
-}, [canvas, selectedInstitute, showLogo, showSignature]);
+    resetHistory();
+    saveHistoryDebounced();
+  },
+  [
+    canvas,
+    selectedInstitute,
+    showLogo,
+    showSignature,
+    setCanvasSize,
+    setTplSize,
+    resetHistory,
+    saveHistoryDebounced,
+  ]
+);
 
 /* ======================= 3. Load template by ID ======================= */
-const loadTemplateById = useCallback(async id => {
-  if (!id) return;
-  setLoadingTemplate(true);
-  try {
-    const res = await axios.get(`https://canvaback.onrender.com/api/template/${id}`);
-    await renderTemplate(res.data || {});
-    setActiveTemplateId(id);
-  } catch {
-    toast.error("Failed to load template");
-  } finally {
-    setLoadingTemplate(false);
-  }
-}, [renderTemplate]);
+const loadTemplateById = useCallback(
+  async (id) => {
+    if (!id || id === "blank") return;
+    setLoadingTemplate(true);
+    try {
+      const res = await axios.get(`https://canvaback.onrender.com/api/template/${id}`);
+      const payload = res.data?.result || res.data || {};
+      await renderTemplate(payload);
+      setActiveTemplateId(id);
+    } catch (err) {
+      console.error("Failed to load template", err);
+      toast.error("Failed to load template");
+    } finally {
+      setLoadingTemplate(false);
+    }
+  },
+  [renderTemplate]
+);
 
 useEffect(() => {
   if (templateId) loadTemplateById(templateId);
 }, [templateId, loadTemplateById]);
+
+const handleTemplateSelect = useCallback(
+  async (templateMeta) => {
+    if (!templateMeta) return;
+
+    try {
+      const { width, height } = extractTemplateSize(templateMeta);
+
+      if (width) setBlankWidth(String(width));
+      if (height) setBlankHeight(String(height));
+
+      if (width && height) {
+        setTplSize({ w: width, h: height });
+        setCanvasSize?.(width, height);
+      }
+
+      if (templateMeta.isBlank) {
+        const fallbackWidth = width ?? tplSize.w;
+        const fallbackHeight = height ?? tplSize.h;
+        handleCreateBlankCanvas(fallbackWidth, fallbackHeight);
+        return;
+      }
+
+      const inlineJson = extractCanvasJsonFromMeta(templateMeta);
+      const id = templateMeta._id || templateMeta.id || null;
+
+      if (inlineJson) {
+        await renderTemplate({ ...templateMeta, canvasJson: inlineJson });
+        setActiveTemplateId(id);
+        return;
+      }
+
+      if (id) {
+        await loadTemplateById(id);
+        return;
+      }
+
+      toast.error("Template is missing layout data");
+    } catch (err) {
+      console.error("Failed to apply template", err);
+      toast.error("Unable to apply template");
+    }
+  },
+  [
+    handleCreateBlankCanvas,
+    loadTemplateById,
+    renderTemplate,
+    setActiveTemplateId,
+    setBlankHeight,
+    setBlankWidth,
+    setCanvasSize,
+    setTplSize,
+    tplSize.h,
+    tplSize.w,
+  ]
+);
 
 // ----- Safe image loader -----
 function safeLoadImage(url, callback) {

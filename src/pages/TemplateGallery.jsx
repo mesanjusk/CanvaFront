@@ -57,7 +57,7 @@ const TemplateGallery = () => {
   const emptyMessage = useMemo(() => {
     if (loading) return "";
     if (error && hasTemplates) return "";
-    if (error) return "We couldn\'t load templates right now.";
+    if (error) return "We couldn't load templates right now.";
     return "Start by creating your first template.";
   }, [loading, error, hasTemplates]);
 

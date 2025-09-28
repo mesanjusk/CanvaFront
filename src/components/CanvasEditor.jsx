@@ -315,6 +315,8 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
 
   const [draftAvailable, setDraftAvailable] = useState(false);
   const autosaveTimeoutRef = useRef(null);
+  const layerCounterRef = useRef(0);
+  const [layersTick, setLayersTick] = useState(0);
 
   // hooks
   const {
@@ -650,8 +652,6 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   const [showToolbar, setShowToolbar] = useState(false);
   const [showMobileTools, setShowMobileTools] = useState(false);
   const [pendingPreset, setPendingPreset] = useState("");
-  const layerCounterRef = useRef(0);
-  const [layersTick, setLayersTick] = useState(0);
   const [renamingLayer, setRenamingLayer] = useState(null);
   const [renameValue, setRenameValue] = useState("");
 

@@ -70,6 +70,12 @@ import ShapeStylePanel from "./ShapeStylePanel";
 import { buildClipShape, buildOverlayShape, moveOverlayAboveImage, applyMaskAndFrame, removeMaskAndFrame } from "../utils/shapeUtils";
 import { PRESET_SIZES, mmToPx, pxToMm, drawCropMarks, drawRegistrationMark } from "../utils/printUtils";
 import { removeBackground } from "../utils/backgroundUtils";
+import {
+  extractTemplateSize,
+  extractCanvasJsonFromMeta,
+  pickTemplatePreview,
+  normalizeTemplateMeta,
+} from "../utils/templateUtils";
 import SelectionToolbar from "./SelectionToolbar";
 import BottomNavBar from "./BottomNavBar";
 
@@ -89,75 +95,6 @@ const setGradientFill = (obj, colors = ["#ff6b6b", "#845ef7"]) => {
   });
   obj.set("fill", grad);
 };
-
-const readPath = (source, path) =>
-  path.split(".").reduce((acc, key) => (acc == null ? undefined : acc[key]), source);
-
-const parsePositiveNumber = (value) => {
-  const num = Number(value);
-  return Number.isFinite(num) && num > 0 ? Math.round(num) : null;
-};
-
-const extractTemplateSize = (meta = {}) => {
-  const widthPaths = [
-    "width",
-    "w",
-    "canvasWidth",
-    "canvas_width",
-    "canvas_size.width",
-    "canvasSize.width",
-    "size.width",
-    "dimensions.width",
-  ];
-  const heightPaths = [
-    "height",
-    "h",
-    "canvasHeight",
-    "canvas_height",
-    "canvas_size.height",
-    "canvasSize.height",
-    "size.height",
-    "dimensions.height",
-  ];
-
-  const width = widthPaths.reduce((acc, path) => acc ?? parsePositiveNumber(readPath(meta, path)), null);
-  const height = heightPaths.reduce((acc, path) => acc ?? parsePositiveNumber(readPath(meta, path)), null);
-
-  return { width, height };
-};
-
-const parseMaybeJSON = (input) => {
-  if (!input) return null;
-  if (typeof input === "string") {
-    try {
-      return JSON.parse(input);
-    } catch (err) {
-      console.warn("Failed to parse template JSON", err);
-      return null;
-    }
-  }
-  if (typeof input === "object") return input;
-  return null;
-};
-
-const extractCanvasJsonFromMeta = (meta = {}) => {
-  return (
-    parseMaybeJSON(meta.canvasJson) ||
-    parseMaybeJSON(meta.canvas_json) ||
-    parseMaybeJSON(meta.layout) ||
-    parseMaybeJSON(meta.canvas) ||
-    parseMaybeJSON(meta.data) ||
-    null
-  );
-};
-
-const pickTemplatePreview = (meta = {}) =>
-  meta.backgroundImage ||
-  meta.image ||
-  meta.previewImage ||
-  meta.thumbnail ||
-  meta.coverImage ||
-  null;
 
 /* ====== Center guides (existing) ====== */
 const useSmartGuides = (canvasRef, enable = true, tolerance = 8) => {
@@ -1102,32 +1039,7 @@ useEffect(() => {
               ? res.data
               : [];
 
-        const normalized = raw.map((item) => {
-          const widthCandidate =
-            item?.width ??
-            item?.w ??
-            item?.canvasWidth ??
-            item?.canvas_size?.width ??
-            item?.canvasSize?.width ??
-            item?.size?.width;
-          const heightCandidate =
-            item?.height ??
-            item?.h ??
-            item?.canvasHeight ??
-            item?.canvas_size?.height ??
-            item?.canvasSize?.height ??
-            item?.size?.height;
-          const width = Number(widthCandidate);
-          const height = Number(heightCandidate);
-
-          return {
-            ...item,
-            width: Number.isFinite(width) && width > 0 ? width : undefined,
-            height: Number.isFinite(height) && height > 0 ? height : undefined,
-          };
-        });
-
-        setTemplates(normalized);
+        setTemplates(raw.map((item) => normalizeTemplateMeta(item)));
       } catch (err) {
         console.error("Error fetching templates:", err);
         setTemplates([]);
@@ -1248,8 +1160,8 @@ const renderTemplate = useCallback(
     if (!canvas) return;
 
     const { width, height } = extractTemplateSize(data);
-    const canvasJson = extractCanvasJsonFromMeta(data);
-    const previewImage = pickTemplatePreview(data);
+    const canvasJson = data.canvasJson ?? extractCanvasJsonFromMeta(data);
+    const previewImage = data.preview ?? pickTemplatePreview(data);
     const targetWidth = width ?? canvas.getWidth();
     const targetHeight = height ?? canvas.getHeight();
 
@@ -1387,7 +1299,7 @@ const handleTemplateSelect = useCallback(
         return;
       }
 
-      const inlineJson = extractCanvasJsonFromMeta(templateMeta);
+      const inlineJson = templateMeta.canvasJson ?? extractCanvasJsonFromMeta(templateMeta);
       const id = templateMeta._id || templateMeta.id || null;
 
       if (inlineJson) {
@@ -2660,37 +2572,43 @@ if (saved?.canvas) {
                 <div className="text-xs text-gray-500">Fetching templates…</div>
               ) : (
                 <div className="grid grid-cols-2 gap-3">
-                  {templates.map((t) => (
-                    <button
-                      key={t._id || t.id}
-                      type="button"
-                      onClick={() => handleTemplateSelect(t)}
-                      disabled={loadingTemplate}
-                      className={`border rounded overflow-hidden text-left hover:shadow focus:ring-2 focus:ring-indigo-500 ${(t._id || t.id) === activeTemplateId ? "ring-2 ring-indigo-500" : ""}`}
-                      title={t.title || "Template"}
-                    >
-                      <div className="aspect-[4/5] bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
-                        {t.image ? (
-                          <img
-                            src={t.image}
-                            alt={t.title || "template thumbnail"}
-                            className="h-full w-full object-cover"
-                            crossOrigin="anonymous"
-                          />
-                        ) : (
-                          <span>Preview</span>
-                        )}
-                      </div>
-                      <div className="px-2 py-1">
-                        <div className="text-xs font-medium truncate">
-                          {t.title || "Untitled"}
+                  {templates.map((t) => {
+                    const preview = t.preview ?? pickTemplatePreview(t);
+                    const { width, height } = extractTemplateSize(t);
+                    const title = t.title || t.name || "Template";
+
+                    return (
+                      <button
+                        key={t._id || t.id || title}
+                        type="button"
+                        onClick={() => handleTemplateSelect(t)}
+                        disabled={loadingTemplate}
+                        className={`border rounded overflow-hidden text-left hover:shadow focus:ring-2 focus:ring-indigo-500 ${(t._id || t.id) === activeTemplateId ? "ring-2 ring-indigo-500" : ""}`}
+                        title={title}
+                      >
+                        <div className="aspect-[4/5] bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
+                          {preview ? (
+                            <img
+                              src={preview}
+                              alt={`${title} preview`}
+                              className="h-full w-full object-cover"
+                              crossOrigin="anonymous"
+                            />
+                          ) : (
+                            <span>Preview</span>
+                          )}
                         </div>
-                        <div className="text-[10px] text-gray-500">
-                          {formatDimension(t.width ?? t.w, 400)}×{formatDimension(t.height ?? t.h, 550)}
+                        <div className="px-2 py-1">
+                          <div className="text-xs font-medium truncate">{title}</div>
+                          <div className="text-[10px] text-gray-500">
+                            {width && height
+                              ? `${formatDimension(width, tplSize.w)}×${formatDimension(height, tplSize.h)} px`
+                              : "Flexible size"}
+                          </div>
                         </div>
-                      </div>
-                    </button>
-                  ))}
+                      </button>
+                    );
+                  })}
                   {templates.length === 0 && !templatesError && (
                     <div className="col-span-2 py-6 text-center text-xs text-gray-500">
                       No templates available yet

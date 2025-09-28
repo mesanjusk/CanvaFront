@@ -440,6 +440,76 @@ const handleUpload = (e) => {
     });
   };
 
+  const handleTemplateSelect = useCallback((templateMeta) => {
+    if (!templateMeta) return;
+
+    const widthCandidate =
+      templateMeta?.width ??
+      templateMeta?.w ??
+      templateMeta?.canvasWidth ??
+      templateMeta?.canvas_size?.width ??
+      templateMeta?.canvasSize?.width ??
+      templateMeta?.size?.width;
+    const heightCandidate =
+      templateMeta?.height ??
+      templateMeta?.h ??
+      templateMeta?.canvasHeight ??
+      templateMeta?.canvas_size?.height ??
+      templateMeta?.canvasSize?.height ??
+      templateMeta?.size?.height;
+
+    const width = Number(widthCandidate);
+    const height = Number(heightCandidate);
+
+    if (Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0) {
+      const w = Math.round(width);
+      const h = Math.round(height);
+      setTplSize({ w, h });
+      setCanvasSize?.(w, h);
+    }
+
+    loadTemplateById(templateMeta._id || templateMeta.id);
+  }, [loadTemplateById, setCanvasSize]);
+
+  const handleCreateBlankCanvas = useCallback(() => {
+    const width = Number(blankWidth);
+    const height = Number(blankHeight);
+
+    if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) {
+      toast.error("Enter a valid canvas size");
+      return;
+    }
+
+    const w = Math.round(width);
+    const h = Math.round(height);
+
+    setActiveTemplateId(null);
+    setTemplateImage(null);
+    setTplSize({ w, h });
+    setCanvasSize?.(w, h);
+    setZoom(1);
+
+    if (canvas) {
+      canvas.discardActiveObject();
+      canvas.clear();
+      canvas.setBackgroundColor("#ffffff", () => {});
+      canvas.setWidth(w);
+      canvas.setHeight(h);
+      canvas.setZoom(1);
+      canvas.requestRenderAll();
+    }
+
+    resetHistory();
+    saveHistoryDebounced();
+    setRightPanel(null);
+    setIsRightbarOpen(false);
+  }, [blankWidth, blankHeight, canvas, resetHistory, saveHistoryDebounced, setCanvasSize]);
+
+  const handleBlankCanvasSubmit = useCallback((event) => {
+    event.preventDefault();
+    handleCreateBlankCanvas();
+  }, [handleCreateBlankCanvas]);
+
   // data
   const [allStudents, setStudents] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null);
@@ -469,6 +539,10 @@ const handleUpload = (e) => {
   const [templates, setTemplates] = useState([]);
   const [activeTemplateId, setActiveTemplateId] = useState(templateId || null);
   const [loadingTemplate, setLoadingTemplate] = useState(false);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [templatesError, setTemplatesError] = useState(null);
+  const [blankWidth, setBlankWidth] = useState("1080");
+  const [blankHeight, setBlankHeight] = useState("1080");
 
   // bulk mode
   const [bulkMode, setBulkMode] = useState(false);
@@ -488,6 +562,11 @@ const handleUpload = (e) => {
 
   // Collapsible sections
   const [showFilters, setShowFilters] = useState(true);
+
+  const formatDimension = useCallback((value, fallback) => {
+    const num = Number(value);
+    return Number.isFinite(num) && num > 0 ? Math.round(num) : fallback;
+  }, []);
 
   /* ========================= PRINT & IMPOSITION ========================= */
   const [usePrintSizing, setUsePrintSizing] = useState(false);
@@ -957,6 +1036,60 @@ useEffect(() => {
 
   loadGallaries();
 }, []);
+
+
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      setLoadingTemplates(true);
+      setTemplatesError(null);
+      try {
+        const res = await axios.get("https://canvaback.onrender.com/api/template");
+        const raw = Array.isArray(res.data?.result)
+          ? res.data.result
+          : Array.isArray(res.data?.data)
+            ? res.data.data
+            : Array.isArray(res.data)
+              ? res.data
+              : [];
+
+        const normalized = raw.map((item) => {
+          const widthCandidate =
+            item?.width ??
+            item?.w ??
+            item?.canvasWidth ??
+            item?.canvas_size?.width ??
+            item?.canvasSize?.width ??
+            item?.size?.width;
+          const heightCandidate =
+            item?.height ??
+            item?.h ??
+            item?.canvasHeight ??
+            item?.canvas_size?.height ??
+            item?.canvasSize?.height ??
+            item?.size?.height;
+          const width = Number(widthCandidate);
+          const height = Number(heightCandidate);
+
+          return {
+            ...item,
+            width: Number.isFinite(width) && width > 0 ? width : undefined,
+            height: Number.isFinite(height) && height > 0 ? height : undefined,
+          };
+        });
+
+        setTemplates(normalized);
+      } catch (err) {
+        console.error("Error fetching templates:", err);
+        setTemplates([]);
+        setTemplatesError("Failed to load templates");
+        toast.error("Failed to load templates");
+      } finally {
+        setLoadingTemplates(false);
+      }
+    };
+
+    fetchTemplates();
+  }, []);
 
 
 /// helper to load/apply a gallary
@@ -2329,42 +2462,89 @@ if (saved?.canvas) {
 
           {rightPanel === "templates" && (
             <Fragment>
+              <form onSubmit={handleBlankCanvasSubmit} className="mb-4 space-y-2 rounded-lg border bg-gray-50 p-3 text-xs">
+                <div className="text-sm font-semibold text-gray-700">Start from blank</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="flex flex-col gap-1">
+                    <span>Width (px)</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={blankWidth}
+                      onChange={(e) => setBlankWidth(e.target.value)}
+                      className="w-full rounded border px-2 py-1"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span>Height (px)</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={blankHeight}
+                      onChange={(e) => setBlankHeight(e.target.value)}
+                      className="w-full rounded border px-2 py-1"
+                    />
+                  </label>
+                </div>
+                <button
+                  type="submit"
+                  className="w-full rounded bg-indigo-600 py-2 text-xs font-semibold text-white shadow hover:bg-indigo-700"
+                >
+                  Create blank canvas
+                </button>
+              </form>
+
               {loadingTemplate && (
                 <div className="text-xs text-gray-500 mb-2">Loading template…</div>
               )}
-              <div className="grid grid-cols-2 gap-3">
-                {templates.map((t) => (
-                  <button
-                    key={t._id || t.id}
-                    onClick={() => {
-                      loadTemplateById(t._id || t.id);
-                    }}
-                    className={`border rounded overflow-hidden text-left hover:shadow focus:ring-2 focus:ring-indigo-500 ${(t._id || t.id) === activeTemplateId ? "ring-2 ring-indigo-500" : ""}`}
-                    title={t.title || "Template"}
-                  >
-                    <div className="aspect-[4/5] bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
-                      {t.image ? (
-                        <img
-                          src={t.image}
-                          alt={t.title || "template thumbnail"}
-                          className="w-full h-full object-cover"
-                          crossOrigin="anonymous"
-                        />
-                      ) : (
-                        <span>Preview</span>
-                      )}
-                    </div>
-                    <div className="px-2 py-1">
-                      <div className="text-xs font-medium truncate">
-                        {t.title || "Untitled"}
+
+              {loadingTemplates ? (
+                <div className="text-xs text-gray-500">Fetching templates…</div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  {templates.map((t) => (
+                    <button
+                      key={t._id || t.id}
+                      type="button"
+                      onClick={() => handleTemplateSelect(t)}
+                      disabled={loadingTemplate}
+                      className={`border rounded overflow-hidden text-left hover:shadow focus:ring-2 focus:ring-indigo-500 ${(t._id || t.id) === activeTemplateId ? "ring-2 ring-indigo-500" : ""}`}
+                      title={t.title || "Template"}
+                    >
+                      <div className="aspect-[4/5] bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
+                        {t.image ? (
+                          <img
+                            src={t.image}
+                            alt={t.title || "template thumbnail"}
+                            className="h-full w-full object-cover"
+                            crossOrigin="anonymous"
+                          />
+                        ) : (
+                          <span>Preview</span>
+                        )}
                       </div>
-                      <div className="text-[10px] text-gray-500">
-                        {t.width || t.w || 400}×{t.height || t.h || 550}
+                      <div className="px-2 py-1">
+                        <div className="text-xs font-medium truncate">
+                          {t.title || "Untitled"}
+                        </div>
+                        <div className="text-[10px] text-gray-500">
+                          {formatDimension(t.width ?? t.w, 400)}×{formatDimension(t.height ?? t.h, 550)}
+                        </div>
                       </div>
+                    </button>
+                  ))}
+                  {templates.length === 0 && !templatesError && (
+                    <div className="col-span-2 py-6 text-center text-xs text-gray-500">
+                      No templates available yet
                     </div>
-                  </button>
-                ))}
-              </div>
+                  )}
+                </div>
+              )}
+
+              {templatesError && (
+                <div className="mt-2 text-xs text-red-500">{templatesError}</div>
+              )}
+
               <TemplateLayout
                 canvas={canvas}
                 activeTemplateId={activeTemplateId}

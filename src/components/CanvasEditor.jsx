@@ -55,7 +55,8 @@ import {
   AlignLeft,
   AlignCenter,
   AlignRight,
-  Ruler
+  Ruler,
+  Pencil
 } from "lucide-react";
 import { Layout as LayoutIcon, BookOpen, Scissors } from "lucide-react";
 import IconButton from "./IconButton";
@@ -72,6 +73,42 @@ import { PRESET_SIZES, mmToPx, pxToMm, drawCropMarks, drawRegistrationMark } fro
 import { removeBackground } from "../utils/backgroundUtils";
 import SelectionToolbar from "./SelectionToolbar";
 import BottomNavBar from "./BottomNavBar";
+
+const MAGIC_RESIZE_PRESETS = [
+  { id: "insta-post", label: "Instagram Post", width: 1080, height: 1080 },
+  { id: "insta-story", label: "Story 9:16", width: 1080, height: 1920 },
+  { id: "a4-portrait", label: "A4 Portrait", width: 2480, height: 3508 },
+  { id: "a4-landscape", label: "A4 Landscape", width: 3508, height: 2480 },
+];
+
+const AUTOSAVE_PREFIX = "canvas-draft:";
+
+const prettifyLayerName = (obj) => {
+  if (!obj) return "Layer";
+  if (obj.layerName) return obj.layerName;
+  if (typeof obj.customId === "string" && obj.customId.trim()) {
+    return obj.customId.replace(/[-_]+/g, " ").replace(/\b\w/g, (ch) => ch.toUpperCase());
+  }
+  const type = (obj.type || "layer").toLowerCase();
+  switch (type) {
+    case "textbox":
+    case "text":
+    case "i-text":
+      return "Text";
+    case "image":
+      return "Image";
+    case "rect":
+      return "Rectangle";
+    case "circle":
+      return "Circle";
+    case "triangle":
+      return "Triangle";
+    case "polygon":
+      return "Polygon";
+    default:
+      return type.replace(/[-_]+/g, " ").replace(/\b\w/g, (ch) => ch.toUpperCase());
+  }
+};
 
 let __CLIPBOARD = null;
 /* ===================== Helpers ===================== */
@@ -230,82 +267,14 @@ const useObjectSnapping = (canvas, enable = true, tolerance = 6) => {
   }, [canvas, enable, tolerance]);
 };
 
-/** Layers panel */
-const LayersPanel = ({ canvas, onSelect }) => {
-  const [, force] = useState(0);
-  const refresh = useCallback(() => force(x => x + 1), []);
-  useEffect(() => {
-    if (!canvas) return;
-    const rerender = () => refresh();
-    canvas.on("object:added", rerender);
-    canvas.on("object:removed", rerender);
-    canvas.on("object:modified", rerender);
-    canvas.on("selection:created", rerender);
-    canvas.on("selection:updated", rerender);
-    canvas.on("selection:cleared", rerender);
-    return () => {
-      canvas.off("object:added", rerender);
-      canvas.off("object:removed", rerender);
-      canvas.off("object:modified", rerender);
-      canvas.off("selection:created", rerender);
-      canvas.off("selection:updated", rerender);
-      canvas.off("selection:cleared", rerender);
-    };
-  }, [canvas, refresh]);
-
-  const objects = useMemo(() => canvas ? canvas.getObjects() : [], [canvas, refresh]);
-  const setVisible = (obj, v) => { obj.visible = v; obj.dirty = true; canvas.requestRenderAll(); };
-  const setLocked = (obj, v) => {
-    obj.set({ lockMovementX: v, lockMovementY: v, lockScalingX: v, lockScalingY: v, lockRotation: v, hasControls: !v });
-    canvas.requestRenderAll();
-  };
-  const bringFwd = (obj) => { obj.bringForward(); canvas.requestRenderAll(); };
-  const sendBack = (obj) => { obj.sendBackwards(); canvas.requestRenderAll(); };
-
-  const renameLayer = (obj) => {
-    const name = prompt("Layer name:", obj.customId || obj.field || obj.type);
-    if (name !== null) { obj.customId = name; canvas.requestRenderAll(); }
-  };
-
-  return (
-    <div className="p-3">
-      <div className="flex items-center gap-2 mb-2">
-        <LayersIcon size={16} /> <div className="text-sm font-semibold">Layers</div>
-      </div>
-      <div className="space-y-2">
-        {[...objects].map((o, idx) => (
-          <div key={idx} className="flex items-center justify-between gap-2 border rounded px-2 py-1">
-            <div className="flex items-center gap-2 min-w-0">
-              <button className="p-1 rounded hover:bg-gray-100" onClick={() => setVisible(o, !o.visible)} title={o.visible ? "Hide" : "Show"}>
-                {o.visible ? <Eye size={16} /> : <EyeOff size={16} />}
-              </button>
-              <button className="p-1 rounded hover:bg-gray-100" onClick={() => setLocked(o, !o.lockMovementX)} title={o.lockMovementX ? "Unlock" : "Lock"}>
-                {o.lockMovementX ? <Unlock size={16} /> : <Lock size={16} />}
-              </button>
-              <div className="truncate cursor-pointer text-xs" title={o.customId || o.field || o.type}
-                onDoubleClick={() => renameLayer(o)}
-                onClick={() => { canvas.setActiveObject(o); canvas.requestRenderAll(); onSelect?.(o); }}>
-                {o.customId || o.field || o.type}
-              </div>
-            </div>
-            <div className="flex items-center gap-1">
-              <button className="p-1 rounded hover:bg-gray-100" title="Bring forward" onClick={() => bringFwd(o)}>▲</button>
-              <button className="p-1 rounded hover:bg-gray-100" title="Send backward" onClick={() => sendBack(o)}>▼</button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
 /* =============================================================================
    Main Editor
 ============================================================================= */
 const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   const { templateId: routeId } = useParams();
   const templateId = propTemplateId || routeId;
-   const isMobile = useMediaQuery("(max-width: 768px)");
+  const isMobile = useMediaQuery("(max-width: 768px)");
+  const bgRemovalAvailable = Boolean(import.meta.env.VITE_BG_REMOVE_URL);
   const [showLogo, setShowLogo] = useState(false);
   const [showSignature, setShowSignature] = useState(false);
 
@@ -343,6 +312,17 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     setCanvasSize,
   } = useCanvasTools({ width: tplSize.w, height: tplSize.h });
 
+  const ensureLayerMeta = useCallback((obj) => {
+    if (!obj) return;
+    if (!obj.layerId) {
+      layerCounterRef.current += 1;
+      obj.layerId = `layer-${layerCounterRef.current}`;
+    }
+    if (!obj.layerName) {
+      obj.layerName = prettifyLayerName(obj);
+    }
+  }, []);
+
 const handleUpload = (e) => { 
   const file = e.target.files?.[0]; 
   if (file) { 
@@ -372,6 +352,82 @@ const handleUpload = (e) => {
     let t;
     return () => { clearTimeout(t); t = setTimeout(() => saveHistory(), 150); };
   }, [saveHistory]);
+
+  const queueAutosave = useCallback(() => {
+    if (!canvas || !autosaveKey) return;
+    if (autosaveTimeoutRef.current) clearTimeout(autosaveTimeoutRef.current);
+    const payload = {
+      tplSize,
+      json: canvas.toJSON(["customId", "layerId", "layerName", "clipPath", "shape", "maskId"]),
+      updatedAt: Date.now(),
+    };
+    autosaveTimeoutRef.current = setTimeout(() => {
+      try {
+        localStorage.setItem(autosaveKey, JSON.stringify(payload));
+        setDraftAvailable(true);
+      } catch (err) {
+        console.warn("Autosave failed", err);
+      }
+    }, 400);
+  }, [canvas, autosaveKey, tplSize]);
+
+  useEffect(() => {
+    if (!autosaveKey) return;
+    try {
+      const stored = localStorage.getItem(autosaveKey);
+      setDraftAvailable(Boolean(stored));
+    } catch (err) {
+      console.warn("Failed to read autosave", err);
+      setDraftAvailable(false);
+    }
+    return () => {
+      if (autosaveTimeoutRef.current) {
+        clearTimeout(autosaveTimeoutRef.current);
+      }
+    };
+  }, [autosaveKey]);
+
+  useEffect(() => {
+    if (!canvas) return;
+    canvas.getObjects().forEach((obj) => ensureLayerMeta(obj));
+    setLayersTick((tick) => tick + 1);
+  }, [canvas, ensureLayerMeta]);
+
+  const restoreDraft = useCallback(() => {
+    if (!canvas || !autosaveKey) return;
+    try {
+      const stored = localStorage.getItem(autosaveKey);
+      if (!stored) {
+        toast.error("No draft available");
+        setDraftAvailable(false);
+        return;
+      }
+      const parsed = JSON.parse(stored);
+      const nextSize = parsed?.tplSize;
+      if (nextSize?.w && nextSize?.h) {
+        setTplSize(nextSize);
+        setCanvasSize?.(nextSize.w, nextSize.h);
+        canvas.setWidth(nextSize.w);
+        canvas.setHeight(nextSize.h);
+      }
+      const json = parsed?.json;
+      if (!json) {
+        toast.error("Draft was corrupted");
+        return;
+      }
+      canvas.loadFromJSON(json, () => {
+        canvas.getObjects().forEach((obj) => ensureLayerMeta(obj));
+        canvas.requestRenderAll();
+        saveHistoryDebounced();
+        fitToViewport();
+        toast.success("Draft restored");
+        setLayersTick((tick) => tick + 1);
+      });
+    } catch (err) {
+      console.error("Failed to restore draft", err);
+      toast.error("Failed to restore draft");
+    }
+  }, [autosaveKey, canvas, ensureLayerMeta, fitToViewport, saveHistoryDebounced, setCanvasSize, setTplSize]);
 
   // enable guides & snapping
   useSmartGuides(canvasRef, true, 8);
@@ -436,9 +492,131 @@ const handleUpload = (e) => {
     setTplSize((prev) => {
       const newSize = { ...prev, [dim]: num };
       setCanvasSize?.(newSize.w, newSize.h);
+      if (canvas) {
+        canvas.setWidth(newSize.w);
+        canvas.setHeight(newSize.h);
+        canvas.requestRenderAll();
+      }
       return newSize;
     });
+    queueAutosave();
   };
+
+  const magicResize = useCallback((width, height) => {
+    if (!canvas || !width || !height) return;
+    const prevWidth = tplSize.w || canvas.getWidth();
+    const prevHeight = tplSize.h || canvas.getHeight();
+    if (!prevWidth || !prevHeight) return;
+
+    const scaleX = width / prevWidth;
+    const scaleY = height / prevHeight;
+
+    canvas.discardActiveObject();
+    canvas.getObjects().forEach((obj) => {
+      if (!obj) return;
+      if (typeof obj.left === "number") obj.left *= scaleX;
+      if (typeof obj.top === "number") obj.top *= scaleY;
+      if (typeof obj.scaleX === "number") obj.scaleX *= scaleX;
+      if (typeof obj.scaleY === "number") obj.scaleY *= scaleY;
+      if (typeof obj.fontSize === "number") obj.set("fontSize", obj.fontSize * scaleY);
+      if (typeof obj.strokeWidth === "number") obj.set("strokeWidth", obj.strokeWidth * ((scaleX + scaleY) / 2));
+      if (typeof obj.radius === "number") obj.set("radius", obj.radius * Math.max(scaleX, scaleY));
+      if (typeof obj.rx === "number") obj.set("rx", obj.rx * scaleX);
+      if (typeof obj.ry === "number") obj.set("ry", obj.ry * scaleY);
+      ensureLayerMeta(obj);
+      obj.setCoords();
+    });
+
+    canvas.setWidth(width);
+    canvas.setHeight(height);
+    setTplSize({ w: width, h: height });
+    setCanvasSize?.(width, height);
+    canvas.requestRenderAll();
+    fitToViewport();
+    queueAutosave();
+    saveHistoryDebounced();
+    toast.success(`Resized to ${width}×${height}`);
+  }, [canvas, ensureLayerMeta, fitToViewport, queueAutosave, saveHistoryDebounced, setCanvasSize, tplSize.w, tplSize.h]);
+
+  const layers = useMemo(() => {
+    if (!canvas) return [];
+    const objects = canvas
+      .getObjects()
+      .filter((obj) => !obj?.isFrameOverlay)
+      .map((obj) => {
+        ensureLayerMeta(obj);
+        return obj;
+      });
+    return objects.slice().reverse();
+  }, [canvas, ensureLayerMeta, layersTick]);
+
+  const activeLayerId = canvas?.getActiveObject?.()?.layerId ?? null;
+
+  const toggleLayerLock = useCallback((layer) => {
+    if (!canvas || !layer) return;
+    const nextLock = !layer.lockMovementX;
+    layer.set({
+      lockMovementX: nextLock,
+      lockMovementY: nextLock,
+      lockScalingX: nextLock,
+      lockScalingY: nextLock,
+      lockRotation: nextLock,
+      selectable: !nextLock,
+      evented: !nextLock,
+    });
+    layer.hasControls = !nextLock;
+    canvas.requestRenderAll();
+    saveHistoryDebounced();
+    queueAutosave();
+    setLayersTick((tick) => tick + 1);
+  }, [canvas, queueAutosave, saveHistoryDebounced]);
+
+  const toggleLayerVisibility = useCallback((layer) => {
+    if (!canvas || !layer) return;
+    layer.visible = !layer.visible;
+    canvas.requestRenderAll();
+    saveHistoryDebounced();
+    queueAutosave();
+    setLayersTick((tick) => tick + 1);
+  }, [canvas, queueAutosave, saveHistoryDebounced]);
+
+  const beginRenameLayer = useCallback((layer) => {
+    if (!layer) return;
+    setRenamingLayer(layer.layerId);
+    setRenameValue(layer.layerName || prettifyLayerName(layer));
+  }, []);
+
+  const commitRenameLayer = useCallback(() => {
+    if (!canvas || !renamingLayer) return;
+    const layer = canvas.getObjects().find((obj) => obj.layerId === renamingLayer);
+    if (!layer) {
+      setRenamingLayer(null);
+      setRenameValue("");
+      return;
+    }
+    const nextName = renameValue.trim() || prettifyLayerName(layer);
+    layer.layerName = nextName;
+    ensureLayerMeta(layer);
+    canvas.requestRenderAll();
+    saveHistoryDebounced();
+    queueAutosave();
+    setRenamingLayer(null);
+    setRenameValue("");
+    setLayersTick((tick) => tick + 1);
+  }, [canvas, ensureLayerMeta, queueAutosave, renamingLayer, renameValue, saveHistoryDebounced]);
+
+  const cancelRenameLayer = useCallback(() => {
+    setRenamingLayer(null);
+    setRenameValue("");
+  }, []);
+
+  const selectLayer = useCallback((layer) => {
+    if (!canvas || !layer) return;
+    canvas.setActiveObject(layer);
+    canvas.requestRenderAll();
+    setActiveObj(layer);
+    setLayersTick((tick) => tick + 1);
+  }, [canvas, setActiveObj]);
 
   // data
   const [allStudents, setStudents] = useState([]);
@@ -453,6 +631,13 @@ const handleUpload = (e) => {
   const [selectedInstitute, setSelectedInstitute] = useState(null);
   const [showToolbar, setShowToolbar] = useState(false);
   const [showMobileTools, setShowMobileTools] = useState(false);
+  const [pendingPreset, setPendingPreset] = useState("");
+  const [draftAvailable, setDraftAvailable] = useState(false);
+  const autosaveTimeoutRef = useRef(null);
+  const layerCounterRef = useRef(0);
+  const [layersTick, setLayersTick] = useState(0);
+  const [renamingLayer, setRenamingLayer] = useState(null);
+  const [renameValue, setRenameValue] = useState("");
 
   // Helper to close the mobile FAB after performing an action
   const withFabClose = (fn) => (...args) => {
@@ -469,6 +654,10 @@ const handleUpload = (e) => {
   const [templates, setTemplates] = useState([]);
   const [activeTemplateId, setActiveTemplateId] = useState(templateId || null);
   const [loadingTemplate, setLoadingTemplate] = useState(false);
+  const autosaveKey = useMemo(() => {
+    const effectiveId = activeTemplateId || templateId || "scratch";
+    return `${AUTOSAVE_PREFIX}${effectiveId}`;
+  }, [activeTemplateId, templateId]);
 
   // bulk mode
   const [bulkMode, setBulkMode] = useState(false);
@@ -584,6 +773,10 @@ const handleUpload = (e) => {
       toast.error("Select an image first");
       return;
     }
+    if (!bgRemovalAvailable) {
+      toast.error("Background removal service is not configured.");
+      return;
+    }
     try {
       const res = await fetch(activeObj.getSrc());
       const blob = await res.blob();
@@ -616,12 +809,17 @@ const handleUpload = (e) => {
           canvas.setActiveObject(img);
           URL.revokeObjectURL(url);
           saveHistoryDebounced();
+          queueAutosave();
         },
         { crossOrigin: "anonymous" }
       );
     } catch (err) {
       console.error(err);
-      toast.error("Background removal failed");
+      if (err?.code === "BG_REMOVE_URL_MISSING") {
+        toast.error("Background removal service is not configured.");
+      } else {
+        toast.error("Background removal failed");
+      }
     }
   };
 
@@ -1082,6 +1280,7 @@ const renderTemplate = useCallback(async (data) => {
         img.set({ selectable: false, evented: false, customId: "templateBg" });
         img.scaleX = canvas.width / img.width;
         img.scaleY = canvas.height / img.height;
+        ensureLayerMeta(img);
         canvas.add(img);
         img.sendToBack();
         resolve();
@@ -1097,9 +1296,11 @@ const renderTemplate = useCallback(async (data) => {
         if (o.customId === "frameSlot" || (o.type === "path" && ["#7c3aed", "rgb(124,58,237)"].includes(o.stroke))) {
           o.customId = "frameSlot";
         }
+        ensureLayerMeta(o);
       });
       cacheTemplatePlaceholders(canvas);
       canvas.requestRenderAll();
+      setLayersTick((tick) => tick + 1);
     });
   }
 
@@ -1348,18 +1549,39 @@ function loadTemplateAsset(id, url, canvas) {
 
   useEffect(() => {
     if (!canvas) return;
-    const onModified = () => saveHistoryDebounced();
-    const onAdded = () => saveHistoryDebounced();
-    const onRemoved = () => saveHistoryDebounced();
-    canvas.on("object:modified", onModified);
-    canvas.on("object:added", onAdded);
-    canvas.on("object:removed", onRemoved);
-    return () => {
-      canvas.off("object:modified", onModified);
-      canvas.off("object:added", onAdded);
-      canvas.off("object:removed", onRemoved);
+    const handleMutate = (e) => {
+      if (e?.target) ensureLayerMeta(e.target);
+      saveHistoryDebounced();
+      queueAutosave();
+      setLayersTick((tick) => tick + 1);
     };
-  }, [canvas, saveHistory]);
+    const handleRemoved = () => {
+      saveHistoryDebounced();
+      queueAutosave();
+      setLayersTick((tick) => tick + 1);
+    };
+    canvas.on("object:modified", handleMutate);
+    canvas.on("object:added", handleMutate);
+    canvas.on("object:removed", handleRemoved);
+    return () => {
+      canvas.off("object:modified", handleMutate);
+      canvas.off("object:added", handleMutate);
+      canvas.off("object:removed", handleRemoved);
+    };
+  }, [canvas, ensureLayerMeta, queueAutosave, saveHistoryDebounced]);
+
+  useEffect(() => {
+    if (!canvas) return;
+    const refreshLayers = () => setLayersTick((tick) => tick + 1);
+    canvas.on("selection:created", refreshLayers);
+    canvas.on("selection:updated", refreshLayers);
+    canvas.on("selection:cleared", refreshLayers);
+    return () => {
+      canvas.off("selection:created", refreshLayers);
+      canvas.off("selection:updated", refreshLayers);
+      canvas.off("selection:cleared", refreshLayers);
+    };
+  }, [canvas]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -1992,6 +2214,40 @@ if (saved?.canvas) {
               Fit
             </button>
 
+            <div className="flex items-center gap-1">
+              <label className="text-xs text-slate-500">Preset</label>
+              <select
+                value={pendingPreset}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setPendingPreset(value);
+                  const preset = MAGIC_RESIZE_PRESETS.find((p) => p.id === value);
+                  if (preset) {
+                    magicResize(preset.width, preset.height);
+                    setTimeout(() => setPendingPreset(""), 0);
+                  }
+                }}
+                className="w-36 rounded border border-slate-200 bg-white px-2 py-1 text-xs"
+              >
+                <option value="">Magic Resize…</option>
+                {MAGIC_RESIZE_PRESETS.map((preset) => (
+                  <option key={preset.id} value={preset.id}>
+                    {preset.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {draftAvailable && (
+              <button
+                className="rounded-full border bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-gray-50"
+                onClick={restoreDraft}
+                type="button"
+              >
+                Restore draft
+              </button>
+            )}
+
             {/* Grid toggle */}
             <button
               className={`hidden sm:flex items-center gap-1 px-3 py-2 rounded-full ${showGrid ? "bg-indigo-600 text-white" : "bg-white"} border hover:bg-gray-50 text-sm`}
@@ -2069,6 +2325,14 @@ if (saved?.canvas) {
               <Images size={16} /> Template
             </button>
 
+            <button
+              title="Layers"
+              onClick={() => { setRightPanel('layers'); setIsRightbarOpen(true); }}
+              className="hidden sm:flex items-center gap-1 px-3 py-2 rounded-full bg-white border hover:bg-gray-50 text-sm"
+            >
+              <LayersIcon size={16} /> Layers
+            </button>
+
             {/* Download current */}
             <button
               title="Download PNG"
@@ -2135,21 +2399,28 @@ if (saved?.canvas) {
       <div className={`fixed top-16 left-2 z-40 flex-col gap-2 ${showMobileTools ? "flex" : "hidden"} md:flex`}>
         <button
           title="Choose Gallary"
-          onClick={() => { setRightPanel('gallaries'); setIsRightbarOpen(true); }}
+          onClick={withFabClose(() => { setRightPanel('gallaries'); setIsRightbarOpen(true); })}
           className="p-2 rounded bg-white shadow hover:bg-blue-100"
         >
           <Images size={20} />
         </button>
         <button
           title="Bulk Settings"
-          onClick={() => { setRightPanel('bulk'); setIsRightbarOpen(true); }}
+          onClick={withFabClose(() => { setRightPanel('bulk'); setIsRightbarOpen(true); })}
+          className="p-2 rounded bg-white shadow hover:bg-blue-100"
+        >
+          <LayersIcon size={20} />
+        </button>
+        <button
+          title="Layers"
+          onClick={withFabClose(() => { setRightPanel('layers'); setIsRightbarOpen(true); })}
           className="p-2 rounded bg-white shadow hover:bg-blue-100"
         >
           <LayersIcon size={20} />
         </button>
         <button
           title="Add Frame"
-          onClick={() => { setRightPanel('frames'); setIsRightbarOpen(true); }}
+          onClick={withFabClose(() => { setRightPanel('frames'); setIsRightbarOpen(true); })}
           className="p-2 rounded bg-white shadow hover:bg-blue-100"
         >
           <LayoutIcon size={20} />
@@ -2273,11 +2544,13 @@ if (saved?.canvas) {
                 ? "Templates"
                 : rightPanel === "bulk"
                   ? "Bulk Settings"
-                  : rightPanel === "frames"
-                    ? "Frames"
-                    : rightPanel === "object"
-                      ? "Object Settings"
-                      : ""}
+                  : rightPanel === "layers"
+                    ? "Layers"
+                    : rightPanel === "frames"
+                      ? "Frames"
+                      : rightPanel === "object"
+                        ? "Object Settings"
+                        : ""}
           </div>
           <button
             className="p-2 rounded hover:bg-gray-100"
@@ -2320,10 +2593,79 @@ if (saved?.canvas) {
                 ))}
               </div>
 
-              <div className="mt-4 border-t pt-3">
-                <LayersPanel canvas={canvas} onSelect={(o) => setActiveObj(o)} />
-              </div>
             </Fragment>
+          )}
+
+          {rightPanel === "layers" && (
+            <div className="space-y-2">
+              {layers.length === 0 ? (
+                <p className="text-sm text-slate-500">Add objects to start managing layers.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {layers.map((layer) => {
+                    const isActive = layer.layerId === activeLayerId;
+                    return (
+                      <li
+                        key={layer.layerId}
+                        className={`rounded border ${isActive ? "border-indigo-400 bg-indigo-50" : "border-slate-200 bg-white"}`}
+                      >
+                        <div className="flex items-center justify-between gap-2 px-3 py-2">
+                          <div className="flex-1">
+                            {renamingLayer === layer.layerId ? (
+                              <input
+                                autoFocus
+                                value={renameValue}
+                                onChange={(e) => setRenameValue(e.target.value)}
+                                onBlur={commitRenameLayer}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") commitRenameLayer();
+                                  if (e.key === "Escape") cancelRenameLayer();
+                                }}
+                                className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none"
+                              />
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => selectLayer(layer)}
+                                className={`w-full text-left text-sm font-medium ${isActive ? "text-indigo-700" : "text-slate-700"}`}
+                              >
+                                {layer.layerName || prettifyLayerName(layer)}
+                              </button>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              className="rounded p-1 text-slate-500 hover:bg-slate-100"
+                              onClick={(e) => { e.stopPropagation(); toggleLayerVisibility(layer); }}
+                              title={layer.visible === false ? "Show" : "Hide"}
+                            >
+                              {layer.visible === false ? <EyeOff size={16} /> : <Eye size={16} />}
+                            </button>
+                            <button
+                              type="button"
+                              className="rounded p-1 text-slate-500 hover:bg-slate-100"
+                              onClick={(e) => { e.stopPropagation(); toggleLayerLock(layer); }}
+                              title={layer.lockMovementX ? "Unlock" : "Lock"}
+                            >
+                              {layer.lockMovementX ? <Unlock size={16} /> : <Lock size={16} />}
+                            </button>
+                            <button
+                              type="button"
+                              className="rounded p-1 text-slate-500 hover:bg-slate-100"
+                              onClick={(e) => { e.stopPropagation(); beginRenameLayer(layer); }}
+                              title="Rename"
+                            >
+                              <Pencil size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
           )}
 
 
@@ -2372,9 +2714,6 @@ if (saved?.canvas) {
                 setSavedPlaceholders={setSavedPlaceholders}
                 frameCorner={frameCorner}
               />
-              <div className="mt-4 border-t pt-3">
-                <LayersPanel canvas={canvas} onSelect={(o) => setActiveObj(o)} />
-              </div>
             </Fragment>
           )}
           {rightPanel === "bulk" && (
@@ -2525,7 +2864,11 @@ if (saved?.canvas) {
 
                     {activeObj?.type === "image" && (
                       <>
-                        <IconButton onClick={removeSelectedImageBackground} title="Remove Background">
+                        <IconButton
+                          onClick={bgRemovalAvailable ? removeSelectedImageBackground : undefined}
+                          title={bgRemovalAvailable ? "Remove Background" : "Configure VITE_BG_REMOVE_URL to enable"}
+                          disabled={!bgRemovalAvailable}
+                        >
                           <Scissors size={18} />
                         </IconButton>
                         <IconButton

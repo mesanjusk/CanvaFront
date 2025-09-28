@@ -298,6 +298,26 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   // replace image input
   const replaceInputRef = useRef(null);
 
+  // gallaries (right sidebar)
+  const [gallaries, setGallaries] = useState([]);
+  const [activeGallaryId, setActiveGallaryId] = useState(null);
+  const [loadingGallary, setLoadingGallary] = useState(false);
+
+  // templates (right sidebar)
+  const [templates, setTemplates] = useState([]);
+  const [activeTemplateId, setActiveTemplateId] = useState(templateId || null);
+  const [loadingTemplate, setLoadingTemplate] = useState(false);
+
+  const autosaveKey = useMemo(() => {
+    const effectiveId = activeTemplateId || templateId || "scratch";
+    return `${AUTOSAVE_PREFIX}${effectiveId}`;
+  }, [activeTemplateId, templateId]);
+
+  const [draftAvailable, setDraftAvailable] = useState(false);
+  const autosaveTimeoutRef = useRef(null);
+  const layerCounterRef = useRef(0);
+  const [layersTick, setLayersTick] = useState(0);
+
   // hooks
   const {
     canvasRef,
@@ -323,17 +343,17 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     }
   }, []);
 
-const handleUpload = (e) => { 
-  const file = e.target.files?.[0]; 
-  if (file) { 
-    const reader = new FileReader(); 
-    reader.onload = () => { 
-      setCropSrc(reader.result); 
-      cropCallbackRef.current = (croppedUrl) => addImage(croppedUrl); 
-    }; 
-    reader.readAsDataURL(file); 
-  } 
-};
+  const handleUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setCropSrc(reader.result);
+        cropCallbackRef.current = (croppedUrl) => addImage(croppedUrl);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const {
     activeObj,
@@ -632,10 +652,6 @@ const handleUpload = (e) => {
   const [showToolbar, setShowToolbar] = useState(false);
   const [showMobileTools, setShowMobileTools] = useState(false);
   const [pendingPreset, setPendingPreset] = useState("");
-  const [draftAvailable, setDraftAvailable] = useState(false);
-  const autosaveTimeoutRef = useRef(null);
-  const layerCounterRef = useRef(0);
-  const [layersTick, setLayersTick] = useState(0);
   const [renamingLayer, setRenamingLayer] = useState(null);
   const [renameValue, setRenameValue] = useState("");
 
@@ -644,20 +660,6 @@ const handleUpload = (e) => {
     fn(...args);
     if (isMobile) setShowMobileTools(false);
   };
-
-  // gallaries (right sidebar)
-  const [gallaries, setGallaries] = useState([]);
-  const [activeGallaryId, setActiveGallaryId] = useState(null);
-  const [loadingGallary, setLoadingGallary] = useState(false);
-
-  // templates (right sidebar)
-  const [templates, setTemplates] = useState([]);
-  const [activeTemplateId, setActiveTemplateId] = useState(templateId || null);
-  const [loadingTemplate, setLoadingTemplate] = useState(false);
-  const autosaveKey = useMemo(() => {
-    const effectiveId = activeTemplateId || templateId || "scratch";
-    return `${AUTOSAVE_PREFIX}${effectiveId}`;
-  }, [activeTemplateId, templateId]);
 
   // bulk mode
   const [bulkMode, setBulkMode] = useState(false);

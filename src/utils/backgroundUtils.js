@@ -1,24 +1,23 @@
 export async function removeBackground(file) {
-  const apiKey = import.meta.env.VITE_REMOVE_BG_API_KEY;
-  if (!apiKey) {
-    throw new Error("Missing Remove.bg API key");
+  const endpoint = import.meta.env.VITE_BG_REMOVE_URL;
+  if (!endpoint) {
+    const error = new Error("Background removal service not configured");
+    error.code = "BG_REMOVE_URL_MISSING";
+    throw error;
   }
 
   const formData = new FormData();
+  formData.append("image", file);
   formData.append("image_file", file);
-  formData.append("size", "auto");
 
-  const response = await fetch("https://api.remove.bg/v1.0/removebg", {
+  const response = await fetch(endpoint, {
     method: "POST",
-    headers: {
-      "X-Api-Key": apiKey,
-    },
     body: formData,
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Remove.bg request failed: ${response.status} ${errorText}`);
+    throw new Error(`Background removal request failed: ${response.status} ${errorText}`);
   }
 
   return await response.blob();

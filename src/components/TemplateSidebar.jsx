@@ -4,9 +4,12 @@ import TemplateCard from "./TemplateCard";
 
 const defaultTemplates = [
   {
+    _id: "blank",
     name: "Blank",
-    data: { version: "5.2.4", objects: [] },
-    image: null,
+    isBlank: true,
+    canvasWidth: 1080,
+    canvasHeight: 1080,
+    canvasJson: { version: "5.2.4", objects: [] },
   },
 ];
 
@@ -25,7 +28,7 @@ const TemplateSidebar = memo(({ loadTemplate }) => {
   return (
     <div className="grid grid-cols-2 gap-2 w-48 sm:w-56">
       {templates.map((t, idx) => (
-        <TemplateCard key={idx} template={t} onSelect={loadTemplate} />
+        <TemplateCard key={t._id || t.id || idx} template={t} onSelect={loadTemplate} />
       ))}
     </div>
   );

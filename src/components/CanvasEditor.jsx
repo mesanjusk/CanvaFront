@@ -70,6 +70,12 @@ import ShapeStylePanel from "./ShapeStylePanel";
 import { buildClipShape, buildOverlayShape, moveOverlayAboveImage, applyMaskAndFrame, removeMaskAndFrame } from "../utils/shapeUtils";
 import { PRESET_SIZES, mmToPx, pxToMm, drawCropMarks, drawRegistrationMark } from "../utils/printUtils";
 import { removeBackground } from "../utils/backgroundUtils";
+import {
+  extractTemplateSize,
+  extractCanvasJsonFromMeta,
+  pickTemplatePreview,
+  normalizeTemplateMeta,
+} from "../utils/templateUtils";
 import SelectionToolbar from "./SelectionToolbar";
 import BottomNavBar from "./BottomNavBar";
 
@@ -509,6 +515,7 @@ const handleUpload = (e) => {
     });
   };
 
+
   const handleCreateBlankCanvas = useCallback(
     (rawWidth, rawHeight) => {
       const widthValue = rawWidth ?? Number(blankWidth);
@@ -590,8 +597,7 @@ const handleUpload = (e) => {
   const [loadingTemplate, setLoadingTemplate] = useState(false);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [templatesError, setTemplatesError] = useState(null);
-  const [blankWidth, setBlankWidth] = useState("1080");
-  const [blankHeight, setBlankHeight] = useState("1080");
+
 
   // bulk mode
   const [bulkMode, setBulkMode] = useState(false);
@@ -1101,32 +1107,7 @@ useEffect(() => {
               ? res.data
               : [];
 
-        const normalized = raw.map((item) => {
-          const widthCandidate =
-            item?.width ??
-            item?.w ??
-            item?.canvasWidth ??
-            item?.canvas_size?.width ??
-            item?.canvasSize?.width ??
-            item?.size?.width;
-          const heightCandidate =
-            item?.height ??
-            item?.h ??
-            item?.canvasHeight ??
-            item?.canvas_size?.height ??
-            item?.canvasSize?.height ??
-            item?.size?.height;
-          const width = Number(widthCandidate);
-          const height = Number(heightCandidate);
 
-          return {
-            ...item,
-            width: Number.isFinite(width) && width > 0 ? width : undefined,
-            height: Number.isFinite(height) && height > 0 ? height : undefined,
-          };
-        });
-
-        setTemplates(normalized);
       } catch (err) {
         console.error("Error fetching templates:", err);
         setTemplates([]);
@@ -1247,8 +1228,7 @@ const renderTemplate = useCallback(
     if (!canvas) return;
 
     const { width, height } = extractTemplateSize(data);
-    const canvasJson = extractCanvasJsonFromMeta(data);
-    const previewImage = pickTemplatePreview(data);
+
     const targetWidth = width ?? canvas.getWidth();
     const targetHeight = height ?? canvas.getHeight();
 
@@ -1386,7 +1366,7 @@ const handleTemplateSelect = useCallback(
         return;
       }
 
-      const inlineJson = extractCanvasJsonFromMeta(templateMeta);
+
       const id = templateMeta._id || templateMeta.id || null;
 
       if (inlineJson) {
@@ -2659,37 +2639,7 @@ if (saved?.canvas) {
                 <div className="text-xs text-gray-500">Fetching templates…</div>
               ) : (
                 <div className="grid grid-cols-2 gap-3">
-                  {templates.map((t) => (
-                    <button
-                      key={t._id || t.id}
-                      type="button"
-                      onClick={() => handleTemplateSelect(t)}
-                      disabled={loadingTemplate}
-                      className={`border rounded overflow-hidden text-left hover:shadow focus:ring-2 focus:ring-indigo-500 ${(t._id || t.id) === activeTemplateId ? "ring-2 ring-indigo-500" : ""}`}
-                      title={t.title || "Template"}
-                    >
-                      <div className="aspect-[4/5] bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
-                        {t.image ? (
-                          <img
-                            src={t.image}
-                            alt={t.title || "template thumbnail"}
-                            className="h-full w-full object-cover"
-                            crossOrigin="anonymous"
-                          />
-                        ) : (
-                          <span>Preview</span>
-                        )}
-                      </div>
-                      <div className="px-2 py-1">
-                        <div className="text-xs font-medium truncate">
-                          {t.title || "Untitled"}
-                        </div>
-                        <div className="text-[10px] text-gray-500">
-                          {formatDimension(t.width ?? t.w, 400)}×{formatDimension(t.height ?? t.h, 550)}
-                        </div>
-                      </div>
-                    </button>
-                  ))}
+
                   {templates.length === 0 && !templatesError && (
                     <div className="col-span-2 py-6 text-center text-xs text-gray-500">
                       No templates available yet

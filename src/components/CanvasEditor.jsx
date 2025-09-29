@@ -413,42 +413,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     setLayersTick((tick) => tick + 1);
   }, [canvas, ensureLayerMeta]);
 
-  const restoreDraft = useCallback(() => {
-    if (!canvas || !autosaveKey) return;
-    try {
-      const stored = localStorage.getItem(autosaveKey);
-      if (!stored) {
-        toast.error("No draft available");
-        setDraftAvailable(false);
-        return;
-      }
-      const parsed = JSON.parse(stored);
-      const nextSize = parsed?.tplSize;
-      if (nextSize?.w && nextSize?.h) {
-        setTplSize(nextSize);
-        setCanvasSize?.(nextSize.w, nextSize.h);
-        canvas.setWidth(nextSize.w);
-        canvas.setHeight(nextSize.h);
-      }
-      const json = parsed?.json;
-      if (!json) {
-        toast.error("Draft was corrupted");
-        return;
-      }
-      canvas.loadFromJSON(json, () => {
-        canvas.getObjects().forEach((obj) => ensureLayerMeta(obj));
-        canvas.requestRenderAll();
-        saveHistoryDebounced();
-        fitToViewport();
-        toast.success("Draft restored");
-        setLayersTick((tick) => tick + 1);
-      });
-    } catch (err) {
-      console.error("Failed to restore draft", err);
-      toast.error("Failed to restore draft");
-    }
-  }, [autosaveKey, canvas, ensureLayerMeta, fitToViewport, saveHistoryDebounced, setCanvasSize, setTplSize]);
-
+  
   // enable guides & snapping
   useSmartGuides(canvasRef, true, 8);
   useObjectSnapping(canvas, true, 6);
@@ -507,6 +472,47 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     if (canvasRef.current) fitToViewport();
   }, [fitToViewport]);
 
+
+const restoreDraft = useCallback(() => {
+    if (!canvas || !autosaveKey) return;
+    try {
+      const stored = localStorage.getItem(autosaveKey);
+      if (!stored) {
+        toast.error("No draft available");
+        setDraftAvailable(false);
+        return;
+      }
+      const parsed = JSON.parse(stored);
+      const nextSize = parsed?.tplSize;
+      if (nextSize?.w && nextSize?.h) {
+        setTplSize(nextSize);
+        setCanvasSize?.(nextSize.w, nextSize.h);
+        canvas.setWidth(nextSize.w);
+        canvas.setHeight(nextSize.h);
+      }
+      const json = parsed?.json;
+      if (!json) {
+        toast.error("Draft was corrupted");
+        return;
+      }
+      canvas.loadFromJSON(json, () => {
+        canvas.getObjects().forEach((obj) => ensureLayerMeta(obj));
+        canvas.requestRenderAll();
+        saveHistoryDebounced();
+        fitToViewport();
+        toast.success("Draft restored");
+        setLayersTick((tick) => tick + 1);
+      });
+    } catch (err) {
+      console.error("Failed to restore draft", err);
+      toast.error("Failed to restore draft");
+    }
+  }, [autosaveKey, canvas, ensureLayerMeta, fitToViewport, saveHistoryDebounced, setCanvasSize, setTplSize]);
+
+
+
+
+  
   const handleSizeChange = (dim, value) => {
     const num = parseInt(value, 10) || 0;
     setTplSize((prev) => {

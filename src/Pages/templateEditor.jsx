@@ -1016,21 +1016,6 @@ const loadGallaryById = useCallback(
   [applyGallaryResponse, resetHistory, saveHistory]
 );
 
-  const saveProps = useCallback(
-    (key, value) => {
-      try {
-        const tpl = activeTemplateId || "global";
-        localStorage.setItem(
-          `canvas_props_${tpl}_${key}`,
-          JSON.stringify(value)
-        );
-      } catch (e) {
-        console.warn("saveProps failed", e);
-      }
-    },
-    [activeTemplateId]
-  );
-
   // Templates list (for right sidebar)
   useEffect(() => {
     const loadTemplates = async () => {

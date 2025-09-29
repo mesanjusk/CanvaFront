@@ -1,9 +1,9 @@
 // CanvasEditor.jsx — updated with Canva-like behaviors, mobile FAB, grid, snapping, filters
-import { useState, useEffect, useRef } from "react";
+import {
+  useState,
   useEffect,
   useMemo,
   useRef,
-  useState,
   useCallback,
   Fragment,
 } from "react";

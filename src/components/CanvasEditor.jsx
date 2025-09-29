@@ -368,7 +368,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     resetHistory,
   } = useCanvasEditor(canvasRef, tplSize.w, tplSize.h);
   // Debounced history saver to avoid perf spikes
-  const saveHistoryDebounced = React.useMemo(() => {
+ const saveHistoryDebounced = useMemo(() => {
     let t;
     return () => { clearTimeout(t); t = setTimeout(() => saveHistory(), 150); };
   }, [saveHistory]);

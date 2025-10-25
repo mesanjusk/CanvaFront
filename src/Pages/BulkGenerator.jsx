@@ -156,8 +156,8 @@ const BulkGenerator = () => {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (evt) => {
-      const wb = XLSX.read(evt.target.result, { type: 'binary' });
-      const worksheet = wb.Sheets[wb.SheetNames[0]];
+      const workbook = XLSX.read(evt.target.result, { type: 'binary' });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const json = XLSX.utils.sheet_to_json(worksheet);
       setRows(json);
       setIndex(0);

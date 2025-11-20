@@ -546,6 +546,13 @@ const TemplateEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     [savedPlaceholders]
   );
 
+  const saveProps = useCallback((field, props) => {
+    setSavedPlaceholders((prev) => {
+      const next = prev.filter((p) => p.field !== field);
+      return [...next, { field, ...props }];
+    });
+  }, []);
+
   /* ============================ Adjust helpers ============================ */
   const getOverlayBox = (img) => {
     const ov = img?.frameOverlay;

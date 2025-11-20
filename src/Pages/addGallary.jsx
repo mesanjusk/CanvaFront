@@ -166,7 +166,7 @@ const AddGallary = ({ onImageSelect }) => {
     }
   };
 
-  const useImage = (src) => {
+  const handleUseImage = (src) => {
     if (onImageSelect) onImageSelect(src);
     toast.success('Image selected for template');
   };
@@ -199,7 +199,7 @@ const AddGallary = ({ onImageSelect }) => {
             return (
               <Grid item xs={6} sm={4} md={3} key={id}>
                 <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                  <CardActionArea onClick={() => useImage(g.image)} sx={{ flexGrow: 1 }}>
+                  <CardActionArea onClick={() => handleUseImage(g.image)} sx={{ flexGrow: 1 }}>
                     <CardMedia
                       component="img"
                       height="220"
@@ -211,7 +211,7 @@ const AddGallary = ({ onImageSelect }) => {
                   </CardActionArea>
                   <CardActions sx={{ justifyContent: 'space-between' }}>
                     <Stack direction="row" spacing={1}>
-                      <Button size="small" variant="outlined" onClick={() => useImage(g.image)}>
+                      <Button size="small" variant="outlined" onClick={() => handleUseImage(g.image)}>
                         Use
                       </Button>
                       <Button size="small" variant="outlined" onClick={() => openEdit(g)}>

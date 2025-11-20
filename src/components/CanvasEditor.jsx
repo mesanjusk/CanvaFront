@@ -19,46 +19,15 @@ import { fabric } from "fabric";
 import {
   Menu as MenuIcon,
   RefreshCw,
-  Download,
-  Type,
-  Square,
-  Circle,
-  Image as ImageIcon,
   Crop,
   Trash2,
   Lock,
   Unlock,
-  Triangle,
-  Hexagon,
-  Star,
-  Heart,
-  Check,
   Move,
   ChevronLeft,
-  ChevronRight,
-  Images,
-  FileDown,
-  Layers as LayersIcon,
-  Eye,
-  EyeOff,
-  Group as GroupIcon,
-  Ungroup,
-  AlignHorizontalJustifyCenter,
-  AlignVerticalJustifyCenter,
-  PaintBucket,
-  Sparkles,
-  Contrast as ContrastIcon,
-  Bold,
-  Italic,
-  Underline,
-  CaseUpper,
-  AlignLeft,
-  AlignCenter,
-  AlignRight,
-  Ruler,
-  HelpCircle
+  ChevronRight
 } from "lucide-react";
-import { Layout as LayoutIcon, BookOpen, Scissors } from "lucide-react";
+import { Scissors } from "lucide-react";
 import IconButton from "./IconButton";
 import CanvasArea from "./CanvasArea";
 import ImageCropModal from "./ImageCropModal";
@@ -73,6 +42,10 @@ import { PRESET_SIZES, mmToPx, pxToMm, drawCropMarks, drawRegistrationMark } fro
 import { removeBackground } from "../utils/backgroundUtils";
 import SelectionToolbar from "./SelectionToolbar";
 import BottomNavBar from "./BottomNavBar";
+import { useSmartGuides, useObjectSnapping } from "../hooks/useCanvasGuides";
+import LayersPanel from "./canvas/LayersPanel";
+import CanvasTopBar from "./canvas/CanvasTopBar";
+import CanvasToolbox from "./canvas/CanvasToolbox";
 
 let __CLIPBOARD = null;
 /* ===================== Helpers ===================== */
@@ -89,215 +62,6 @@ const setGradientFill = (obj, colors = ["#ff6b6b", "#845ef7"]) => {
     colorStops: [{ offset: 0, color: colors[0] }, { offset: 1, color: colors[1] }],
   });
   obj.set("fill", grad);
-};
-
-/* ====== Center guides (existing) ====== */
-const useSmartGuides = (canvasRef, enable = true, tolerance = 8) => {
-  const showV = useRef(false);
-  const showH = useRef(false);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !enable) return;
-
-    const prevOverlay = canvas._renderOverlay;
-    canvas._renderOverlay = function (ctx) {
-      if (typeof prevOverlay === "function") prevOverlay.call(this, ctx);
-      const w = canvas.getWidth();
-      const h = canvas.getHeight();
-      ctx.save();
-      ctx.strokeStyle = "rgba(99,102,241,0.85)";
-      ctx.lineWidth = 1;
-      if (showV.current) { ctx.beginPath(); ctx.moveTo(w / 2 + 0.5, 0); ctx.lineTo(w / 2 + 0.5, h); ctx.stroke(); }
-      if (showH.current) { ctx.beginPath(); ctx.moveTo(0, h / 2 + 0.5); ctx.lineTo(w, h / 2 + 0.5); ctx.stroke(); }
-      ctx.restore();
-    };
-
-    const onMove = (e) => {
-      const obj = e.target; if (!obj) return;
-      const w = canvas.getWidth(), h = canvas.getHeight();
-      const nearV = Math.abs(obj.left - w / 2) <= tolerance;
-      const nearH = Math.abs(obj.top - h / 2) <= tolerance;
-      showV.current = nearV; showH.current = nearH;
-      if (nearV) obj.set({ left: Math.round(w / 2) });
-      if (nearH) obj.set({ top: Math.round(h / 2) });
-    };
-    const clear = () => { showV.current = false; showH.current = false; canvas.requestRenderAll(); };
-
-    canvas.on("object:moving", onMove);
-    canvas.on("mouse:up", clear);
-    return () => {
-      canvas.off("object:moving", onMove);
-      canvas.off("mouse:up", clear);
-      canvas._renderOverlay = prevOverlay;
-      canvas.requestRenderAll();
-    };
-  }, [canvasRef, enable, tolerance]);
-};
-
-/* ====== Object-to-object snapping (edges/centers) ====== */
-const useObjectSnapping = (canvas, enable = true, tolerance = 6) => {
-  const vGuide = useRef(null);
-  const hGuide = useRef(null);
-
-  useEffect(() => {
-    if (!canvas || !enable) return;
-
-    const prevOverlay = canvas._renderOverlay;
-    canvas._renderOverlay = function (ctx) {
-      if (typeof prevOverlay === "function") prevOverlay.call(this, ctx);
-      ctx.save();
-      ctx.strokeStyle = "rgba(99,102,241,0.85)";
-      ctx.lineWidth = 1;
-      if (vGuide.current !== null) {
-        ctx.beginPath();
-        ctx.moveTo(vGuide.current + 0.5, 0);
-        ctx.lineTo(vGuide.current + 0.5, canvas.getHeight());
-        ctx.stroke();
-      }
-      if (hGuide.current !== null) {
-        ctx.beginPath();
-        ctx.moveTo(0, hGuide.current + 0.5);
-        ctx.lineTo(canvas.getWidth(), hGuide.current + 0.5);
-        ctx.stroke();
-      }
-      ctx.restore();
-    };
-
-    const onMove = (e) => {
-      const t = e.target;
-      if (!t) return;
-      const objs = canvas.getObjects().filter((o) => o !== t && !o.isEditing);
-      const tRect = t.getBoundingRect(true, true);
-      const tCx = tRect.left + tRect.width / 2;
-      const tCy = tRect.top + tRect.height / 2;
-
-      let snappedX = null,
-        snappedY = null,
-        guideX = null,
-        guideY = null;
-      objs.forEach((o) => {
-        const r = o.getBoundingRect(true, true);
-        const oCx = r.left + r.width / 2;
-        const oCy = r.top + r.height / 2;
-        // centers
-        if (Math.abs(tCx - oCx) <= tolerance) {
-          snappedX = oCx - tRect.width / 2;
-          guideX = oCx;
-        }
-        if (Math.abs(tCy - oCy) <= tolerance) {
-          snappedY = oCy - tRect.height / 2;
-          guideY = oCy;
-        }
-        // left/right edges
-        if (Math.abs(tRect.left - r.left) <= tolerance) {
-          snappedX = r.left;
-          guideX = r.left;
-        }
-        if (Math.abs(tRect.left + tRect.width - (r.left + r.width)) <= tolerance) {
-          snappedX = r.left + r.width - tRect.width;
-          guideX = r.left + r.width;
-        }
-        // top/bottom edges
-        if (Math.abs(tRect.top - r.top) <= tolerance) {
-          snappedY = r.top;
-          guideY = r.top;
-        }
-        if (Math.abs(tRect.top + tRect.height - (r.top + r.height)) <= tolerance) {
-          snappedY = r.top + r.height - tRect.height;
-          guideY = r.top + r.height;
-        }
-      });
-      if (snappedX !== null) t.set({ left: snappedX });
-      if (snappedY !== null) t.set({ top: snappedY });
-      vGuide.current = guideX;
-      hGuide.current = guideY;
-      canvas.requestRenderAll();
-    };
-
-    const clearGuides = () => {
-      vGuide.current = null;
-      hGuide.current = null;
-      canvas.requestRenderAll();
-    };
-
-    canvas.on("object:moving", onMove);
-    canvas.on("mouse:up", clearGuides);
-    return () => {
-      canvas.off("object:moving", onMove);
-      canvas.off("mouse:up", clearGuides);
-      canvas._renderOverlay = prevOverlay;
-    };
-  }, [canvas, enable, tolerance]);
-};
-
-/** Layers panel (kept minimal to fit patch) */
-const LayersPanel = ({ canvas, onSelect }) => {
-  const [, force] = useState(0);
-  const refresh = useCallback(() => force(x => x + 1), []);
-  useEffect(() => {
-    if (!canvas) return;
-    const rerender = () => refresh();
-    canvas.on("object:added", rerender);
-    canvas.on("object:removed", rerender);
-    canvas.on("object:modified", rerender);
-    canvas.on("selection:created", rerender);
-    canvas.on("selection:updated", rerender);
-    canvas.on("selection:cleared", rerender);
-    return () => {
-      canvas.off("object:added", rerender);
-      canvas.off("object:removed", rerender);
-      canvas.off("object:modified", rerender);
-      canvas.off("selection:created", rerender);
-      canvas.off("selection:updated", rerender);
-      canvas.off("selection:cleared", rerender);
-    };
-  }, [canvas, refresh]);
-
-  const objects = useMemo(() => canvas ? canvas.getObjects() : [], [canvas, refresh]);
-  const setVisible = (obj, v) => { obj.visible = v; obj.dirty = true; canvas.requestRenderAll(); };
-  const setLocked = (obj, v) => {
-    obj.set({ lockMovementX: v, lockMovementY: v, lockScalingX: v, lockScalingY: v, lockRotation: v, hasControls: !v });
-    canvas.requestRenderAll();
-  };
-  const bringFwd = (obj) => { obj.bringForward(); canvas.requestRenderAll(); };
-  const sendBack = (obj) => { obj.sendBackwards(); canvas.requestRenderAll(); };
-
-  const renameLayer = (obj) => {
-    const name = prompt("Layer name:", obj.customId || obj.field || obj.type);
-    if (name !== null) { obj.customId = name; canvas.requestRenderAll(); }
-  };
-
-  return (
-    <div className="p-3">
-      <div className="flex items-center gap-2 mb-2">
-        <LayersIcon size={16} /> <div className="text-sm font-semibold">Layers</div>
-      </div>
-      <div className="space-y-2">
-        {[...objects].map((o, idx) => (
-          <div key={idx} className="flex items-center justify-between gap-2 border rounded px-2 py-1">
-            <div className="flex items-center gap-2 min-w-0">
-              <button className="p-1 rounded hover:bg-gray-100" onClick={() => setVisible(o, !o.visible)} title={o.visible ? "Hide" : "Show"}>
-                {o.visible ? <Eye size={16} /> : <EyeOff size={16} />}
-              </button>
-              <button className="p-1 rounded hover:bg-gray-100" onClick={() => setLocked(o, !o.lockMovementX)} title={o.lockMovementX ? "Unlock" : "Lock"}>
-                {o.lockMovementX ? <Unlock size={16} /> : <Lock size={16} />}
-              </button>
-              <div className="truncate cursor-pointer text-xs" title={o.customId || o.field || o.type}
-                onDoubleClick={() => renameLayer(o)}
-                onClick={() => { canvas.setActiveObject(o); canvas.requestRenderAll(); onSelect?.(o); }}>
-                {o.customId || o.field || o.type}
-              </div>
-            </div>
-            <div className="flex items-center gap-1">
-              <button className="p-1 rounded hover:bg-gray-100" title="Bring forward" onClick={() => bringFwd(o)}>▲</button>
-              <button className="p-1 rounded hover:bg-gray-100" title="Send backward" onClick={() => sendBack(o)}>▼</button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
 };
 
 /* =============================================================================
@@ -1632,245 +1396,56 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     <div className="h-screen w-screen overflow-hidden bg-gray-100">
       <Toaster position="top-right" />
 
-      {/* TOP BAR */}
-      {!hideHeader && (
-        <header className="fixed top-0 left-0 right-0 h-14 bg-white border-b z-40 flex items-center justify-between px-3 md:px-4 gap-3">
-          <div className="flex items-center gap-2 overflow-x-auto">
-            <button onClick={() => navigate(-1)} className="p-2 rounded hover:bg-gray-100" title="Back" aria-label="Back">
-              <ChevronLeft size={20} />
-            </button>
-          </div>
-
-          {/* Contextual mini-toolbar (text/shape quick tools) */}
-          {activeObj && (isText(activeObj) || isShape(activeObj)) && (
-            <div className="flex items-center gap-2 max-w-[60vw] overflow-x-auto rounded-full bg-white px-2 py-1 border">
-              <input
-                type="color"
-                value={typeof activeObj.fill === "string" ? activeObj.fill : "#000000"}
-                onChange={(e) => { activeObj.set({ fill: e.target.value }); canvasRef.current?.requestRenderAll(); }}
-                className="w-8 h-8 p-0 border rounded cursor-pointer"
-                title="Fill Color"
-              />
-              <button className="px-2 py-1 rounded border text-xs hover:bg-gray-100"
-                onClick={() => { setGradientFill(activeObj); canvas.requestRenderAll(); }}
-                title="Gradient Fill"><PaintBucket size={14} /></button>
-
-              {isText(activeObj) && (
-                <Fragment>
-                  <div className="flex items-center gap-1">
-                    <IconButton title="Bold" onClick={() => { activeObj.set("fontWeight", activeObj.fontWeight === "bold" ? "normal" : "bold"); canvas.requestRenderAll(); }}><Bold size={16} /></IconButton>
-                    <IconButton title="Italic" onClick={() => { activeObj.set("fontStyle", activeObj.fontStyle === "italic" ? "normal" : "italic"); canvas.requestRenderAll(); }}><Italic size={16} /></IconButton>
-                    <IconButton title="Underline" onClick={() => { activeObj.set("underline", !activeObj.underline); canvas.requestRenderAll(); }}><Underline size={16} /></IconButton>
-                    <IconButton title="Uppercase" onClick={() => { activeObj.set("text", (activeObj.text || "").toUpperCase()); canvas.requestRenderAll(); }}><CaseUpper size={16} /></IconButton>
-                  </div>
-
-                  <input type="number" min={8} max={200} value={activeObj.fontSize || 20}
-                    onChange={(e) => {
-                      const size = parseInt(e.target.value);
-                      if (!isNaN(size)) {
-                        const obj = canvasRef.current?.getActiveObject();
-                        if (obj && isText(obj)) {
-                          obj.set({ fontSize: size }); obj.setCoords();
-                          canvas.fire("object:modified"); canvas.requestRenderAll();
-                        }
-                      }
-                    }}
-                    className="w-16 p-1 border rounded" title="Font Size" />
-
-                  {/* ✨ ADDED: basic font list without external loader */}
-                  <select
-                    value={activeObj.fontFamily || "Arial"}
-                    onChange={(e) => { const obj = canvasRef.current?.getActiveObject(); if (obj && isText(obj)) { obj.set({ fontFamily: e.target.value }); obj.setCoords(); canvas.fire("object:modified"); canvas.requestRenderAll(); } }}
-                    className="p-1 border rounded" title="Font Family">
-                    <option value="Arial">Arial</option>
-                    <option value="Helvetica">Helvetica</option>
-                    <option value="Times New Roman">Times New Roman</option>
-                    <option value="Courier New">Courier New</option>
-                    <option value="Georgia">Georgia</option>
-                    <option value="Verdana">Verdana</option>
-                    <option value="Poppins">Poppins</option>
-                    <option value="Inter">Inter</option>
-                    <option value="Montserrat">Montserrat</option>
-                    <option value="Lato">Lato</option>
-                  </select>
-
-                  <div className="flex items-center gap-1">
-                    <IconButton title="Align Left" onClick={() => { activeObj.set("textAlign", "left"); canvas.requestRenderAll(); }}><AlignLeft size={16} /></IconButton>
-                    <IconButton title="Align Center" onClick={() => { activeObj.set("textAlign", "center"); canvas.requestRenderAll(); }}><AlignCenter size={16} /></IconButton>
-                    <IconButton title="Align Right" onClick={() => { activeObj.set("textAlign", "right"); canvas.requestRenderAll(); }}><AlignRight size={16} /></IconButton>
-                  </div>
-
-                  <div className="flex items-center gap-1 text-xs">
-                    <label className="ml-2">Spacing</label>
-                    <input type="range" min={-50} max={200} value={Math.round((activeObj.charSpacing || 0) / 10)} onChange={(e) => { activeObj.set("charSpacing", parseInt(e.target.value, 10) * 10); canvas.requestRenderAll(); }} />
-                    <label className="ml-2">Line</label>
-                    <input type="range" min={0.8} max={3} step={0.05} value={activeObj.lineHeight || 1.16} onChange={(e) => { activeObj.set("lineHeight", parseFloat(e.target.value)); canvas.requestRenderAll(); }} />
-                  </div>
-
-                  <button className="px-2 py-1 rounded border text-xs hover:bg-gray-100" title="Text Shadow"
-                    onClick={() => { activeObj.set("shadow", { color: "rgba(0,0,0,0.35)", blur: 6, offsetX: 2, offsetY: 2 }); canvas.requestRenderAll(); }}>
-                    <Sparkles size={14} />
-                  </button>
-                  <button className="px-2 py-1 rounded border text-xs hover:bg-gray-100" title="Text Outline"
-                    onClick={() => { activeObj.set({ stroke: "#000000", strokeWidth: 1 }); canvas.requestRenderAll(); }}>
-                    <ContrastIcon size={14} />
-                  </button>
-                </Fragment>
-              )}
-            </div>
-          )}
-
-          <div className="w-full overflow-x-auto">
-            <div className="flex items-center gap-2 min-w-max px-2 py-1">
-              <label className="text-xs">W</label>
-              <input type="number" value={tplSize.w} onChange={(e) => handleSizeChange("w", e.target.value)} className="w-16 p-1 border rounded" />
-              <label className="text-xs">H</label>
-              <input type="number" value={tplSize.h} onChange={(e) => handleSizeChange("h", e.target.value)} className="w-16 p-1 border rounded" />
-              <label className="text-xs">Zoom</label>
-              <input type="range" min={25} max={200} value={Math.round(zoom * 100)} onChange={(e) => handleZoomChange(e.target.value)} className="w-24" />
-              <span className="text-xs w-12 text-center">{Math.round(zoom * 100)}%</span>
-              <button className="px-2 py-1 rounded border text-xs hover:bg-gray-100" onClick={fitToViewport} title="Fit to Viewport">Fit</button>
-
-              {/* Grid toggle */}
-              <button className={`hidden sm:flex items-center gap-1 px-3 py-2 rounded-full ${showGrid ? "bg-indigo-600 text-white" : "bg-white"} border hover:bg-gray-50 text-sm`}
-                onClick={() => setShowGrid(v => !v)} title="Toggle Grid">
-                <Ruler size={16} /> Grid
-                <input type="checkbox" checked={showGrid} onChange={(e) => setShowGrid(e.target.checked)} title="Show Grid" />
-              </button>
-
-              {/* ✨ ADDED: Snap toggles */}
-              <label className="hidden md:flex items-center gap-1 text-xs px-2 py-1 border rounded-full bg-white">
-                <input type="checkbox" checked={snapCenterGuides} onChange={(e) => setSnapCenterGuides(e.target.checked)} />
-                Center guides
-              </label>
-              <label className="hidden md:flex items-center gap-1 text-xs px-2 py-1 border rounded-full bg-white">
-                <input type="checkbox" checked={snapObjects} onChange={(e) => setSnapObjects(e.target.checked)} />
-                Object snap
-              </label>
-              <div className="hidden md:flex items-center gap-1 text-xs px-2 py-1 border rounded-full bg-white">
-                <span>Tol</span>
-                <input type="number" className="w-12" min={2} max={20} value={snapTolerance} onChange={(e)=> setSnapTolerance(Math.max(2, Math.min(20, parseInt(e.target.value)||6)))} />
-              </div>
-
-              {/* Group / Ungroup */}
-              <button className="hidden sm:flex items-center gap-1 px-3 py-2 rounded-full bg-white border hover:bg-gray-50 text-sm"
-                onClick={() => {
-                  const sel = canvas?.getActiveObject();
-                  if (!sel) return;
-                  if (sel.type === "activeSelection") {
-                    const grp = sel.toGroup();
-                    canvas.setActiveObject(grp);
-                    canvas.requestRenderAll();
-                    saveHistoryDebounced();
-                  } else if (sel.type === "group") {
-                    sel.toActiveSelection();
-                    canvas.requestRenderAll();
-                    saveHistoryDebounced();
-                  } else {
-                    toast("Select multiple objects to group");
-                  }
-                }}
-                title="Group / Ungroup (Ctrl/Cmd+G)">
-                <GroupIcon size={16} /> / <Ungroup size={16} />
-              </button>
-
-              {/* Distribute */}
-              <button className="hidden sm:flex items-center gap-1 px-3 py-2 rounded-full bg-white border hover:bg-gray-50 text-sm"
-                onClick={() => distributeWithSpacing("h", 20)} title="Distribute Horizontally w/ spacing">
-                <AlignHorizontalJustifyCenter size={16} /> H+
-              </button>
-              <button className="hidden sm:flex items-center gap-1 px-3 py-2 rounded-full bg-white border hover:bg-gray-50 text-sm"
-                onClick={() => distributeWithSpacing("v", 20)} title="Distribute Vertically w/ spacing">
-                <AlignVerticalJustifyCenter size={16} /> V+
-              </button>
-
-              {/* ✨ ADDED: Align to canvas */}
-              <div className="hidden lg:flex items-center gap-1">
-                <button className="px-2 py-1 rounded border text-xs hover:bg-gray-100" onClick={()=>alignToCanvas("left")}>⟸</button>
-                <button className="px-2 py-1 rounded border text-xs hover:bg-gray-100" onClick={()=>alignToCanvas("hcenter")}>↔</button>
-                <button className="px-2 py-1 rounded border text-xs hover:bg-gray-100" onClick={()=>alignToCanvas("right")}>⟹</button>
-                <button className="px-2 py-1 rounded border text-xs hover:bg-gray-100" onClick={()=>alignToCanvas("top")}>⟸</button>
-                <button className="px-2 py-1 rounded border text-xs hover:bg-gray-100" onClick={()=>alignToCanvas("vcenter")}>↕</button>
-                <button className="px-2 py-1 rounded border text-xs hover:bg-gray-100" onClick={()=>alignToCanvas("bottom")}>⟹</button>
-              </div>
-
-              {/* Help */}
-              <button className="hidden sm:flex items-center gap-1 px-3 py-2 rounded-full bg-white border hover:bg-gray-50 text-sm"
-                onClick={()=> setShowHelp(true)} title="Keyboard Shortcuts">
-                <HelpCircle size={16}/> Help
-              </button>
-
-              {/* Template selection */}
-              <button title="Choose Template" onClick={() => { setRightPanel('templates'); setIsRightbarOpen(true); }}
-                className="hidden sm:flex items-center gap-1 px-3 py-2 rounded-full bg-white border hover:bg-gray-50 text-sm">
-                <Images size={16} /> Template
-              </button>
-
-              {/* Download current */}
-              <button title="Download PNG" onClick={downloadCurrentPNG} className="p-2 rounded-full bg-green-600 text-white shadow hover:bg-green-700">
-                <Download size={18} />
-              </button>
-
-              {/* Export PDF */}
-              <button title="Export PDF" onClick={exportSinglePDF} className="p-2 rounded-full bg-purple-600 text-white shadow hover:bg-purple-700">
-                <FileDown size={18} />
-              </button>
-              <button title="Export Imposed Sheet PDF" onClick={exportImposedPDF}
-                className={`hidden sm:flex items-center gap-1 px-3 py-2 rounded-full ${imposeOn ? "bg-rose-600 hover:bg-rose-700" : "bg-rose-300 cursor-not-allowed"} text-white shadow text-sm`}
-                disabled={!imposeOn}>
-                <BookOpen size={16} /> Imposed PDF
-              </button>
-
-              {bulkMode && (
-                <button title="Download All (PNGs)" onClick={downloadBulkPNGs}
-                  className="hidden sm:flex items-center gap-1 px-3 py-2 rounded-full bg-indigo-600 text-white shadow hover:bg-indigo-700 text-sm">
-                  <Images size={16} /> Download All
-                </button>
-              )}
-
-              {bulkMode && (
-                <button title="Download PDF (All)" onClick={downloadBulkPDF}
-                  className="hidden sm:flex items-center gap-1 px-3 py-2 rounded-full bg-purple-600 text-white shadow hover:bg-purple-700 text-sm">
-                  <FileDown size={16} /> Download PDF (All)
-                </button>
-              )}
-            </div>
-          </div>
-        </header>
-      )}
-
-      {/* Mobile FAB to toggle tools */}
-      <button onClick={() => setShowMobileTools(v => !v)} className="md:hidden fixed bottom-20 left-4 z-50 rounded-full p-3 shadow bg-indigo-600 text-white" title="Tools" aria-label="Toggle Tools">
-        <MenuIcon size={20} />
-      </button>
-
-      {/* LEFT VERTICAL TOOLBAR */}
-      <div className={`fixed top-16 left-2 z-40 flex-col gap-2 ${showMobileTools ? "flex" : "hidden"} md:flex`}>
-        <button title="Choose Gallary" onClick={() => { setRightPanel('gallaries'); setIsRightbarOpen(true); }} className="p-2 rounded bg-white shadow hover:bg-blue-100">
-          <Images size={20} />
-        </button>
-        <button title="Bulk Settings" onClick={() => { setRightPanel('bulk'); setIsRightbarOpen(true); }} className="p-2 rounded bg-white shadow hover:bg-blue-100">
-          <LayersIcon size={20} />
-        </button>
-        <button title="Add Frame" onClick={() => { setRightPanel('frames'); setIsRightbarOpen(true); }} className="p-2 rounded bg-white shadow hover:bg-blue-100">
-          <LayoutIcon size={20} />
-        </button>
-        <button title="Add Text" onClick={withFabClose(addText)} className="p-2 rounded bg-white shadow hover:bg-blue-100">
-          <Type size={20} />
-        </button>
-        <button title="Add Rectangle" onClick={withFabClose(addRect)} className="p-2 rounded bg-white shadow hover:bg-blue-100">
-          <Square size={20} />
-        </button>
-        <button title="Add Circle" onClick={withFabClose(addCircle)} className="p-2 rounded bg-white shadow hover:bg-blue-100">
-          <Circle size={20} />
-        </button>
-        <input type="file" accept="image/*" id="upload-image" style={{ display: "none" }} onChange={handleUpload} />
-        <label htmlFor="upload-image" onClick={withFabClose(() => { })} className="p-2 rounded bg-white shadow hover:bg-blue-100 cursor-pointer" title="Upload Image">
-          <ImageIcon size={20} />
-        </label>
-
-        <UndoRedoControls undo={undo} redo={redo} duplicateObject={duplicateObject} vertical />
-      </div>
+      <CanvasTopBar
+        activeObj={activeObj}
+        alignToCanvas={alignToCanvas}
+        bulkMode={bulkMode}
+        canvas={canvas}
+        canvasRef={canvasRef}
+        distributeWithSpacing={distributeWithSpacing}
+        downloadBulkPDF={downloadBulkPDF}
+        downloadBulkPNGs={downloadBulkPNGs}
+        downloadCurrentPNG={downloadCurrentPNG}
+        exportImposedPDF={exportImposedPDF}
+        exportSinglePDF={exportSinglePDF}
+        fitToViewport={fitToViewport}
+        handleSizeChange={handleSizeChange}
+        handleZoomChange={handleZoomChange}
+        hideHeader={hideHeader}
+        imposeOn={imposeOn}
+        isShape={isShape}
+        isText={isText}
+        navigateBack={() => navigate(-1)}
+        saveHistoryDebounced={saveHistoryDebounced}
+        setIsRightbarOpen={setIsRightbarOpen}
+        setRightPanel={setRightPanel}
+        setShowHelp={setShowHelp}
+        setSnapCenterGuides={setSnapCenterGuides}
+        setSnapObjects={setSnapObjects}
+        setSnapTolerance={setSnapTolerance}
+        setShowGrid={setShowGrid}
+        setGradientFill={setGradientFill}
+        showGrid={showGrid}
+        snapCenterGuides={snapCenterGuides}
+        snapObjects={snapObjects}
+        snapTolerance={snapTolerance}
+        tplSize={tplSize}
+        zoom={zoom}
+      />
+      <CanvasToolbox
+        addCircle={addCircle}
+        addRect={addRect}
+        addText={addText}
+        duplicateObject={duplicateObject}
+        handleUpload={handleUpload}
+        redo={redo}
+        setIsRightbarOpen={setIsRightbarOpen}
+        setRightPanel={setRightPanel}
+        setShowMobileTools={setShowMobileTools}
+        showMobileTools={showMobileTools}
+        undo={undo}
+        withFabClose={withFabClose}
+      />
 
       {/* CENTER / Canva-like viewport */}
       <main ref={viewportRef} className={`absolute bg-gray-100 top-14 left-0 right-0 ${isRightbarOpen ? "md:right-80" : "right-0"} bottom-14 md:bottom-16 overflow-auto flex items-center justify-center`}>

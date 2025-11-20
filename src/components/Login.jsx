@@ -2,6 +2,19 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import toast, { Toaster } from 'react-hot-toast';
+import {
+  Box,
+  Button,
+  Container,
+  IconButton,
+  InputAdornment,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
+import Visibility from '@mui/icons-material/Visibility';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { getInstituteId } from '../utils/instituteUtils';
 import { fetchBranding } from '../utils/brandingUtils';
 import { fetchAndStoreMasters } from '../utils/masterUtils';
@@ -17,6 +30,8 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const inputRef = useRef(null);
 
+  const accentColor = branding?.theme?.color || '#5b5b5b';
+
   useEffect(() => {
     inputRef.current?.focus();
     if (branding?.theme?.color) {
@@ -29,57 +44,56 @@ const Login = () => {
     }
   }, [navigate, branding]);
 
-  // ✅ Auto-login if token present in URL 
-useEffect(() => {
-  const token = searchParams.get("token");
-  if (!token) return;
+  // ✅ Auto-login if token present in URL
+  useEffect(() => {
+    const token = searchParams.get('token');
+    if (!token) return;
 
-  localStorage.setItem("authToken", token);
+    localStorage.setItem('authToken', token);
 
-  // Verify token with backend
-  axios.post(`https://canvaback.onrender.com/api/auth/verify`, { token })
-    .then(async (res) => {
-      if (res.data.success) {
-        const user = res.data.user;
-        const institute = res.data.institute;
+    // Verify token with backend
+    axios
+      .post(`https://canvaback.onrender.com/api/auth/verify`, { token })
+      .then(async (res) => {
+        if (res.data.success) {
+          const user = res.data.user;
+          const institute = res.data.institute;
 
-        // Store data in same format your app expects
-        storeUserData({
-          id: user.id,
-          name: user.name,
-          role: user.role,
-          username: user.username,
-        });
-        storeInstituteData({
-          institute_uuid: institute.institute_uuid,
-          institute_name: institute.institute_name,
-          institute_id: institute.institute_id,
-          theme_color: institute.theme_color,
-        });
+          // Store data in same format your app expects
+          storeUserData({
+            id: user.id,
+            name: user.name,
+            role: user.role,
+            username: user.username,
+          });
+          storeInstituteData({
+            institute_uuid: institute.institute_uuid,
+            institute_name: institute.institute_name,
+            institute_id: institute.institute_id,
+            theme_color: institute.theme_color,
+          });
 
-        // Branding + masters
-        await fetchBranding(institute.institute_uuid, setBranding);
-        await fetchAndStoreMasters();
+          // Branding + masters
+          await fetchBranding(institute.institute_uuid, setBranding);
+          await fetchAndStoreMasters();
 
-        document.documentElement.style.setProperty(
-          '--theme-color',
-          institute.theme_color || '#5b5b5b'
-        );
+          document.documentElement.style.setProperty(
+            '--theme-color',
+            institute.theme_color || '#5b5b5b'
+          );
 
-        toast.success(`Welcome, ${user.name}`);
-        navigate(`/home`);   // ✅ force redirect to home after auto-login
-      } else {
-        toast.error("Invalid or expired session, please login again");
-        navigate("/login");
-      }
-    })
-    .catch(() => {
-      toast.error("Token verification failed");
-      navigate("/login");
-    });
-}, [searchParams, navigate]);
-
-
+          toast.success(`Welcome, ${user.name}`);
+          navigate(`/home`); // ✅ force redirect to home after auto-login
+        } else {
+          toast.error('Invalid or expired session, please login again');
+          navigate('/login');
+        }
+      })
+      .catch(() => {
+        toast.error('Token verification failed');
+        navigate('/login');
+      });
+  }, [searchParams, navigate]);
 
   // fetch branding on first load so login page shows correct logo/tagline
   useEffect(() => {
@@ -95,7 +109,10 @@ useEffect(() => {
     const insti = getInstituteId(searchParams);
     try {
       // Make sure backend uses bcrypt.compare for hashed password check!
-      const { data } = await axios.post(`https://canvaback.onrender.com/api/auth/user/login`, { username, password });
+      const { data } = await axios.post(`https://canvaback.onrender.com/api/auth/user/login`, {
+        username,
+        password,
+      });
       if (data.message !== 'success') {
         toast.error(data.message || 'Invalid credentials');
         setLoading(false);
@@ -137,85 +154,113 @@ useEffect(() => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-white px-4">
+    <Box
+      sx={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#f3f4f6',
+        px: 2,
+      }}
+    >
       <Toaster position="top-center" />
-      <div className="bg-white w-full max-w-md rounded-lg shadow p-6">
-        <div className="flex justify-center mb-2">
-          <img
-            src={branding?.logo || '/pwa-512x512.png'}
-            alt="Logo"
-            onError={(e) => (e.target.src = '/pwa-512x512.png')}
-            className="w-20 h-20 object-contain"
-          />
-        </div>
-        <h2 className="text-2xl font-bold text-center mb-1" style={{ color: branding?.theme?.color || '#5b5b5b' }}>
-          {branding?.institute || 'Login'}
-        </h2>
-        {branding?.tagline && (
-          <p className="text-center text-sm text-gray-600 mb-4">{branding.tagline}</p>
-        )}
-        <div className="text-xs text-center mb-2 text-gray-500">
-          (Login using your Center Code as both username and password)
-        </div>
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label className="block mb-1 text-sm text-gray-700">Center Code</label>
-            <input
-              ref={inputRef}
-              type="text"
-              value={username}
-              onChange={(e) => {
-                setUsername(e.target.value);
-                setPassword(e.target.value); // Optional: auto-fill password for easy login
+      <Container maxWidth="sm">
+        <Paper elevation={6} sx={{ p: { xs: 3, sm: 4 }, borderRadius: 3 }}>
+          <Stack spacing={2} alignItems="center">
+            <Box
+              component="img"
+              src={branding?.logo || '/pwa-512x512.png'}
+              onError={(e) => {
+                e.target.src = '/pwa-512x512.png';
               }}
-              required
-              className="w-full px-3 py-2 border rounded shadow-sm focus:outline-none"
-              placeholder="Enter Center Code"
-              autoComplete="username"
+              alt="Logo"
+              sx={{ width: 80, height: 80, objectFit: 'contain' }}
             />
-          </div>
-          <div>
-            <label className="block mb-1 text-sm text-gray-700">Password</label>
-            <div className="relative">
-              <input
+            <Typography
+              variant="h5"
+              fontWeight={700}
+              align="center"
+              sx={{ color: accentColor }}
+            >
+              {branding?.institute || 'Login'}
+            </Typography>
+            {branding?.tagline && (
+              <Typography variant="body2" color="text.secondary" align="center">
+                {branding.tagline}
+              </Typography>
+            )}
+            <Typography variant="caption" color="text.secondary" align="center">
+              (Login using your Center Code as both username and password)
+            </Typography>
+          </Stack>
+
+          <Box component="form" onSubmit={handleLogin} noValidate sx={{ mt: 3 }}>
+            <Stack spacing={2}>
+              <TextField
+                inputRef={inputRef}
+                label="Center Code"
+                value={username}
+                onChange={(e) => {
+                  setUsername(e.target.value);
+                  setPassword(e.target.value);
+                }}
+                required
+                fullWidth
+                placeholder="Enter Center Code"
+                autoComplete="username"
+              />
+
+              <TextField
+                label="Password"
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full px-3 py-2 border rounded shadow-sm focus:outline-none pr-10"
+                fullWidth
                 placeholder="Enter Password"
                 autoComplete="current-password"
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        edge="end"
+                        onClick={() => setShowPassword((prev) => !prev)}
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
               />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-2 flex items-center text-sm text-gray-600"
-                tabIndex={-1}
+
+              <Button
+                type="submit"
+                variant="contained"
+                disabled={loading}
+                sx={{
+                  py: 1.2,
+                  backgroundColor: accentColor,
+                  '&:hover': { backgroundColor: accentColor },
+                }}
               >
-                {showPassword ? 'Hide' : 'Show'}
-              </button>
-            </div>
-          </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className={`w-full py-2 rounded text-white ${loading ? 'opacity-60 cursor-not-allowed' : ''}`}
-            style={{ backgroundColor: branding?.theme?.color || '#45818e' }}
-          >
-            {loading ? 'Logging in...' : 'Login'}
-          </button>
-        </form>
-        <div className="text-center mt-4 text-sm text-gray-600">
-          Don’t have an account?
-          <button
-            onClick={() => navigate('/signup')}
-            className="ml-1 text-blue-600 hover:underline font-medium"
-          >
-            Register
-          </button>
-        </div>
-      </div>
-    </div>
+                {loading ? 'Logging in...' : 'Login'}
+              </Button>
+            </Stack>
+          </Box>
+
+          <Stack direction="row" justifyContent="center" spacing={1} sx={{ mt: 3 }}>
+            <Typography variant="body2" color="text.secondary">
+              Don’t have an account?
+            </Typography>
+            <Button onClick={() => navigate('/signup')} size="small">
+              Register
+            </Button>
+          </Stack>
+        </Paper>
+      </Container>
+    </Box>
   );
 };
 

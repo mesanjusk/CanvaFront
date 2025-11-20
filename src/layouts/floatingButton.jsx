@@ -1,56 +1,58 @@
-import React, { useState } from "react";
+import React, { useState } from 'react';
+import { Box, Fab, Stack, Button } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
 
-const FloatingButtons = ({ buttonsList = [], direction = "up" }) => {
+const FloatingButtons = ({ buttonsList = [], direction = 'up' }) => {
   const [isOpen, setIsOpen] = useState(false);
 
-  // Modern + Button
-  const getButtonIcon = () => (
-    <svg className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
-      <line x1="12" y1="5" x2="12" y2="19" stroke="white" strokeWidth="3" strokeLinecap="round"/>
-      <line x1="5" y1="12" x2="19" y2="12" stroke="white" strokeWidth="3" strokeLinecap="round"/>
-    </svg>
-  );
-
   return (
-    <div className="fixed bottom-20 right-10 flex flex-col items-center z-50">
-      {/* Action Buttons */}
+    <Box position="fixed" bottom={80} right={24} display="flex" flexDirection="column" alignItems="center" zIndex={1200}>
       {isOpen && (
-        <div
-          className={`flex ${
-            direction === "up" ? "flex-col-reverse" : "flex-col"
-          } items-center gap-3 mb-3 transition-all ease-out duration-300`}
+        <Stack
+          spacing={1}
+          direction="column"
+          justifyContent="center"
+          alignItems="center"
+          sx={{ mb: 1.5, flexDirection: direction === 'up' ? 'column-reverse' : 'column' }}
         >
           {buttonsList.length === 0 ? (
-            <p className="text-white text-sm">No actions</p>
+            <Box color="common.white" fontSize={14} px={1}>
+              No actions
+            </Box>
           ) : (
             buttonsList.map((button, index) => (
-              <button
+              <Button
                 key={index}
+                variant="contained"
+                color="secondary"
                 onClick={() => {
                   button.onClick();
-                  setIsOpen(false); // Auto-close after click
+                  setIsOpen(false);
                 }}
-                tabIndex={0}
-                className="w-36 h-12 bg-white text-green-700 font-semibold p-2 rounded-full shadow-lg hover:bg-green-100 transition-all duration-200 transform hover:scale-105 focus:outline-none"
-                aria-label={button.label || `Action ${index + 1}`}
-                title={button.label || ""}
+                sx={{
+                  width: 150,
+                  borderRadius: 999,
+                  boxShadow: 3,
+                  fontWeight: 700,
+                  textTransform: 'none',
+                }}
               >
-                <span className="mx-auto">{button.label}</span>
-              </button>
+                {button.label}
+              </Button>
             ))
           )}
-        </div>
+        </Stack>
       )}
 
-      {/* Toggle FAB */}
-      <button
-        onClick={() => setIsOpen((v) => !v)}
-        className="w-10 h-10 bg-green-600 text-white flex justify-center items-center rounded-full shadow-2xl hover:bg-green-700 transition-all duration-200 transform hover:rotate-90 focus:outline-none"
+      <Fab
+        color="success"
         aria-label="Toggle actions"
+        onClick={() => setIsOpen((v) => !v)}
+        sx={{ boxShadow: 6 }}
       >
-        {getButtonIcon()}
-      </button>
-    </div>
+        <AddIcon />
+      </Fab>
+    </Box>
   );
 };
 

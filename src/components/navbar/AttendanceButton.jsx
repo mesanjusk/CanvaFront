@@ -1,4 +1,5 @@
 import React from 'react';
+import { Button } from '@mui/material';
 import { formatDisplayDate } from '../../utils/dateUtils';
 
 const AttendanceButton = ({
@@ -6,27 +7,27 @@ const AttendanceButton = ({
   attendanceState,
   userName,
   saveAttendance,
-  setShowButtons
+  setShowButtons,
 }) => {
   if (!showButtons || !attendanceState) return null;
   return (
-    <div className="w-full">
-      <button
-        onClick={async () => {
-          setShowButtons(false);
-          await saveAttendance(attendanceState);
-          setShowButtons(true);
-        }}
-        disabled={!showButtons}
-        className={`w-full text-white font-semibold py-1.5 px-3 text-sm rounded-md transition-all ${
-          showButtons ? 'bg-green-500 hover:bg-green-600 cursor-pointer' : 'bg-gray-400 cursor-not-allowed'
-        }`}
-      >
-        {showButtons
-          ? `${userName} ${attendanceState} - ${formatDisplayDate(new Date())}`
-          : 'Saving...'}
-      </button>
-    </div>
+    <Button
+      fullWidth
+      variant="contained"
+      color="success"
+      size="small"
+      disabled={!showButtons}
+      onClick={async () => {
+        setShowButtons(false);
+        await saveAttendance(attendanceState);
+        setShowButtons(true);
+      }}
+      sx={{ fontWeight: 700, textTransform: 'none' }}
+    >
+      {showButtons
+        ? `${userName} ${attendanceState} - ${formatDisplayDate(new Date())}`
+        : 'Saving...'}
+    </Button>
   );
 };
 

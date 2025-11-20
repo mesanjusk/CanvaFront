@@ -1,4 +1,5 @@
 import React from 'react';
+import { Box, Divider, Paper, Typography, Button } from '@mui/material';
 import AttendanceButton from './AttendanceButton';
 
 const UserMenu = ({
@@ -10,15 +11,32 @@ const UserMenu = ({
   saveAttendance,
   setShowButtons,
   logoutUser,
-  onClose
+  onClose,
 }) => (
   <>
-    <div className="fixed inset-0 z-40" onClick={onClose} />
-    <div className="absolute top-12 right-0 w-80 bg-white rounded-lg z-50 p-4">
-      <div className="mb-2">
-        <div className="font-semibold text-gray-800">{username}</div>
-        {role && <div className="text-xs text-gray-500 capitalize">{role}</div>}
-      </div>
+    <Box position="fixed" zIndex={40} onClick={onClose} sx={{ inset: 0 }} />
+    <Paper
+      elevation={6}
+      sx={{
+        position: 'absolute',
+        top: 56,
+        right: 8,
+        width: 320,
+        zIndex: 50,
+        p: 2,
+        borderRadius: 2,
+      }}
+    >
+      <Box mb={1.5}>
+        <Typography variant="subtitle1" fontWeight={700} color="text.primary">
+          {username}
+        </Typography>
+        {role && (
+          <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'capitalize' }}>
+            {role}
+          </Typography>
+        )}
+      </Box>
       <AttendanceButton
         showButtons={showButtons}
         attendanceState={attendanceState}
@@ -26,13 +44,17 @@ const UserMenu = ({
         saveAttendance={saveAttendance}
         setShowButtons={setShowButtons}
       />
-      <button
+      <Divider sx={{ my: 1.5 }} />
+      <Button
+        fullWidth
+        variant="outlined"
+        color="error"
         onClick={logoutUser}
-        className="w-full text-left px-4 py-2 rounded bg-red-50 hover:bg-red-100 text-red-600 font-medium mt-2"
+        sx={{ fontWeight: 600, textTransform: 'none' }}
       >
         Logout
-      </button>
-    </div>
+      </Button>
+    </Paper>
   </>
 );
 

@@ -1,6 +1,16 @@
 import React from 'react';
+import {
+  Box,
+  Collapse,
+  Divider,
+  Drawer,
+  List,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Typography,
+} from '@mui/material';
 import EventNoteIcon from '@mui/icons-material/EventNote';
-import SchoolIcon from '@mui/icons-material/School';
 import GroupIcon from '@mui/icons-material/Group';
 
 const RightDrawer = ({
@@ -11,120 +21,123 @@ const RightDrawer = ({
   setShowSettingsItems,
   navigate,
   user,
-  onClose
+  onClose,
 }) => {
-  if (!isOpen) return null;
   return (
-    <>
-      <div className="absolute top-12 right-0 w-56 bg-white rounded-lg  z-50 p-4">
-        {/* Master Section */}
-        <div>
-          <div
-            className="font-semibold text-gray-700 mb-2 cursor-pointer hover:underline"
-            onClick={() => setShowMasterItems(!showMasterItems)}
-          >
-            Master {showMasterItems}
-          </div>
-          {showMasterItems && (
-            <div className="space-y-2 pl-2">
+    <Drawer anchor="right" open={isOpen} onClose={onClose} PaperProps={{ sx: { width: 280 } }}>
+      <Box role="presentation" px={2} py={3}>
+        <List subheader={<Typography variant="subtitle2">Master</Typography>}>
+          <ListItemButton onClick={() => setShowMasterItems((prev) => !prev)}>
+            <ListItemText primary="Master" secondary={showMasterItems ? 'Hide' : 'Show'} />
+          </ListItemButton>
+          <Collapse in={showMasterItems} timeout="auto" unmountOnExit>
+            <List component="div" disablePadding>
               {[
-                { path: '/addTemplate', label: 'Template', icon: <EventNoteIcon fontSize="small" /> },
-                { path: '/dashboard/addCategory', label: 'Category', icon: <EventNoteIcon fontSize="small" /> },
-                { path: '/dashboard/addSubcategory', label: 'Subcategory', icon: <EventNoteIcon fontSize="small" /> },
+                { path: '/addTemplate', label: 'Template' },
+                { path: '/dashboard/addCategory', label: 'Category' },
+                { path: '/dashboard/addSubcategory', label: 'Subcategory' },
               ].map((item) => (
-                <div
+                <ListItemButton
                   key={item.path}
+                  sx={{ pl: 3 }}
                   onClick={() => {
                     navigate(item.path);
                     onClose();
                   }}
-                  className="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100 text-sm cursor-pointer"
                 >
-                  {item.icon}
-                  {item.label}
-                </div>
+                  <ListItemIcon>
+                    <EventNoteIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText primary={item.label} />
+                </ListItemButton>
               ))}
-            </div>
-          )}
-        </div>
+            </List>
+          </Collapse>
+        </List>
 
-        {/* Settings Section */}
-        <div>
-          <div
-            className="font-semibold text-gray-700 mb-2 cursor-pointer hover:underline"
-            onClick={() => setShowSettingsItems(!showSettingsItems)}
-          >
-            Settings {showSettingsItems}
-          </div>
-          {showSettingsItems && (
-            <div className="space-y-2 pl-2">
-              <div
+        <Divider sx={{ my: 1.5 }} />
+
+        <List subheader={<Typography variant="subtitle2">Settings</Typography>}>
+          <ListItemButton onClick={() => setShowSettingsItems((prev) => !prev)}>
+            <ListItemText primary="Settings" secondary={showSettingsItems ? 'Hide' : 'Show'} />
+          </ListItemButton>
+          <Collapse in={showSettingsItems} timeout="auto" unmountOnExit>
+            <List component="div" disablePadding>
+              <ListItemButton
+                sx={{ pl: 3 }}
                 onClick={() => {
                   navigate('/dashboard/user');
                   onClose();
                 }}
-                className="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100 text-sm cursor-pointer"
               >
-                <GroupIcon fontSize="small" />
-                User
-              </div>
+                <ListItemIcon>
+                  <GroupIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText primary="User" />
+              </ListItemButton>
 
               {user?.role === 'admin' && (
-                <div
+                <ListItemButton
+                  sx={{ pl: 3 }}
                   onClick={() => {
                     navigate('/dashboard/instituteProfile');
                     onClose();
                   }}
-                  className="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100 text-sm cursor-pointer"
                 >
-                  <EventNoteIcon fontSize="small" />
-                  Profile
-                </div>
+                  <ListItemIcon>
+                    <EventNoteIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText primary="Profile" />
+                </ListItemButton>
               )}
 
               {(user?.role === 'owner' || user?.role === 'super_admin') && (
                 <>
-                  <div
+                  <ListItemButton
+                    sx={{ pl: 3 }}
                     onClick={() => {
                       navigate('/dashboard/owner');
                       onClose();
                     }}
-                    className="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100 text-sm cursor-pointer"
                   >
-                    <EventNoteIcon fontSize="small" />
-                    Owner
-                  </div>
-                  <div
+                    <ListItemIcon>
+                      <EventNoteIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText primary="Owner" />
+                  </ListItemButton>
+                  <ListItemButton
+                    sx={{ pl: 3 }}
                     onClick={() => {
                       navigate('/dashboard/institutes');
                       onClose();
                     }}
-                    className="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100 text-sm cursor-pointer"
                   >
-                    <EventNoteIcon fontSize="small" />
-                    Institutes
-                  </div>
+                    <ListItemIcon>
+                      <EventNoteIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText primary="Institutes" />
+                  </ListItemButton>
                   {user?.role === 'super_admin' && (
-                    <div
+                    <ListItemButton
+                      sx={{ pl: 3 }}
                       onClick={() => {
                         navigate('/dashboard/tools');
                         onClose();
                       }}
-                      className="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100 text-sm cursor-pointer"
                     >
-                      <EventNoteIcon fontSize="small" />
-                      Tools
-                    </div>
+                      <ListItemIcon>
+                        <EventNoteIcon fontSize="small" />
+                      </ListItemIcon>
+                      <ListItemText primary="Tools" />
+                    </ListItemButton>
                   )}
                 </>
               )}
-            </div>
-          )}
-        </div>
-      </div>
-      {/* Overlay */}
-      <div onClick={onClose} className="fixed inset-0 bg-black opacity-25 z-40" />
-    </>
+            </List>
+          </Collapse>
+        </List>
+      </Box>
+    </Drawer>
   );
 };
 

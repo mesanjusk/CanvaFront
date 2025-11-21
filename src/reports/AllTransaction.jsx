@@ -2,8 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import BASE_URL from '../config';
-import TopNavbar from '../Pages/topNavbar';
-import Footer from '../Pages/footer';
 import { FaWhatsapp, FaSortUp, FaSortDown } from 'react-icons/fa';
 import * as XLSX from 'xlsx';
 import { jsPDF } from "jspdf";
@@ -158,7 +156,7 @@ const AllTransaction = () => {
     return (
         <>
             <div className="no-print">
-                <TopNavbar />
+               
             </div>
             <div className="pt-12 pb-20">
                 <div className="mt-6 max-w-7xl mx-auto  p-4">

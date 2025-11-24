@@ -719,7 +719,11 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   }, []);
 
   // Gallary list (with states)
-  useEffect(() => {
+    useEffect(() => {
+    if (!canvas) return;
+    canvas.selection = true;
+  }, [canvas]);
+      useEffect(() => {
     const loadGallaries = async () => {
       setGallaryError(null);
       try {
@@ -840,18 +844,45 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
       });
     }
 
-    if (data?.canvasJson) {
+        if (data?.canvasJson) {
       canvas.loadFromJSON(data.canvasJson, () => {
-        canvas.getObjects().forEach(o => {
-          if (o.type === "i-text" && (!o.customId || /text/i.test(o.customId))) o.customId = "templateText";
-          if (o.customId === "frameSlot" || (o.type === "path" && ["#7c3aed", "rgb(124,58,237)"].includes(o.stroke))) {
+        canvas.getObjects().forEach((o) => {
+          // classify template text & frame slots
+          if (o.type === "i-text" && (!o.customId || /text/i.test(o.customId))) {
+            o.customId = "templateText";
+          }
+          if (
+            o.customId === "frameSlot" ||
+            (o.type === "path" &&
+              ["#7c3aed", "rgb(124,58,237)"].includes(o.stroke))
+          ) {
             o.customId = "frameSlot";
           }
+
+          // ✅ ensure objects (except background) stay editable
+          if (o.customId === "templateBg") {
+            // background stays locked
+            o.set({ selectable: false, evented: false });
+          } else {
+            // everything else: text, shapes, photos, etc.
+            o.set({
+              selectable: true,
+              evented: true,
+              lockMovementX: false,
+              lockMovementY: false,
+              lockScalingX: false,
+              lockScalingY: false,
+              lockRotation: false,
+              hasControls: true,
+            });
+          }
         });
+
         cacheTemplatePlaceholders(canvas);
         canvas.requestRenderAll();
       });
     }
+
 
     if (showLogo && selectedInstitute?.logo) loadTemplateAsset("logo", selectedInstitute.logo, canvas);
     if (showSignature && selectedInstitute?.signature) loadTemplateAsset("signature", selectedInstitute.signature, canvas);
@@ -957,11 +988,11 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
       const scale = Math.max(bounds.width / img.width, bounds.height / img.height);
       img.set({
         originX: "center", originY: "center",
-        left:   savedPhoto.left   ?? bounds.left + bounds.width  / 2,
-        top:    savedPhoto.top    ?? bounds.top  + bounds.height / 2,
+        left: savedPhoto.left ?? bounds.left + bounds.width / 2,
+        top: savedPhoto.top ?? bounds.top + bounds.height / 2,
         scaleX: savedPhoto.scaleX ?? scale,
         scaleY: savedPhoto.scaleY ?? scale,
-        angle:  savedPhoto.angle  ?? 0,
+        angle: savedPhoto.angle ?? 0,
         selectable: true,
         evented: true,
         customId: "studentPhoto",
@@ -976,7 +1007,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
         };
         saveProps("studentPhoto", studentLayoutsRef.current[uuid].studentPhotoProps);
       };
-      img.on("modified", persist); img.on("scaling",  persist); img.on("moving",   persist);
+      img.on("modified", persist); img.on("scaling", persist); img.on("moving", persist);
 
       canvas.add(img);
       img.moveTo(canvas.getObjects().indexOf(frameSlot) + 1);
@@ -1026,7 +1057,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
       const cx = (mx / (tplSize.w * newZoom)) * el.clientWidth;
       const cy = (my / (tplSize.h * newZoom)) * el.clientHeight;
       vp.scrollLeft = Math.max(0, cx - vp.clientWidth / 2);
-      vp.scrollTop  = Math.max(0, cy - vp.clientHeight / 2);
+      vp.scrollTop = Math.max(0, cy - vp.clientHeight / 2);
     };
 
     let panning = false;
@@ -1035,7 +1066,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     const onMouseMove = (e) => {
       if (!panning) return;
       vp.scrollLeft -= e.movementX;
-      vp.scrollTop  -= e.movementY;
+      vp.scrollTop -= e.movementY;
     };
 
     vp.addEventListener("wheel", onWheel, { passive: false });
@@ -1054,11 +1085,11 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   useEffect(() => {
     const host = stageRef.current;
     if (!host) return;
-    const onDragOver = (e) => { e.preventDefault(); host.classList.add("ring-2","ring-indigo-400"); };
-    const onDragLeave = () => host.classList.remove("ring-2","ring-indigo-400");
+    const onDragOver = (e) => { e.preventDefault(); host.classList.add("ring-2", "ring-indigo-400"); };
+    const onDragLeave = () => host.classList.remove("ring-2", "ring-indigo-400");
     const onDrop = (e) => {
       e.preventDefault();
-      host.classList.remove("ring-2","ring-indigo-400");
+      host.classList.remove("ring-2", "ring-indigo-400");
       const file = e.dataTransfer?.files?.[0];
       if (file && file.type.startsWith("image/")) {
         const reader = new FileReader();
@@ -1334,7 +1365,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     doc.save(`design_${pagePreset}_${pageOrientation}_${dpi}dpi_${ts}.pdf`);
   };
 
-  
+
   /* ====================== ✨ ADDED: Export Imposed Sheet PDF ====================== */
   const exportImposedPDF = () => {
     try {
@@ -1371,7 +1402,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
           const x = outer.left + c * (cellWmm + gap.x_mm);
-          const y = outer.top  + r * (cellHmm + gap.y_mm);
+          const y = outer.top + r * (cellHmm + gap.y_mm);
           doc.addImage(png, "PNG", x, y, cellWmm, cellHmm);
         }
       }
@@ -1393,7 +1424,8 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   const [inspectorOpen, setInspectorOpen] = useState(false); // ✨ ADDED
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-gray-100">
+    <div className="min-h-screen w-screen overflow-hidden bg-gray-100 pb-14 md:pb-0 flex flex-col">
+
       <Toaster position="top-right" />
 
       <CanvasTopBar
@@ -1448,175 +1480,445 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
       />
 
       {/* CENTER / Canva-like viewport */}
-      <main ref={viewportRef} className={`absolute bg-gray-100 top-14 left-0 right-0 ${isRightbarOpen ? "md:right-80" : "right-0"} bottom-14 md:bottom-16 overflow-auto flex items-center justify-center`}>
-        <div className="flex flex-col items-center">
-          <div ref={stageRef} style={{ width: `${tplSize.w * zoom}px`, height: `${tplSize.h * zoom}px` }} className="shadow-lg border bg-white relative">
-            <CanvasArea ref={canvasRef} width={tplSize.w} height={tplSize.h} />
-            {showToolbar && activeObj && (<SelectionToolbar activeObj={activeObj} canvas={canvas} />)}
-          </div>
 
-          {bulkMode && (
-            <div className="mt-4 flex items-center justify-center gap-4">
-              <button type="button" className="p-3 rounded-full bg-white border shadow-sm active:scale-95" title="Previous" onClick={prevStudent} onTouchEnd={prevStudent}>
-                <ChevronLeft size={20} />
-              </button>
-              <div className="px-2 text-sm text-gray-700">
-                {bulkList.length ? `${bulkIndex + 1}/${bulkList.length}` : "0/0"}
-              </div>
-              <button type="button" className="p-3 rounded-full bg-white border shadow-sm active:scale-95" title="Next" onClick={nextStudent} onTouchEnd={nextStudent}>
-                <ChevronRight size={20} />
-              </button>
+           {/* CENTER / Canva-like viewport */}
+      <div className="relative flex-1 flex flex-col md:flex-row">
+        <main
+          ref={viewportRef}
+          className="relative bg-gray-100 flex-1 overflow-auto flex items-center justify-center"
+        >
+          <div className="flex flex-col items-center">
+            <div
+              ref={stageRef}
+              style={{
+                width: `${tplSize.w * zoom}px`,
+                height: `${tplSize.h * zoom}px`,
+              }}
+              className="shadow-lg border bg-white relative"
+            >
+              <CanvasArea
+                ref={canvasRef}
+                width={tplSize.w}
+                height={tplSize.h}
+              />
+              {showToolbar && activeObj && (
+                <SelectionToolbar activeObj={activeObj} canvas={canvas} />
+              )}
             </div>
-          )}
-        </div>
-        {cropSrc && (
-          <ImageCropModal
-            src={cropSrc}
-            onCancel={() => setCropSrc(null)}
-            onConfirm={(img) => { if (cropCallbackRef.current) cropCallbackRef.current(img); setCropSrc(null); }}
-          />
-        )}
-      </main>
+
+            {bulkMode && (
+              <div className="mt-4 flex items-center justify-center gap-4">
+                <button
+                  type="button"
+                  className="p-3 rounded-full bg-white border shadow-sm active:scale-95"
+                  title="Previous"
+                  onClick={prevStudent}
+                  onTouchEnd={prevStudent}
+                >
+                  <ChevronLeft size={20} />
+                </button>
+                <div className="px-2 text-sm text-gray-700">
+                  {bulkList.length
+                    ? `${bulkIndex + 1}/${bulkList.length}`
+                    : "0/0"}
+                </div>
+                <button
+                  type="button"
+                  className="p-3 rounded-full bg-white border shadow-sm active:scale-95"
+                  title="Next"
+                  onClick={nextStudent}
+                  onTouchEnd={nextStudent}
+                >
+                  <ChevronRight size={20} />
+                </button>
+              </div>
+            )}
+
+            {cropSrc && (
+              <ImageCropModal
+                src={cropSrc}
+                onCancel={() => setCropSrc(null)}
+                onConfirm={(img) => {
+                  if (cropCallbackRef.current) {
+                    cropCallbackRef.current(img);
+                  }
+                  setCropSrc(null);
+                }}
+              />
+            )}
+          </div>
+        </main>
+      </div>
+
+
 
       {/* RIGHT SIDEBAR PANELS */}
-      <aside className={`fixed top-14 bottom-14 md:bottom-16 right-0 md:w-80 w-72 bg-white border-l z-30 overflow-y-auto transform transition-transform duration-200 ${isRightbarOpen ? "translate-x-0" : "translate-x-full"}`}>
+      {/* RIGHT SIDEBAR / BOTTOM SHEET PANELS */}
+      <aside
+        className={`fixed z-30 bg-white overflow-y-auto transform transition-transform duration-200
+        ${isMobile
+            ? "left-0 right-0 bottom-14 top-auto w-full max-h-[70vh] border-t rounded-t-2xl"
+            : "top-14 bottom-14 md:bottom-16 right-0 md:w-80 w-72 border-l"
+          }
+        ${isRightbarOpen
+            ? "translate-y-0 md:translate-x-0"
+            : "translate-y-full md:translate-x-full"
+          }`}
+      >
+        {/* drag handle on mobile */}
+        {isMobile && (
+          <div className="flex justify-center pt-2">
+            <div className="h-1.5 w-12 rounded-full bg-gray-300" />
+          </div>
+        )}
+
         <div className="p-3 border-b flex items-center justify-between">
           <div className="text-sm font-semibold">
-            {rightPanel === "gallaries" ? "Gallary"
-              : rightPanel === "templates" ? "Templates"
-                : rightPanel === "bulk" ? "Bulk Settings"
-                  : rightPanel === "frames" ? "Frames"
-                    : rightPanel === "object" ? "Object Settings" : ""}
+            {rightPanel === "gallaries"
+              ? "Gallery"
+              : rightPanel === "templates"
+                ? "Templates"
+                : rightPanel === "bulk"
+                  ? "Bulk & Print"
+                  : rightPanel === "frames"
+                    ? "Frames"
+                    : rightPanel === "object"
+                      ? "Object Settings"
+                      : ""}
           </div>
-          <button className="p-2 rounded hover:bg-gray-100" onClick={() => { setIsRightbarOpen(false); setRightPanel(null); }} title="Close">
+          <button
+            className="p-2 rounded hover:bg-gray-100"
+            onClick={() => {
+              setIsRightbarOpen(false);
+              setRightPanel(null);
+            }}
+            title="Close"
+          >
             <MenuIcon size={18} />
           </button>
         </div>
-        <div className="p-3">
+
+        <div className={`p-3 ${isMobile ? "pb-6" : ""}`}>
           {rightPanel === "gallaries" && (
             <Fragment>
-              {loadingGallary && (<div className="text-xs text-gray-500 mb-2">Loading gallery…</div>)}
-              {gallaryError && (<div className="text-xs text-red-600 mb-2">{gallaryError}</div>)}
+              {loadingGallary && (
+                <div className="text-xs text-gray-500 mb-2">
+                  Loading gallery…
+                </div>
+              )}
+              {gallaryError && (
+                <div className="text-xs text-red-600 mb-2">
+                  {gallaryError}
+                </div>
+              )}
               {!loadingGallary && !gallaryError && gallaries.length === 0 && (
-                <div className="text-xs text-gray-500 mb-2">No gallery items found.</div>
+                <div className="text-xs text-gray-500 mb-2">
+                  No gallery items found.
+                </div>
               )}
               <div className="grid grid-cols-2 gap-3">
                 {gallaries.map((g) => (
-                  <div key={g._id || g.Gallary_uuid} className="border rounded overflow-hidden hover:shadow cursor-pointer" onClick={() => loadGallaryById(g._id || g.Gallary_uuid)}>
+                  <div
+                    key={g._id || g.Gallary_uuid}
+                    className="border rounded overflow-hidden hover:shadow cursor-pointer"
+                    onClick={() =>
+                      loadGallaryById(g._id || g.Gallary_uuid)
+                    }
+                  >
                     <div className="aspect-[4/5] bg-gray-100 flex flex-col items-center justify-center gap-2 p-2">
                       {g.image ? (
-                        <img src={g.image} alt="Gallary" className="w-24 h-24 object-contain border rounded bg-white" crossOrigin="anonymous" />
-                      ) : (<span className="text-xs text-gray-400">No Image</span>)}
+                        <img
+                          src={g.image}
+                          alt="Gallery"
+                          className="w-24 h-24 object-contain border rounded bg-white"
+                          crossOrigin="anonymous"
+                        />
+                      ) : (
+                        <span className="text-xs text-gray-400">
+                          No Image
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))}
               </div>
               <div className="mt-4 border-t pt-3">
-                <LayersPanel canvas={canvas} onSelect={(o) => setActiveObj(o)} />
+                <LayersPanel
+                  canvas={canvas}
+                  onSelect={(o) => setActiveObj(o)}
+                />
               </div>
             </Fragment>
           )}
 
           {rightPanel === "templates" && (
             <Fragment>
-              {loadingTemplate && (<div className="text-xs text-gray-500 mb-2">Loading template…</div>)}
-              {templateError && (<div className="text-xs text-red-600 mb-2">{templateError}</div>)}
-              {!loadingTemplate && !templateError && templates.length === 0 && (
-                <div className="text-xs text-gray-500 mb-2">No templates yet.</div>
+              {loadingTemplate && (
+                <div className="text-xs text-gray-500 mb-2">
+                  Loading template…
+                </div>
               )}
+              {templateError && (
+                <div className="text-xs text-red-600 mb-2">
+                  {templateError}
+                </div>
+              )}
+              {!loadingTemplate &&
+                !templateError &&
+                templates.length === 0 && (
+                  <div className="text-xs text-gray-500 mb-2">
+                    No templates yet.
+                  </div>
+                )}
               <div className="grid grid-cols-2 gap-3">
                 {templates.map((t) => (
-                  <button key={t._id || t.id} onClick={() => { loadTemplateById(t._id || t.id); }}
-                    className={`border rounded overflow-hidden text-left hover:shadow focus:ring-2 focus:ring-indigo-500 ${(t._id || t.id) === activeTemplateId ? "ring-2 ring-indigo-500" : ""}`} title={t.title || "Template"}>
+                  <button
+                    key={t._id || t.id}
+                    onClick={() => {
+                      loadTemplateById(t._id || t.id);
+                    }}
+                    className={`border rounded overflow-hidden text-left hover:shadow focus:ring-2 focus:ring-indigo-500 ${(t._id || t.id) === activeTemplateId
+                        ? "ring-2 ring-indigo-500"
+                        : ""
+                      }`}
+                    title={t.title || "Template"}
+                  >
                     <div className="aspect-[4/5] bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
-                      {t.image ? (<img src={t.image} alt={t.title || "template thumbnail"} className="w-full h-full object-cover" crossOrigin="anonymous" />) : (<span>Preview</span>)}
+                      {t.image ? (
+                        <img
+                          src={t.image}
+                          alt={t.title || "template thumbnail"}
+                          className="w-full h-full object-cover"
+                          crossOrigin="anonymous"
+                        />
+                      ) : (
+                        <span>Preview</span>
+                      )}
                     </div>
                     <div className="px-2 py-1">
-                      <div className="text-xs font-medium truncate">{t.title || "Untitled"}</div>
-                      <div className="text-[10px] text-gray-500">{t.width || t.w || 400}×{t.height || t.h || 550}</div>
+                      <div className="text-xs font-medium truncate">
+                        {t.title || "Untitled"}
+                      </div>
+                      <div className="text-[10px] text-gray-500">
+                        {t.width || t.w || 400}×
+                        {t.height || t.h || 550}
+                      </div>
                     </div>
                   </button>
                 ))}
               </div>
-              <TemplateLayout canvas={canvas} activeTemplateId={activeTemplateId} tplSize={tplSize} setSavedPlaceholders={setSavedPlaceholders} frameCorner={frameCorner} />
+
+              <TemplateLayout
+                canvas={canvas}
+                activeTemplateId={activeTemplateId}
+                tplSize={tplSize}
+                setSavedPlaceholders={setSavedPlaceholders}
+                frameCorner={frameCorner}
+              />
               <div className="mt-4 border-t pt-3">
-                <LayersPanel canvas={canvas} onSelect={(o) => setActiveObj(o)} />
+                <LayersPanel
+                  canvas={canvas}
+                  onSelect={(o) => setActiveObj(o)}
+                />
               </div>
             </Fragment>
           )}
+
           {rightPanel === "bulk" && (
             <Fragment>
-              <FormControlLabel sx={{ mr: 1 }} control={<Switch checked={bulkMode} onChange={(e) => setBulkMode(e.target.checked)} size="small" />} label={<span className="text-sm">Bulk</span>} />
+              <FormControlLabel
+                sx={{ mr: 1 }}
+                control={
+                  <Switch
+                    checked={bulkMode}
+                    onChange={(e) => setBulkMode(e.target.checked)}
+                    size="small"
+                  />
+                }
+                label={<span className="text-sm">Bulk</span>}
+              />
+
               {bulkMode && (
                 <div className="border-b">
-                  <button className="w-full text-left p-3 text-sm font-semibold" onClick={() => setShowFilters((v) => !v)}>Filters</button>
+                  <button
+                    className="w-full text-left p-3 text-sm font-semibold"
+                    onClick={() => setShowFilters((v) => !v)}
+                  >
+                    Filters
+                  </button>
                   {showFilters && (
                     <div className="px-3 pb-3">
                       <div className="mb-2">
-                        <div className="text-xs font-medium mb-1">Profile</div>
+                        <div className="text-xs font-medium mb-1">
+                          Profile
+                        </div>
                         <div className="flex items-center gap-4">
                           <label className="inline-flex items-center gap-2">
-                            <input id="logoCheckbox" type="checkbox" checked={showLogo} onChange={(e) => setShowLogo(e.target.checked)} className="accent-[#25D366]" />
+                            <input
+                              id="logoCheckbox"
+                              type="checkbox"
+                              checked={showLogo}
+                              onChange={(e) =>
+                                setShowLogo(e.target.checked)
+                              }
+                              className="accent-[#25D366]"
+                            />
                             <span className="text-sm">Logo</span>
                           </label>
                           <label className="inline-flex items-center gap-2">
-                            <input id="signatureCheckbox" type="checkbox" checked={showSignature} onChange={(e) => setShowSignature(e.target.checked)} className="accent-[#25D366]" />
-                            <span className="text-sm">Signature</span>
+                            <input
+                              id="signatureCheckbox"
+                              type="checkbox"
+                              checked={showSignature}
+                              onChange={(e) =>
+                                setShowSignature(e.target.checked)
+                              }
+                              className="accent-[#25D366]"
+                            />
+                            <span className="text-sm">
+                              Signature
+                            </span>
                           </label>
                         </div>
                       </div>
-                      <label className="block text-xs mb-1">Course</label>
-                      <select className="w-full border rounded px-2 py-1 mb-2" value={selectedCourse} onChange={(e) => setSelectedCourse(e.target.value)}>
+
+                      <label className="block text-xs mb-1">
+                        Course
+                      </label>
+                      <select
+                        className="w-full border rounded px-2 py-1 mb-2"
+                        value={selectedCourse}
+                        onChange={(e) =>
+                          setSelectedCourse(e.target.value)
+                        }
+                      >
                         <option value="">Select course</option>
-                        {courses.map((c) => (<option key={c._id} value={c.Course_uuid}>{c.name}</option>))}
+                        {courses.map((c) => (
+                          <option
+                            key={c._id}
+                            value={c.Course_uuid}
+                          >
+                            {c.name}
+                          </option>
+                        ))}
                       </select>
-                      <label className="block text-xs mb-1">Batch</label>
-                      <select className="w-full border rounded px-2 py-1 mb-2" value={selectedBatch} onChange={(e) => setSelectedBatch(e.target.value)}>
+
+                      <label className="block text-xs mb-1">
+                        Batch
+                      </label>
+                      <select
+                        className="w-full border rounded px-2 py-1 mb-2"
+                        value={selectedBatch}
+                        onChange={(e) =>
+                          setSelectedBatch(e.target.value)
+                        }
+                      >
                         <option value="">Select batch</option>
-                        {batches.map((b) => (<option key={b._id} value={b.name}>{b.name}</option>))}
+                        {batches.map((b) => (
+                          <option key={b._id} value={b.name}>
+                            {b.name}
+                          </option>
+                        ))}
                       </select>
-                      <label className="block text-xs mb-1">Student</label>
-                      <select className="w-full border rounded px-2 py-1" onChange={(e) => handleStudentSelect(e.target.value)} value={selectedStudent?.uuid || ""} disabled={bulkMode}>
-                        <option value="">Select a student</option>
-                        {(filteredStudents.length ? filteredStudents : allStudents).map((s) => (<option key={s.uuid} value={s.uuid}>{s.firstName} {s.lastName}</option>))}
+
+                      <label className="block text-xs mb-1">
+                        Student
+                      </label>
+                      <select
+                        className="w-full border rounded px-2 py-1"
+                        onChange={(e) =>
+                          handleStudentSelect(e.target.value)
+                        }
+                        value={selectedStudent?.uuid || ""}
+                        disabled={bulkMode}
+                      >
+                        <option value="">
+                          Select a student
+                        </option>
+                        {(filteredStudents.length
+                          ? filteredStudents
+                          : allStudents
+                        ).map((s) => (
+                          <option key={s.uuid} value={s.uuid}>
+                            {s.firstName} {s.lastName}
+                          </option>
+                        ))}
                       </select>
                     </div>
                   )}
                 </div>
               )}
+
               <PrintSettings
-                usePrintSizing={usePrintSizing} setUsePrintSizing={setUsePrintSizing}
-                pagePreset={pagePreset} setPagePreset={setPagePreset}
-                customPage={customPage} setCustomPage={setCustomPage}
-                pageOrientation={pageOrientation} setPageOrientation={setPageOrientation}
-                dpi={dpi} setDpi={setDpi}
-                bleed={bleed} setBleed={setBleed}
-                safe={safe} setSafe={setSafe}
-                showMarks={showMarks} setShowMarks={setShowMarks}
-                showReg={showReg} setShowReg={setShowReg}
-                imposeOn={imposeOn} setImposeOn={setImposeOn}
-                sheetPreset={sheetPreset} setSheetPreset={setSheetPreset}
-                sheetCustom={sheetCustom} setSheetCustom={setSheetCustom}
-                rows={rows} setRows={setRows}
-                cols={cols} setCols={setCols}
-                gap={gap} setGap={setGap}
-                outer={outer} setOuter={setOuter}
+                usePrintSizing={usePrintSizing}
+                setUsePrintSizing={setUsePrintSizing}
+                pagePreset={pagePreset}
+                setPagePreset={setPagePreset}
+                customPage={customPage}
+                setCustomPage={setCustomPage}
+                pageOrientation={pageOrientation}
+                setPageOrientation={setPageOrientation}
+                dpi={dpi}
+                setDpi={setDpi}
+                bleed={bleed}
+                setBleed={setBleed}
+                safe={safe}
+                setSafe={setSafe}
+                showMarks={showMarks}
+                setShowMarks={setShowMarks}
+                showReg={showReg}
+                setShowReg={setShowReg}
+                imposeOn={imposeOn}
+                setImposeOn={setImposeOn}
+                sheetPreset={sheetPreset}
+                setSheetPreset={setSheetPreset}
+                sheetCustom={sheetCustom}
+                setSheetCustom={setSheetCustom}
+                rows={rows}
+                setRows={setRows}
+                cols={cols}
+                setCols={setCols}
+                gap={gap}
+                setGap={setGap}
+                outer={outer}
+                setOuter={setOuter}
               />
             </Fragment>
           )}
-          {rightPanel === "frames" && (<FrameSection addFrameSlot={addFrameSlot} />)}
+
+          {rightPanel === "frames" && (
+            <FrameSection addFrameSlot={addFrameSlot} />
+          )}
+
           {rightPanel === "object" && (
             <Fragment>
               {activeObj ? (
                 <Fragment>
                   <div className="flex flex-wrap gap-2 mb-3">
-                    <IconButton onClick={cropImage} title="Crop"><Crop size={18} /></IconButton>
+                    <IconButton onClick={cropImage} title="Crop">
+                      <Crop size={18} />
+                    </IconButton>
+
                     {activeObj?.type === "image" && (
                       <>
-                        <IconButton onClick={removeSelectedImageBackground} title="Remove Background"><Scissors size={18} /></IconButton>
-                        <IconButton title="Replace Image" onClick={() => replaceInputRef.current && replaceInputRef.current.click()}><RefreshCw size={18} /></IconButton>
+                        <IconButton
+                          onClick={removeSelectedImageBackground}
+                          title="Remove Background"
+                        >
+                          <Scissors size={18} />
+                        </IconButton>
+                        <IconButton
+                          title="Replace Image"
+                          onClick={() =>
+                            replaceInputRef.current &&
+                            replaceInputRef.current.click()
+                          }
+                        >
+                          <RefreshCw size={18} />
+                        </IconButton>
                       </>
                     )}
+
                     <IconButton
                       onClick={() => {
                         const obj = activeObj;
@@ -1627,55 +1929,142 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
                         } else {
                           canvas.remove(obj);
                         }
-                        setActiveObj(null); setActiveStudentPhoto(null); saveHistoryDebounced();
+                        setActiveObj(null);
+                        setActiveStudentPhoto(null);
+                        saveHistoryDebounced();
                       }}
-                      title="Delete"><Trash2 size={18} /></IconButton>
-                    <IconButton onClick={() => {
-                      const locked = !!activeObj.lockMovementX;
-                      activeObj.set({
-                        lockMovementX: !locked, lockMovementY: !locked,
-                        lockScalingX: !locked,  lockScalingY: !locked,
-                        lockRotation: !locked,  hasControls: locked,
-                      });
-                      canvas.renderAll();
-                    }} title="Lock/Unlock">{activeObj?.lockMovementX ? <Unlock size={18} /> : <Lock size={18} />}</IconButton>
-                    {activeObj?.type === "image" && activeObj?.frameOverlay && (
-                      <IconButton onClick={extractActiveImage} title="Extract Image (remove frame)"><Move size={18} /></IconButton>
-                    )}
+                      title="Delete"
+                    >
+                      <Trash2 size={18} />
+                    </IconButton>
+
+                    <IconButton
+                      onClick={() => {
+                        const locked = !!activeObj.lockMovementX;
+                        activeObj.set({
+                          lockMovementX: !locked,
+                          lockMovementY: !locked,
+                          lockScalingX: !locked,
+                          lockScalingY: !locked,
+                          lockRotation: !locked,
+                          hasControls: locked,
+                        });
+                        canvas.renderAll();
+                      }}
+                      title="Lock/Unlock"
+                    >
+                      {activeObj?.lockMovementX ? (
+                        <Unlock size={18} />
+                      ) : (
+                        <Lock size={18} />
+                      )}
+                    </IconButton>
+
+                    {activeObj?.type === "image" &&
+                      activeObj?.frameOverlay && (
+                        <IconButton
+                          onClick={extractActiveImage}
+                          title="Extract Image (remove frame)"
+                        >
+                          <Move size={18} />
+                        </IconButton>
+                      )}
                   </div>
 
                   {/* Image filter sliders */}
                   {activeObj?.type === "image" && (
                     <div className="space-y-2 mb-3">
-                      <div className="text-xs font-medium text-gray-600">Image Adjust</div>
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs w-16">Bright</label>
-                        <input type="range" min={-1} max={1} step={0.05} value={imgFilters.brightness}
-                          onChange={(e) => setImgFilters(v => ({ ...v, brightness: parseFloat(e.target.value) }))} />
+                      <div className="text-xs font-medium text-gray-600">
+                        Image Adjust
                       </div>
                       <div className="flex items-center gap-2">
-                        <label className="text-xs w-16">Contrast</label>
-                        <input type="range" min={-1} max={1} step={0.05} value={imgFilters.contrast}
-                          onChange={(e) => setImgFilters(v => ({ ...v, contrast: parseFloat(e.target.value) }))} />
+                        <label className="text-xs w-16">
+                          Bright
+                        </label>
+                        <input
+                          type="range"
+                          min={-1}
+                          max={1}
+                          step={0.05}
+                          value={imgFilters.brightness}
+                          onChange={(e) =>
+                            setImgFilters((v) => ({
+                              ...v,
+                              brightness: parseFloat(
+                                e.target.value
+                              ),
+                            }))
+                          }
+                        />
                       </div>
                       <div className="flex items-center gap-2">
-                        <label className="text-xs w-16">Satur.</label>
-                        <input type="range" min={-1} max={1} step={0.05} value={imgFilters.saturation}
-                          onChange={(e) => setImgFilters(v => ({ ...v, saturation: parseFloat(e.target.value) }))} />
+                        <label className="text-xs w-16">
+                          Contrast
+                        </label>
+                        <input
+                          type="range"
+                          min={-1}
+                          max={1}
+                          step={0.05}
+                          value={imgFilters.contrast}
+                          onChange={(e) =>
+                            setImgFilters((v) => ({
+                              ...v,
+                              contrast: parseFloat(
+                                e.target.value
+                              ),
+                            }))
+                          }
+                        />
                       </div>
                       <div className="flex items-center gap-2">
-                        <Button size="small" variant="outlined" onClick={() => setImgFilters({ brightness: 0, contrast: 0, saturation: 0 })}>Reset</Button>
+                        <label className="text-xs w-16">
+                          Satur.
+                        </label>
+                        <input
+                          type="range"
+                          min={-1}
+                          max={1}
+                          step={0.05}
+                          value={imgFilters.saturation}
+                          onChange={(e) =>
+                            setImgFilters((v) => ({
+                              ...v,
+                              saturation: parseFloat(
+                                e.target.value
+                              ),
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() =>
+                            setImgFilters({
+                              brightness: 0,
+                              contrast: 0,
+                              saturation: 0,
+                            })
+                          }
+                        >
+                          Reset
+                        </Button>
                       </div>
                     </div>
                   )}
                 </Fragment>
               ) : (
-                <div className="text-sm text-gray-600">No object selected.</div>
+                <div className="text-sm text-gray-600">
+                  No object selected.
+                </div>
               )}
             </Fragment>
           )}
         </div>
       </aside>
+
 
       {/* hidden input for replace image */}
       <input ref={replaceInputRef} type="file" accept="image/*" style={{ display: "none" }}
@@ -1685,11 +2074,11 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
 
       {/* ✨ ADDED: Keyboard shortcuts help overlay */}
       {showHelp && (
-        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center" onClick={()=> setShowHelp(false)}>
-          <div className="bg-white rounded-xl shadow-xl p-4 max-w-lg w-full" onClick={(e)=> e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center" onClick={() => setShowHelp(false)}>
+          <div className="bg-white rounded-xl shadow-xl p-4 max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-2">
               <h3 className="font-semibold">Keyboard Shortcuts</h3>
-              <button className="p-1 rounded hover:bg-gray-100" onClick={()=> setShowHelp(false)}>✕</button>
+              <button className="p-1 rounded hover:bg-gray-100" onClick={() => setShowHelp(false)}>✕</button>
             </div>
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>Undo</div><div><code>Ctrl/Cmd + Z</code></div>
@@ -1706,6 +2095,50 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
           </div>
         </div>
       )}
+      {isMobile && (
+        <div className="fixed bottom-0 left-0 right-0 z-30 flex h-14 bg-white border-t shadow-md md:hidden">
+          <button
+            className="flex-1 flex flex-col items-center justify-center text-xs"
+            onClick={() => {
+              setIsRightbarOpen(true);
+              setRightPanel("gallaries");
+            }}
+          >
+            <span>Gallery</span>
+          </button>
+
+          <button
+            className="flex-1 flex flex-col items-center justify-center text-xs"
+            onClick={() => {
+              setIsRightbarOpen(true);
+              setRightPanel("templates");
+            }}
+          >
+            <span>Templates</span>
+          </button>
+
+          <button
+            className="flex-1 flex flex-col items-center justify-center text-xs"
+            onClick={() => {
+              setIsRightbarOpen(true);
+              setRightPanel("bulk");
+            }}
+          >
+            <span>Bulk</span>
+          </button>
+
+          <button
+            className="flex-1 flex flex-col items-center justify-center text-xs"
+            onClick={() => {
+              setIsRightbarOpen(true);
+              setRightPanel("object");
+            }}
+          >
+            <span>Edit</span>
+          </button>
+        </div>
+      )}
+
     </div>
   );
 };

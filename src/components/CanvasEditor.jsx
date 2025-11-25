@@ -1,4 +1,3 @@
-// CanvasEditor.jsx — PRO UPGRADE (non-breaking additions marked with "✨ ADDED")
 import React, {
   useEffect,
   useMemo,
@@ -147,44 +146,6 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   useSmartGuides(canvasRef, snapCenterGuides, 8);
   useObjectSnapping(canvas, snapObjects, snapTolerance);
 
-  // Global safety: ensure everything except the background stays editable
-  useEffect(() => {
-    const c = canvasRef.current;
-    if (!c) return;
-
-    const unlockObjects = () => {
-      c.getObjects().forEach((o) => {
-        if (o.customId === "templateBg") {
-          o.set({ selectable: false, evented: false });
-          return;
-        }
-
-        o.set({
-          selectable: true,
-          evented: true,
-          lockMovementX: false,
-          lockMovementY: false,
-          lockScalingX: false,
-          lockScalingY: false,
-          lockRotation: false,
-          hasControls: true,
-        });
-      });
-      c.requestRenderAll();
-    };
-
-    unlockObjects();
-    c.on("object:added", unlockObjects);
-    c.on("object:modified", unlockObjects);
-    c.on("object:removed", unlockObjects);
-
-    return () => {
-      c.off("object:added", unlockObjects);
-      c.off("object:modified", unlockObjects);
-      c.off("object:removed", unlockObjects);
-    };
-  }, [canvas]);
-
   // grid background rendering
   useEffect(() => {
     const c = canvasRef.current;
@@ -221,7 +182,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   const fitToViewport = useCallback(() => {
     const vp = viewportRef.current;
     if (!vp) return;
-    const s = Math.min(vp.clientWidth / tplSize.w, vp.clientHeight / tplSize.h);
+    const s = Math.min(vp.clientWidth / tplSize.w, vp.clientHeight / tplSize.h, 1);
     handleZoomChange(s * 100);
   }, [tplSize]);
 
@@ -232,17 +193,6 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     return () => window.removeEventListener("resize", onResize);
   }, [fitToViewport]);
   useEffect(() => { if (canvasRef.current) fitToViewport(); }, [fitToViewport]);
-
-  // Ensure the canvas fits once the viewport + template are ready
-  useEffect(() => {
-    if (!canvasRef.current || !viewportRef.current) return;
-    const raf = requestAnimationFrame(() => fitToViewport());
-    const timeout = setTimeout(() => fitToViewport(), 120);
-    return () => {
-      cancelAnimationFrame(raf);
-      clearTimeout(timeout);
-    };
-  }, [canvas, tplSize, loadingTemplate, fitToViewport]);
 
   const handleSizeChange = (dim, value) => {
     const num = parseInt(value, 10) || 0;
@@ -936,9 +886,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     if (showLogo && selectedInstitute?.logo) loadTemplateAsset("logo", selectedInstitute.logo, canvas);
     if (showSignature && selectedInstitute?.signature) loadTemplateAsset("signature", selectedInstitute.signature, canvas);
 
-    requestAnimationFrame(() => fitToViewport());
-
-  }, [canvas, fitToViewport, selectedInstitute, showLogo, showSignature]);
+  }, [canvas, selectedInstitute, showLogo, showSignature]);
 
   const loadTemplateById = useCallback(async id => {
     if (!id) return;

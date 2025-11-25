@@ -90,6 +90,9 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   const [showGrid, setShowGrid] = useState(false);
   const [gridSize, setGridSize] = useState(20);
 
+  // Track whether we've already auto-fitted the canvas for the current layout/template
+  const initialFitDoneRef = useRef(false);
+
   // ✨ ADDED: Snapping toggles
   const [snapCenterGuides, setSnapCenterGuides] = useState(true);
   const [snapObjects, setSnapObjects] = useState(true);
@@ -225,9 +228,17 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
     handleZoomChange(s * 100);
   }, [tplSize]);
 
-  useEffect(() => { fitToViewport(); }, [tplSize, fitToViewport]);
   useEffect(() => {
-    const onResize = () => fitToViewport();
+    if (loadingTemplate) return;
+    if (!initialFitDoneRef.current) return;
+    fitToViewport();
+  }, [tplSize, loadingTemplate, fitToViewport]);
+  useEffect(() => {
+    const onResize = () => {
+      initialFitDoneRef.current = false;
+      fitToViewport();
+      initialFitDoneRef.current = true;
+    };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, [fitToViewport]);
@@ -236,8 +247,18 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   // Ensure the canvas fits once the viewport + template are ready
   useEffect(() => {
     if (!canvasRef.current || !viewportRef.current) return;
-    const raf = requestAnimationFrame(() => fitToViewport());
-    const timeout = setTimeout(() => fitToViewport(), 120);
+    if (loadingTemplate) return;
+    if (initialFitDoneRef.current) return;
+
+    const raf = requestAnimationFrame(() => {
+      fitToViewport();
+      initialFitDoneRef.current = true;
+    });
+    const timeout = setTimeout(() => {
+      fitToViewport();
+      initialFitDoneRef.current = true;
+    }, 120);
+
     return () => {
       cancelAnimationFrame(raf);
       clearTimeout(timeout);
@@ -246,6 +267,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
 
   const handleSizeChange = (dim, value) => {
     const num = parseInt(value, 10) || 0;
+    initialFitDoneRef.current = false;
     setTplSize((prev) => {
       const newSize = { ...prev, [dim]: num };
       setCanvasSize?.(newSize.w, newSize.h);
@@ -872,6 +894,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
   /* ======================= Render Template (existing trimmed) ======================= */
   const renderTemplate = useCallback(async (data) => {
     if (!canvas) return;
+    initialFitDoneRef.current = false;
     const templateIds = ["templateBg", "frameSlot", "templateText", "logo", "signature"];
     canvas.getObjects().filter(o => o?.customId && templateIds.includes(o.customId)).forEach(o => canvas.remove(o));
 
@@ -893,7 +916,7 @@ const CanvasEditor = ({ templateId: propTemplateId, hideHeader = false }) => {
       });
     }
 
-        if (data?.canvasJson) {
+    if (data?.canvasJson) {
       canvas.loadFromJSON(data.canvasJson, () => {
         canvas.getObjects().forEach((o) => {
           // classify template text & frame slots

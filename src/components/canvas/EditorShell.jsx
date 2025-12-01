@@ -21,7 +21,7 @@ const EditorShell = ({
       <Stack direction={isMobile ? "column" : "row"} flex={1} overflow="hidden">
         {isMobile ? (
           <Drawer anchor="left" open={mobileLeftOpen} onClose={onToggleLeft} ModalProps={{ keepMounted: true }}>
-            <Box sx={{ width: 288 }} role="presentation" onClick={onToggleLeft}>
+            <Box sx={{ width: 288 }} role="presentation">
               {leftToolbar}
             </Box>
           </Drawer>
@@ -45,7 +45,7 @@ const EditorShell = ({
 
         {isMobile ? (
           <Drawer anchor="right" open={mobileRightOpen} onClose={onToggleRight} ModalProps={{ keepMounted: true }}>
-            <Box sx={{ width: 320 }} role="presentation" onClick={onToggleRight}>
+            <Box sx={{ width: 320 }} role="presentation">
               {rightPanel}
             </Box>
           </Drawer>

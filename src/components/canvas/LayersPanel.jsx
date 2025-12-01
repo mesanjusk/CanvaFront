@@ -1,12 +1,20 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import PropTypes from "prop-types";
 import { Eye, EyeOff, Group, Layers as LayersIcon, Lock, Unlock } from "lucide-react";
 import { fabric } from "fabric";
 
 const getLabel = (obj) => obj.customId || obj.field || obj.type;
+let layerIdCounter = 0;
+const getObjectKey = (obj) => {
+  if (!obj.__layerId) {
+    layerIdCounter += 1;
+    obj.__layerId = `layer-${layerIdCounter}`;
+  }
+  return obj.__layerId;
+};
 
 const LayersPanel = ({ canvas, onSelect, saveHistory }) => {
-  const [refreshTick, force] = useState(0);
+  const [, force] = useState(0);
   const refresh = useCallback(() => force((x) => x + 1), []);
 
   useEffect(() => {
@@ -28,10 +36,7 @@ const LayersPanel = ({ canvas, onSelect, saveHistory }) => {
     };
   }, [canvas, refresh]);
 
-  const objects = useMemo(
-    () => (canvas ? [...canvas.getObjects()].reverse() : []),
-    [canvas, refreshTick]
-  );
+  const objects = canvas ? [...canvas.getObjects()].reverse() : [];
   const active = canvas?.getActiveObject();
   const activeObjects = canvas?.getActiveObjects?.() || [];
 
@@ -123,8 +128,11 @@ const LayersPanel = ({ canvas, onSelect, saveHistory }) => {
       </div>
 
       <div className="space-y-2">
-        {objects.map((o, idx) => (
-          <div key={idx} className="flex items-center justify-between gap-2 border rounded px-2 py-1 bg-white">
+        {objects.map((o) => (
+          <div
+            key={getObjectKey(o)}
+            className="flex items-center justify-between gap-2 border rounded px-2 py-1 bg-white"
+          >
             <div className="flex items-center gap-2 min-w-0">
               <button
                 className="p-1 rounded hover:bg-gray-100"

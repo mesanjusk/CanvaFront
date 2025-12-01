@@ -161,15 +161,20 @@ export function CanvasEditor({
     let cancelled = false;
 
     const loadFromJson = (json, title) =>
-      new Promise((resolve) => {
-        fabricCanvas.loadFromJSON(json, () => {
-          fabricCanvas.renderAll();
-          resetHistory?.();
-          saveHistory?.();
-          resolve();
-        });
+      new Promise((resolve, reject) => {
+        try {
+          fabricCanvas.clear();
+          fabricCanvas.loadFromJSON(json, () => {
+            fabricCanvas.renderAll();
+            resetHistory?.();
+            saveHistory?.();
+            resolve();
+          });
 
-        if (title) setTemplateTitle(title);
+          if (title) setTemplateTitle(title);
+        } catch (err) {
+          reject(err);
+        }
       });
 
     const loadTemplate = async () => {
@@ -200,12 +205,20 @@ export function CanvasEditor({
         console.error("Failed to load template from cache", err);
       }
 
-      if (!cancelled) setLoadError("Unable to load the selected template.");
+      if (!cancelled) {
+        setLoadError("Unable to load the selected template.");
+        fabricCanvas.renderAll();
+      }
     };
 
-    loadTemplate().finally(() => {
-      if (!cancelled) setLoadingTemplate(false);
-    });
+    loadTemplate()
+      .catch((err) => {
+        console.error("Failed to hydrate template", err);
+        if (!cancelled) setLoadError("Unable to load the selected template.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingTemplate(false);
+      });
 
     return () => {
       cancelled = true;

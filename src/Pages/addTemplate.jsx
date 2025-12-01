@@ -4,6 +4,32 @@ import { fabric } from 'fabric';
 import imageCompression from 'browser-image-compression';
 import toast, { Toaster } from 'react-hot-toast';
 import { useNavigate } from "react-router-dom";
+import {
+  Box,
+  Button,
+  Container,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  TextField,
+  Typography,
+  IconButton,
+  LinearProgress,
+} from '@mui/material';
+import { Add, Close, Delete, Edit, OpenInNew } from '@mui/icons-material';
 
 const AddTemplate = () => {
   const canvasRef = useRef(null);
@@ -20,42 +46,38 @@ const AddTemplate = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
-  const [modalImageSrc, setModalImageSrc] = useState(null);
 
   const fileInputRef = useRef(null);
 
-  const safeExtract = (res) => Array.isArray(res) ? res : res?.result || [];
+  const safeExtract = (res) => (Array.isArray(res) ? res : res?.result || []);
 
-   useEffect(() => {
-  if (fabricCanvasRef.current) {
-    fabricCanvasRef.current.dispose();
-  }
+  useEffect(() => {
+    if (fabricCanvasRef.current) {
+      fabricCanvasRef.current.dispose();
+    }
 
-  const newCanvas = new fabric.Canvas(canvasRef.current, {
-    height: 500,
-    width: 800,
-    backgroundColor: '#fff',
-  });
+    const newCanvas = new fabric.Canvas(canvasRef.current, {
+      height: 500,
+      width: 800,
+      backgroundColor: '#fff',
+    });
 
-  const rect = new fabric.Rect({
-    left: 100,
-    top: 100,
-    fill: 'red',
-    width: 100,
-    height: 100,
-  });
+    const rect = new fabric.Rect({
+      left: 100,
+      top: 100,
+      fill: 'red',
+      width: 100,
+      height: 100,
+    });
 
-  newCanvas.add(rect); 
+    newCanvas.add(rect);
 
-  fabricCanvasRef.current = newCanvas;
+    fabricCanvasRef.current = newCanvas;
 
-  return () => {
-    // dispose when component unmounts, not on every render
-    newCanvas.dispose();
-  };
-}, []);
-
+    return () => {
+      newCanvas.dispose();
+    };
+  }, []);
 
   useEffect(() => {
     const fetchDropdowns = async () => {
@@ -130,11 +152,12 @@ const AddTemplate = () => {
     });
 
     if (image) formData.append("image", image);
-   const canvas = fabricCanvasRef.current;
-    if (!canvas) return;
 
-    const json = canvas.toJSON();
-formData.append("canvasJson", JSON.stringify(json));
+    const canvas = fabricCanvasRef.current;
+    if (canvas) {
+      const json = canvas.toJSON();
+      formData.append("canvasJson", JSON.stringify(json));
+    }
 
 
     if (editingId && existingImageURLs.length > 0) {
@@ -180,11 +203,6 @@ formData.append("canvasJson", JSON.stringify(json));
     return found?.name || '';
   };
 
-  const openImageModal = (src) => {
-    setModalImageSrc(src);
-    setIsImageModalOpen(true);
-  };
-
   const handleDelete = async (id) => {
     if (!window.confirm('Are you sure you want to delete this template?')) return;
     await axios.delete(`https://canvaback.onrender.com/api/template/${id}`);
@@ -207,124 +225,201 @@ formData.append("canvasJson", JSON.stringify(json));
   };
 
   const openTemplateEditor = (id) => {
-  // Example route: /template-editor/<id>
-  navigate(`/template-editor/${id}`);
-};
-
+    navigate(`/template-editor/${id}`);
+  };
 
   const filteredTemplates = templates.filter(item => (item.title || '').toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
+    <Box sx={{ minHeight: '100vh', bgcolor: 'grey.100', py: 4 }}>
       <Toaster position="top-right" />
-      
+      <Container maxWidth="lg">
+        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={2} mb={3}>
+          <Typography variant="h4" fontWeight={700} color="text.primary">
+            Upload Template
+          </Typography>
+          <Button variant="contained" startIcon={<Add />} onClick={() => setShowModal(true)}>
+            New Template
+          </Button>
+        </Stack>
 
-    <div className="flex justify-between items-center mb-6">
-      <h1 className="text-3xl font-bold text-gray-800">Upload Template</h1>
-      <button onClick={() => setShowModal(true)} className="bg-green-600 text-white px-4 py-2 rounded">+ New Template</button>
-    </div>
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} mb={3} alignItems="center">
+          <TextField
+            label="Search title"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            fullWidth
+            sx={{ maxWidth: 420 }}
+          />
+        </Stack>
 
-    {showModal && (
-      <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-        <div className="bg-white p-6 rounded shadow max-w-xl w-full">
-          <h2 className="text-xl font-semibold mb-4">{editingId ? 'Edit Listing' : 'Create New Listing'}</h2>
-          <form onSubmit={handleSubmit} className="flex flex-col space-y-4">
-            <input type="text" value={form.title} onChange={handleInputChange('title')} className="p-2 border rounded" placeholder="Enter title" required />
-            <select value={form.category} onChange={handleInputChange('category')} className="p-2 border rounded" required>
-              <option value="">Select Category</option>
-              {dropdownData.categories.map(c => <option key={c.category_uuid} value={c.category_uuid}>{c.name}</option>)}
-            </select>
-            <select value={form.subcategory} onChange={handleInputChange('subcategory')} className="p-2 border rounded" required>
-              <option value="">Select Subcategory</option>
-              {dropdownData.subcategories.map(s => <option key={s.subcategory_uuid} value={s.subcategory_uuid}>{s.name}</option>)}
-            </select>
-            <input type="text" value={form.price} onChange={handleInputChange('price')} className="p-2 border rounded" placeholder="Enter price (numeric only)" required />
-            <input type="file" ref={fileInputRef} accept="image/*" onChange={handleImageUpload} className="mb-2" />
+        <Paper sx={{ p: 2, mb: 3 }} variant="outlined">
+          <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+            Template Canvas
+          </Typography>
+          <Box
+            component="canvas"
+            ref={canvasRef}
+            width={800}
+            height={500}
+            sx={{ width: '100%', maxWidth: 800, borderRadius: 1, border: '1px solid', borderColor: 'divider', bgcolor: 'common.white' }}
+          />
+        </Paper>
+
+        <TableContainer component={Paper} elevation={1}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Image</TableCell>
+                <TableCell>Title</TableCell>
+                <TableCell>Category</TableCell>
+                <TableCell>Subcategory</TableCell>
+                <TableCell>Price</TableCell>
+                <TableCell align="right">Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {filteredTemplates.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} align="center">
+                    <Typography color="text.secondary">No templates found.</Typography>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredTemplates.map((item, i) => (
+                  <TableRow key={i} hover>
+                    <TableCell>
+                      <Box display="flex" justifyContent="flex-start">
+                        <Box
+                          component="img"
+                          src={item.image}
+                          alt={item.title || 'Template'}
+                          sx={{ width: 56, height: 56, borderRadius: 1, objectFit: 'cover', cursor: 'pointer' }}
+                          onClick={() => openTemplateEditor(item._id)}
+                        />
+                      </Box>
+                    </TableCell>
+                    <TableCell>{item.title}</TableCell>
+                    <TableCell>{getName(item.category, 'categories')}</TableCell>
+                    <TableCell>{getName(item.subCategory, 'subcategories')}</TableCell>
+                    <TableCell>{item.price}</TableCell>
+                    <TableCell align="right">
+                      <Stack direction="row" spacing={1} justifyContent="flex-end">
+                        <Button size="small" variant="outlined" startIcon={<OpenInNew />} onClick={() => openTemplateEditor(item._id)}>
+                          Open
+                        </Button>
+                        <Button size="small" color="warning" variant="outlined" startIcon={<Edit />} onClick={() => handleEdit(item)}>
+                          Edit
+                        </Button>
+                        <Button size="small" color="error" variant="outlined" startIcon={<Delete />} onClick={() => handleDelete(item._id)}>
+                          Delete
+                        </Button>
+                      </Stack>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Container>
+
+      <Dialog open={showModal} onClose={() => setShowModal(false)} fullWidth maxWidth="sm">
+        <DialogTitle>{editingId ? 'Edit Listing' : 'Create New Listing'}</DialogTitle>
+        <DialogContent>
+          <Stack component="form" onSubmit={handleSubmit} spacing={2} mt={1}>
+            <TextField
+              label="Title"
+              value={form.title}
+              onChange={handleInputChange('title')}
+              required
+              fullWidth
+            />
+            <FormControl fullWidth required>
+              <InputLabel id="category-label">Category</InputLabel>
+              <Select
+                labelId="category-label"
+                label="Category"
+                value={form.category}
+                onChange={handleInputChange('category')}
+              >
+                <MenuItem value="">
+                  <em>Select Category</em>
+                </MenuItem>
+                {dropdownData.categories.map((c) => (
+                  <MenuItem key={c.category_uuid} value={c.category_uuid}>
+                    {c.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth required>
+              <InputLabel id="subcategory-label">Subcategory</InputLabel>
+              <Select
+                labelId="subcategory-label"
+                label="Subcategory"
+                value={form.subcategory}
+                onChange={handleInputChange('subcategory')}
+              >
+                <MenuItem value="">
+                  <em>Select Subcategory</em>
+                </MenuItem>
+                {dropdownData.subcategories.map((s) => (
+                  <MenuItem key={s.subcategory_uuid} value={s.subcategory_uuid}>
+                    {s.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <TextField
+              label="Price"
+              value={form.price}
+              onChange={handleInputChange('price')}
+              placeholder="Enter price (numeric only)"
+              required
+              fullWidth
+            />
+            <Box>
+              <Button variant="outlined" component="label">
+                Upload Image
+                <input type="file" hidden ref={fileInputRef} accept="image/*" onChange={handleImageUpload} />
+              </Button>
+            </Box>
             {previewImage && previewImage[0] && (
-              <div className="relative">
-                <img src={previewImage[0].url} className="w-20 h-20 object-cover rounded" alt="preview" />
-                <button
-                  type="button"
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <Box
+                  component="img"
+                  src={previewImage[0].url}
+                  alt="preview"
+                  sx={{ width: 80, height: 80, borderRadius: 1, objectFit: 'cover', border: '1px solid', borderColor: 'divider' }}
+                />
+                <IconButton
+                  color="error"
+                  size="small"
                   onClick={() => {
                     setImage(null);
                     setPreviewImage([]);
                     if (fileInputRef.current) fileInputRef.current.value = '';
                   }}
-                  className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
                 >
-                  &times;
-                </button>
-              </div>
+                  <Close />
+                </IconButton>
+              </Stack>
             )}
-
-            <div className="flex justify-end gap-4">
-              <button type="button" onClick={() => setShowModal(false)} className="bg-gray-400 text-white px-4 py-2 rounded">Cancel</button>
-              <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded">
+            {uploadProgress > 0 && (
+              <LinearProgress variant="determinate" value={uploadProgress} />
+            )}
+            <DialogActions sx={{ px: 0 }}>
+              <Button onClick={() => setShowModal(false)} color="inherit">Cancel</Button>
+              <Button type="submit" variant="contained" disabled={loading}>
                 {loading ? `Uploading... ${uploadProgress}%` : editingId ? 'Update' : 'Save'}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    )}
+              </Button>
+            </DialogActions>
+          </Stack>
+        </DialogContent>
+      </Dialog>
 
-    <input type="text" placeholder="Search title..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="mb-4 p-2 border rounded w-full max-w-md" />
-
-    <table className="w-full border border-gray-300 rounded-md">
-      <thead>
-        <tr className="bg-gray-100">
-          <th className="p-2 border">Image</th>
-          <th className="p-2 border">Title</th>
-          <th className="p-2 border">Category</th>
-          <th className="p-2 border">Subcategory</th>
-          <th className="p-2 border">Price</th>
-          <th className="p-2 border">Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {filteredTemplates.map((item, i) => (
-          <tr key={i} className="text-center">
-            <td className="p-2 border">
-
-              <div className="flex gap-2 justify-center">
-               <img
-  src={item.image}
-  alt="Thumb"
-  className="h-12 mx-auto cursor-pointer"
-  onClick={() => openTemplateEditor(item._id)}
-/>
-
-
-              </div>
-
-            </td>
-            <td className="p-2 border">{item.title}</td>
-            <td className="p-2 border">{getName(item.category, 'categories')}</td>
-            <td className="p-2 border">{getName(item.subCategory, 'subcategories')}</td>
-            <td className="p-2 border">{item.price}</td>
-            <td className="p-2 border space-x-2">
-              <button onClick={() => handleEdit(item)} className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600">Edit</button>
-              <button onClick={() => handleDelete(item._id)} className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600">Delete</button>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-
-    {/* Image Modal */}
-    {isImageModalOpen && (
-      <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50" onClick={() => setIsImageModalOpen(false)}>
-        <img
-          src={modalImageSrc}
-          alt="Banner Full View"
-          className="max-h-[90vh] max-w-[90vw] rounded shadow-lg"
-          onClick={(e) => e.stopPropagation()}
-        />
-        <button className="absolute top-4 right-4 text-white text-3xl font-bold">&times;</button>
-      </div>
-    )}
-  
-    </div>
+    </Box>
   );
 };
 

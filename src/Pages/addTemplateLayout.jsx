@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { fabric } from "fabric";
+import { Box, Button } from "@mui/material";
 
 const TemplateLayout = ({
   canvas,
@@ -63,12 +64,11 @@ const TemplateLayout = ({
   return (
     <>
       {children}
-      <button
-        onClick={handleSave}
-        className="px-4 py-2 bg-blue-600 text-white rounded-md shadow"
-      >
-        Save
-      </button>
+      <Box display="flex" justifyContent="flex-end" mt={2}>
+        <Button variant="contained" color="primary" onClick={handleSave}>
+          Save
+        </Button>
+      </Box>
     </>
   );
 };

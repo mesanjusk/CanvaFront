@@ -1,135 +1,162 @@
-import React, { useState } from 'react';
-import axios from 'axios';
-import toast, { Toaster } from 'react-hot-toast';
-import { useNavigate } from 'react-router-dom';
-import BASE_URL from '../config';
-import { useApp } from '../context/AppContext';
+import React, { useState } from "react";
+import axios from "axios";
+import toast, { Toaster } from "react-hot-toast";
+import { useNavigate } from "react-router-dom";
+import {
+  Box,
+  Button,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
+import BASE_URL from "../config";
+import { useApp } from "../context/AppContext";
 
 const ForgotPassword = () => {
   const navigate = useNavigate();
   const { institute } = useApp();
-  const themeColor = institute?.theme_color || '#5b5b5b';
+  const themeColor = institute?.theme_color || "#5b5b5b";
 
-  const [centerCode, setCenterCode] = useState('');
-  const [mobile, setMobile] = useState('');
+  const [centerCode, setCenterCode] = useState("");
+  const [mobile, setMobile] = useState("");
   const [otpSent, setOtpSent] = useState(false);
-  const [otp, setOtp] = useState('');
-  const [serverOtp, setServerOtp] = useState('');
-  const [userId, setUserId] = useState('');
+  const [otp, setOtp] = useState("");
+  const [serverOtp, setServerOtp] = useState("");
+  const [userId, setUserId] = useState("");
 
- const handleSendOtp = async (e) => {
-  e.preventDefault();
+  const handleSendOtp = async (e) => {
+    e.preventDefault();
 
-  if (!/^[0-9]{10}$/.test(mobile)) {
-    toast.error('Enter a valid 10-digit mobile number');
-    return;
-  }
+    if (!/^[0-9]{10}$/.test(mobile)) {
+      toast.error("Enter a valid 10-digit mobile number");
+      return;
+    }
 
-  const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-  setServerOtp(generatedOtp);
+    const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    setServerOtp(generatedOtp);
 
-  const message = `Your OTP for Institute registration is ${generatedOtp}`;
+    const message = `Your OTP for Institute registration is ${generatedOtp}`;
 
-  try {
-    const res = await axios.post(`${BASE_URL}/api/institute/send-message`, {
-      mobile: `91${mobile}`,
-      message,
-      type: 'forgot',
-      userName: centerCode,
-    });
+    try {
+      const res = await axios.post(`${BASE_URL}/api/institute/send-message`, {
+        mobile: `91${mobile}`,
+        message,
+        type: "forgot",
+        userName: centerCode,
+      });
 
-   if (res.data.success && res.data.userId) {
-  setUserId(res.data.userId); 
-  setOtpSent(true);
-  toast.success('OTP sent to your mobile');
-} else {
-  toast.error('User ID missing in response');
-}
-
-  } catch (err) {
-    console.error('OTP Send Error:', err);
-    toast.error('Error sending OTP');
-  }
-};
-
+      if (res.data.success && res.data.userId) {
+        setUserId(res.data.userId);
+        setOtpSent(true);
+        toast.success("OTP sent to your mobile");
+      } else {
+        toast.error("User ID missing in response");
+      }
+    } catch (err) {
+      console.error("OTP Send Error:", err);
+      toast.error("Error sending OTP");
+    }
+  };
 
   const handleVerifyOtp = (e) => {
     e.preventDefault();
 
     if (!otp || otp !== serverOtp) {
-      toast.error('Invalid OTP');
+      toast.error("Invalid OTP");
       return;
     }
 
-    toast.success('OTP verified. Redirecting...');
+    toast.success("OTP verified. Redirecting...");
     navigate(`/reset-password/${userId}`);
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4" style={{ backgroundColor: themeColor }}>
+    <Box
+      minHeight="100vh"
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
+      px={2}
+      sx={{ backgroundColor: themeColor }}
+    >
       <Toaster position="top-center" />
-      <div className="bg-white w-full max-w-md rounded-lg shadow p-6">
-        <h2 className="text-2xl font-bold text-center mb-6" style={{ color: themeColor }}>
+      <Paper elevation={3} sx={{ p: 4, width: "100%", maxWidth: 420 }}>
+        <Typography
+          variant="h5"
+          fontWeight={700}
+          textAlign="center"
+          mb={3}
+          sx={{ color: themeColor }}
+        >
           Forgot Password
-        </h2>
+        </Typography>
 
-        <form onSubmit={otpSent ? handleVerifyOtp : handleSendOtp} className="space-y-4">
-          <input
-            type="text"
+        <Stack
+          component="form"
+          spacing={2}
+          onSubmit={otpSent ? handleVerifyOtp : handleSendOtp}
+        >
+          <TextField
+            label="Center Code"
             value={centerCode}
             onChange={(e) => setCenterCode(e.target.value)}
-            placeholder="Center Code"
             required
-            className="w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none"
-            style={{ boxShadow: `0 0 0 1.5px ${themeColor}` }}
+            size="medium"
+            InputProps={{
+              sx: { boxShadow: `0 0 0 1.5px ${themeColor} inset` },
+            }}
           />
 
-          <input
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]{10}"
-            maxLength={10}
+          <TextField
+            label="Registered Mobile Number"
             value={mobile}
             onChange={(e) => setMobile(e.target.value)}
-            placeholder="Registered Mobile Number"
+            inputProps={{ pattern: "[0-9]{10}", maxLength: 10, inputMode: "numeric" }}
             required
-            className="w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none"
-            style={{ boxShadow: `0 0 0 1.5px ${themeColor}` }}
+            size="medium"
+            InputProps={{
+              sx: { boxShadow: `0 0 0 1.5px ${themeColor} inset` },
+            }}
           />
 
           {otpSent && (
-            <input
-              type="text"
+            <TextField
+              label="Enter OTP"
               value={otp}
               onChange={(e) => setOtp(e.target.value)}
-              placeholder="Enter OTP"
-              maxLength={6}
-              className="w-full px-3 py-2 border rounded-md shadow-sm"
-              style={{ boxShadow: `0 0 0 1.5px ${themeColor}` }}
+              inputProps={{ maxLength: 6 }}
               required
+              size="medium"
+              InputProps={{
+                sx: { boxShadow: `0 0 0 1.5px ${themeColor} inset` },
+              }}
             />
           )}
 
-          <button
+          <Button
             type="submit"
-            className="w-full text-white py-2 rounded-md transition hover:opacity-90"
-            style={{ backgroundColor: themeColor }}
+            variant="contained"
+            size="large"
+            sx={{
+              backgroundColor: themeColor,
+              "&:hover": { opacity: 0.9, backgroundColor: themeColor },
+            }}
           >
-            {otpSent ? 'Verify OTP' : 'Send OTP'}
-          </button>
-        </form>
+            {otpSent ? "Verify OTP" : "Send OTP"}
+          </Button>
+        </Stack>
 
-        <div className="text-center mt-4 text-sm text-gray-600">
-          Remembered your password?
-          <button
-            onClick={() => navigate('/')}
-            className="ml-1 text-blue-600 hover:underline font-medium"
-          >
+        <Stack direction="row" justifyContent="center" spacing={1} mt={3}>
+          <Typography variant="body2" color="text.secondary">
+            Remembered your password?
+          </Typography>
+          <Button variant="text" size="small" onClick={() => navigate("/")}>
             Login
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </Stack>
+      </Paper>
+    </Box>
   );
 };
 

@@ -1,4 +1,15 @@
 import React, { useState } from "react";
+import {
+  Box,
+  Button,
+  Checkbox,
+  Collapse,
+  FormControlLabel,
+  Grid,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
 import { clamp } from "../utils/numberUtils";
 
 const ImpositionSection = ({
@@ -18,53 +29,66 @@ const ImpositionSection = ({
   setOuter,
 }) => {
   const [open, setOpen] = useState(false);
+  const presets = ["A4", "Letter", "Legal", "Tabloid", "Custom"];
 
   return (
-    <div className="border-b">
-      {/* Section Header */}
-      <button
-        className="w-full flex justify-between items-center p-3 text-sm font-semibold"
+    <Box borderBottom={1} borderColor="divider">
+      <Button
+        fullWidth
         onClick={() => setOpen(!open)}
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          textTransform: "none",
+          fontSize: 14,
+          fontWeight: 600,
+          py: 1.5,
+          color: "text.primary",
+        }}
       >
-        <span>Imposition (n-up)</span>
-        <span className="text-xs">{open ? "▲" : "▼"}</span>
-      </button>
+        <Typography variant="body2" fontWeight={600}>
+          Imposition (n-up)
+        </Typography>
+        <Typography variant="caption">{open ? "▲" : "▼"}</Typography>
+      </Button>
 
-      {/* Collapsible Content */}
-      {open && (
-        <div className="px-3 pb-3 space-y-2 text-sm">
-          <label className="flex items-center gap-2 text-xs">
-            <input
-              type="checkbox"
-              checked={imposeOn}
-              onChange={(e) => setImposeOn(e.target.checked)}
-            />
-            Enable Imposition on Sheet
-          </label>
+      <Collapse in={open} timeout="auto" unmountOnExit>
+        <Stack spacing={2} px={2} pb={2} fontSize={13}>
+          <FormControlLabel
+            control={
+              <Checkbox
+                size="small"
+                checked={imposeOn}
+                onChange={(e) => setImposeOn(e.target.checked)}
+              />
+            }
+            label={<Typography variant="caption">Enable Imposition on Sheet</Typography>}
+          />
 
-          {/* Sheet Presets */}
-          <div className="grid grid-cols-2 gap-2">
-            {["A4", "Letter", "Legal", "Tabloid", "Custom"].map((key) => (
-              <button
-                key={key}
-                className={`border rounded px-2 py-1 ${
-                  sheetPreset === key ? "bg-gray-900 text-white" : ""
-                }`}
-                onClick={() => setSheetPreset(key)}
-              >
-                {key}
-              </button>
+          <Grid container spacing={1}>
+            {presets.map((key) => (
+              <Grid item xs={6} key={key}>
+                <Button
+                  fullWidth
+                  variant={sheetPreset === key ? "contained" : "outlined"}
+                  size="small"
+                  onClick={() => setSheetPreset(key)}
+                >
+                  {key}
+                </Button>
+              </Grid>
             ))}
-          </div>
+          </Grid>
 
-          {/* Custom Sheet Inputs */}
           {sheetPreset === "Custom" && (
-            <div className="grid grid-cols-2 gap-2">
-              <label className="text-xs">
-                Sheet W (mm)
-                <input
+            <Grid container spacing={1}>
+              <Grid item xs={6}>
+                <TextField
+                  size="small"
+                  label="Sheet W (mm)"
                   type="number"
-                  className="w-full border rounded px-2 py-1"
+                  fullWidth
                   value={sheetCustom.w_mm}
                   onChange={(e) =>
                     setSheetCustom((s) => ({
@@ -73,12 +97,13 @@ const ImpositionSection = ({
                     }))
                   }
                 />
-              </label>
-              <label className="text-xs">
-                Sheet H (mm)
-                <input
+              </Grid>
+              <Grid item xs={6}>
+                <TextField
+                  size="small"
+                  label="Sheet H (mm)"
                   type="number"
-                  className="w-full border rounded px-2 py-1"
+                  fullWidth
                   value={sheetCustom.h_mm}
                   onChange={(e) =>
                     setSheetCustom((s) => ({
@@ -87,43 +112,40 @@ const ImpositionSection = ({
                     }))
                   }
                 />
-              </label>
-            </div>
+              </Grid>
+            </Grid>
           )}
 
-          {/* Rows & Cols */}
-          <div className="grid grid-cols-2 gap-2">
-            <label className="text-xs">
-              Rows
-              <input
+          <Grid container spacing={1}>
+            <Grid item xs={6}>
+              <TextField
+                size="small"
+                label="Rows"
                 type="number"
-                className="w-full border rounded px-2 py-1"
+                fullWidth
                 value={rows}
-                onChange={(e) =>
-                  setRows(clamp(parseInt(e.target.value) || 1, 1, 20))
-                }
+                onChange={(e) => setRows(clamp(parseInt(e.target.value) || 1, 1, 20))}
               />
-            </label>
-            <label className="text-xs">
-              Columns
-              <input
+            </Grid>
+            <Grid item xs={6}>
+              <TextField
+                size="small"
+                label="Columns"
                 type="number"
-                className="w-full border rounded px-2 py-1"
+                fullWidth
                 value={cols}
-                onChange={(e) =>
-                  setCols(clamp(parseInt(e.target.value) || 1, 1, 20))
-                }
+                onChange={(e) => setCols(clamp(parseInt(e.target.value) || 1, 1, 20))}
               />
-            </label>
-          </div>
+            </Grid>
+          </Grid>
 
-          {/* Gap */}
-          <div className="grid grid-cols-2 gap-2">
-            <label className="text-xs">
-              Gap X (mm)
-              <input
+          <Grid container spacing={1}>
+            <Grid item xs={6}>
+              <TextField
+                size="small"
+                label="Gap X (mm)"
                 type="number"
-                className="w-full border rounded px-2 py-1"
+                fullWidth
                 value={gap.x_mm}
                 onChange={(e) =>
                   setGap((g) => ({
@@ -132,12 +154,13 @@ const ImpositionSection = ({
                   }))
                 }
               />
-            </label>
-            <label className="text-xs">
-              Gap Y (mm)
-              <input
+            </Grid>
+            <Grid item xs={6}>
+              <TextField
+                size="small"
+                label="Gap Y (mm)"
                 type="number"
-                className="w-full border rounded px-2 py-1"
+                fullWidth
                 value={gap.y_mm}
                 onChange={(e) =>
                   setGap((g) => ({
@@ -146,17 +169,17 @@ const ImpositionSection = ({
                   }))
                 }
               />
-            </label>
-          </div>
+            </Grid>
+          </Grid>
 
-          {/* Outer margins */}
-          <div className="grid grid-cols-4 gap-2">
+          <Grid container spacing={1}>
             {["top", "right", "bottom", "left"].map((side) => (
-              <label key={side} className="text-xs capitalize">
-                Outer {side}
-                <input
+              <Grid item xs={3} key={side}>
+                <TextField
+                  size="small"
+                  label={`Outer ${side}`}
                   type="number"
-                  className="w-full border rounded px-2 py-1"
+                  fullWidth
                   value={outer[side]}
                   onChange={(e) =>
                     setOuter((prev) => ({
@@ -165,17 +188,17 @@ const ImpositionSection = ({
                     }))
                   }
                 />
-              </label>
+              </Grid>
             ))}
-          </div>
+          </Grid>
 
-          <div className="text-[11px] text-gray-500">
-            When Bulk + Imposition are on, we tile across the sheet using your
-            filtered students.
-          </div>
-        </div>
-      )}
-    </div>
+          <Typography variant="caption" color="text.secondary">
+            When Bulk + Imposition are on, we tile across the sheet using your filtered
+            students.
+          </Typography>
+        </Stack>
+      </Collapse>
+    </Box>
   );
 };
 

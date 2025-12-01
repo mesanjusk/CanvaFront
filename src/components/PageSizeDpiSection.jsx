@@ -1,5 +1,16 @@
 import React, { useState } from "react";
-import { Slider } from "@mui/material";
+import {
+  Box,
+  Button,
+  Checkbox,
+  Collapse,
+  FormControlLabel,
+  Grid,
+  Slider,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
 import { clamp } from "../utils/numberUtils";
 
 const PageSizeDpiSection = ({
@@ -15,53 +26,66 @@ const PageSizeDpiSection = ({
   setDpi,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const pageOptions = ["ID-1/CR80", "A4", "Letter", "Legal", "Tabloid", "Custom"];
 
   return (
-    <div className="border-b">
-      {/* Toggle button */}
-      <button
+    <Box borderBottom={1} borderColor="divider">
+      <Button
+        fullWidth
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full text-left p-3 text-sm font-semibold flex justify-between items-center"
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          textTransform: "none",
+          fontSize: 14,
+          fontWeight: 600,
+          py: 1.5,
+          color: "text.primary",
+        }}
       >
-        Page Size & DPI
-        <span className="text-xs">{isOpen ? "▲" : "▼"}</span>
-      </button>
+        <Typography variant="body2" fontWeight={600}>
+          Page Size & DPI
+        </Typography>
+        <Typography variant="caption">{isOpen ? "▲" : "▼"}</Typography>
+      </Button>
 
-      {/* Collapsible content */}
-      {isOpen && (
-        <div className="px-3 pb-3 space-y-2 text-sm">
-          <label className="flex items-center gap-2 text-xs mb-2">
-            <input
-              type="checkbox"
-              checked={usePrintSizing}
-              onChange={(e) => setUsePrintSizing(e.target.checked)}
-            />
-            Enable print sizing
-          </label>
+      <Collapse in={isOpen} timeout="auto" unmountOnExit>
+        <Stack spacing={2} px={2} pb={2} fontSize={13}>
+          <FormControlLabel
+            control={
+              <Checkbox
+                size="small"
+                checked={usePrintSizing}
+                onChange={(e) => setUsePrintSizing(e.target.checked)}
+              />
+            }
+            label={<Typography variant="caption">Enable print sizing</Typography>}
+          />
 
-          <div className="grid grid-cols-2 gap-2">
-            {["ID-1/CR80", "A4", "Letter", "Legal", "Tabloid", "Custom"].map(
-              (key) => (
-                <button
-                  key={key}
+          <Grid container spacing={1}>
+            {pageOptions.map((key) => (
+              <Grid item xs={6} key={key}>
+                <Button
+                  fullWidth
+                  variant={pagePreset === key ? "contained" : "outlined"}
+                  size="small"
                   onClick={() => setPagePreset(key)}
-                  className={`border rounded px-2 py-1 ${
-                    pagePreset === key ? "bg-gray-900 text-white" : ""
-                  }`}
                 >
                   {key}
-                </button>
-              )
-            )}
-          </div>
+                </Button>
+              </Grid>
+            ))}
+          </Grid>
 
           {pagePreset === "Custom" && (
-            <div className="grid grid-cols-2 gap-2">
-              <label className="text-xs">
-                Width (mm)
-                <input
+            <Grid container spacing={1}>
+              <Grid item xs={6}>
+                <TextField
+                  size="small"
+                  label="Width (mm)"
                   type="number"
-                  className="w-full border rounded px-2 py-1"
+                  fullWidth
                   value={customPage.w_mm}
                   onChange={(e) =>
                     setCustomPage((s) => ({
@@ -70,12 +94,13 @@ const PageSizeDpiSection = ({
                     }))
                   }
                 />
-              </label>
-              <label className="text-xs">
-                Height (mm)
-                <input
+              </Grid>
+              <Grid item xs={6}>
+                <TextField
+                  size="small"
+                  label="Height (mm)"
                   type="number"
-                  className="w-full border rounded px-2 py-1"
+                  fullWidth
                   value={customPage.h_mm}
                   onChange={(e) =>
                     setCustomPage((s) => ({
@@ -84,34 +109,40 @@ const PageSizeDpiSection = ({
                     }))
                   }
                 />
-              </label>
-            </div>
+              </Grid>
+            </Grid>
           )}
 
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              className={`border rounded px-2 py-1 ${
-                pageOrientation === "portrait" ? "bg-gray-900 text-white" : ""
-              }`}
-              onClick={() => setPageOrientation("portrait")}
-            >
-              Portrait
-            </button>
-            <button
-              className={`border rounded px-2 py-1 ${
-                pageOrientation === "landscape" ? "bg-gray-900 text-white" : ""
-              }`}
-              onClick={() => setPageOrientation("landscape")}
-            >
-              Landscape
-            </button>
-          </div>
+          <Grid container spacing={1}>
+            <Grid item xs={6}>
+              <Button
+                fullWidth
+                variant={pageOrientation === "portrait" ? "contained" : "outlined"}
+                size="small"
+                onClick={() => setPageOrientation("portrait")}
+              >
+                Portrait
+              </Button>
+            </Grid>
+            <Grid item xs={6}>
+              <Button
+                fullWidth
+                variant={pageOrientation === "landscape" ? "contained" : "outlined"}
+                size="small"
+                onClick={() => setPageOrientation("landscape")}
+              >
+                Landscape
+              </Button>
+            </Grid>
+          </Grid>
 
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs">DPI</span>
-              <span className="text-[11px] opacity-70">{dpi} dpi</span>
-            </div>
+          <Stack spacing={1}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center">
+              <Typography variant="caption">DPI</Typography>
+              <Typography variant="caption" color="text.secondary">
+                {dpi} dpi
+              </Typography>
+            </Stack>
             <Slider
               min={150}
               max={600}
@@ -119,10 +150,10 @@ const PageSizeDpiSection = ({
               value={dpi}
               onChange={(_, v) => setDpi(Array.isArray(v) ? v[0] : v)}
             />
-          </div>
-        </div>
-      )}
-    </div>
+          </Stack>
+        </Stack>
+      </Collapse>
+    </Box>
   );
 };
 

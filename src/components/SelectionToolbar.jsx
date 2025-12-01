@@ -1,4 +1,13 @@
 import React, { useEffect, useState } from "react";
+import {
+  Box,
+  IconButton,
+  InputAdornment,
+  Slider,
+  Stack,
+  TextField,
+  Tooltip,
+} from "@mui/material";
 import { Bold, Italic, AlignLeft, AlignCenter, AlignRight } from "lucide-react";
 
 const SelectionToolbar = ({ activeObj, canvas }) => {
@@ -39,87 +48,119 @@ const SelectionToolbar = ({ activeObj, canvas }) => {
   };
 
   return (
-    <div
-      className="fixed z-50 bg-white shadow-md rounded-md p-2 flex flex-wrap gap-2 items-center"
-      style={{ left: pos.left, top: pos.top, transform: "translate(-50%, -110%)" }}
+    <Box
+      sx={{
+        position: "fixed",
+        zIndex: 50,
+        backgroundColor: "background.paper",
+        boxShadow: 3,
+        borderRadius: 1,
+        p: 1,
+        transform: "translate(-50%, -110%)",
+        left: pos.left,
+        top: pos.top,
+      }}
     >
-      <input
-        type="color"
-        value={typeof activeObj.fill === "string" ? activeObj.fill : "#000000"}
-        onChange={(e) => apply({ fill: e.target.value })}
-        className="w-8 h-8 p-0 border rounded"
-        title="Color"
-      />
-
-      {isText && (
-        <>
-          <input
-            type="number"
-            value={activeObj.fontSize || 20}
-            min={8}
-            max={200}
-            onChange={(e) => apply({ fontSize: parseInt(e.target.value) || 12 })}
-            className="w-14 p-1 border rounded text-xs"
-            title="Font size"
-          />
-          <button
-            onClick={() => apply({ fontWeight: activeObj.fontWeight === "bold" ? "normal" : "bold" })}
-            className={`p-1 rounded ${activeObj.fontWeight === "bold" ? "bg-gray-200" : ""}`}
-            title="Bold"
-          >
-            <Bold size={16} />
-          </button>
-          <button
-            onClick={() => apply({ fontStyle: activeObj.fontStyle === "italic" ? "normal" : "italic" })}
-            className={`p-1 rounded ${activeObj.fontStyle === "italic" ? "bg-gray-200" : ""}`}
-            title="Italic"
-          >
-            <Italic size={16} />
-          </button>
-          <button onClick={() => apply({ textAlign: "left" })} className="p-1 rounded" title="Align left">
-            <AlignLeft size={16} />
-          </button>
-          <button onClick={() => apply({ textAlign: "center" })} className="p-1 rounded" title="Align center">
-            <AlignCenter size={16} />
-          </button>
-          <button onClick={() => apply({ textAlign: "right" })} className="p-1 rounded" title="Align right">
-            <AlignRight size={16} />
-          </button>
-          <input
-            type="range"
-            min={-100}
-            max={400}
-            value={activeObj.charSpacing || 0}
-            onChange={(e) => apply({ charSpacing: parseInt(e.target.value) })}
-            className="w-20"
-            title="Spacing"
-          />
-        </>
-      )}
-
-      {isRect && (
-        <input
-          type="range"
-          min={0}
-          max={100}
-          value={activeObj.rx || 0}
-          onChange={(e) => apply({ rx: parseInt(e.target.value), ry: parseInt(e.target.value) })}
-          className="w-20"
-          title="Corner radius"
+      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+        <TextField
+          type="color"
+          value={typeof activeObj.fill === "string" ? activeObj.fill : "#000000"}
+          onChange={(e) => apply({ fill: e.target.value })}
+          size="small"
+          InputProps={{
+            sx: { width: 48, height: 48, p: 0.5 },
+          }}
         />
-      )}
 
-      <input
-        type="range"
-        min={0}
-        max={1}
-        step={0.05}
-        value={activeObj.opacity ?? 1}
-        onChange={(e) => apply({ opacity: parseFloat(e.target.value) })}
-        className="w-20"
-        title="Opacity"
-      />
-    </div>
+        {isText && (
+          <Stack direction="row" spacing={1} alignItems="center">
+            <TextField
+              type="number"
+              size="small"
+              value={activeObj.fontSize || 20}
+              inputProps={{ min: 8, max: 200, style: { width: 64 } }}
+              onChange={(e) => apply({ fontSize: parseInt(e.target.value) || 12 })}
+              label="Size"
+            />
+            <Tooltip title="Bold">
+              <IconButton
+                size="small"
+                color={activeObj.fontWeight === "bold" ? "primary" : "default"}
+                onClick={() =>
+                  apply({ fontWeight: activeObj.fontWeight === "bold" ? "normal" : "bold" })
+                }
+              >
+                <Bold size={16} />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Italic">
+              <IconButton
+                size="small"
+                color={activeObj.fontStyle === "italic" ? "primary" : "default"}
+                onClick={() =>
+                  apply({ fontStyle: activeObj.fontStyle === "italic" ? "normal" : "italic" })
+                }
+              >
+                <Italic size={16} />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Align left">
+              <IconButton size="small" onClick={() => apply({ textAlign: "left" })}>
+                <AlignLeft size={16} />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Align center">
+              <IconButton size="small" onClick={() => apply({ textAlign: "center" })}>
+                <AlignCenter size={16} />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Align right">
+              <IconButton size="small" onClick={() => apply({ textAlign: "right" })}>
+                <AlignRight size={16} />
+              </IconButton>
+            </Tooltip>
+            <TextField
+              type="number"
+              size="small"
+              value={activeObj.charSpacing || 0}
+              onChange={(e) => apply({ charSpacing: parseInt(e.target.value) })}
+              label="Spacing"
+              InputProps={{
+                endAdornment: <InputAdornment position="end">pt</InputAdornment>,
+                inputProps: { min: -100, max: 400, style: { width: 80 } },
+              }}
+            />
+          </Stack>
+        )}
+
+        {isRect && (
+          <Box sx={{ width: 140 }}>
+            <Slider
+              size="small"
+              min={0}
+              max={100}
+              value={activeObj.rx || 0}
+              onChange={(e, value) =>
+                apply({ rx: parseInt(value), ry: parseInt(value) })
+              }
+              valueLabelDisplay="auto"
+            />
+          </Box>
+        )}
+
+        <Box sx={{ width: 140 }}>
+          <Slider
+            size="small"
+            min={0}
+            max={1}
+            step={0.05}
+            value={activeObj.opacity ?? 1}
+            onChange={(e, value) => apply({ opacity: parseFloat(value) })}
+            valueLabelDisplay="auto"
+          />
+        </Box>
+      </Stack>
+    </Box>
   );
 };
 

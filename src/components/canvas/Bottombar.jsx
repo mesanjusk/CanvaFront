@@ -1,11 +1,22 @@
-/* ------------------------- BottomBar ------------------------- */
-import PropTypes from "prop-types";
+import React from "react";
+import { Box } from "@mui/material";
 
-export function BottomBar({ children }) {
-return (
-<div className="h-14 border-t bg-white flex items-center px-4">{children}</div>
+const Bottombar = ({ children }) => (
+  <Box
+    component="footer"
+    sx={{
+      height: 56,
+      borderTop: 1,
+      borderColor: "divider",
+      bgcolor: "background.paper",
+      display: "flex",
+      alignItems: "center",
+      px: 2,
+      gap: 1.5,
+    }}
+  >
+    {children}
+  </Box>
 );
-}
-BottomBar.propTypes = { children: PropTypes.node };
 
-export default BottomBar;
+export default Bottombar;

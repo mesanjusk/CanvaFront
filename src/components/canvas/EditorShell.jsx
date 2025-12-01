@@ -1,31 +1,22 @@
-/* ------------------------- EditorShell ------------------------- */
-import PropTypes from "prop-types";
+import React from "react";
+import { Box, Stack } from "@mui/material";
 
-export function EditorShell({
-topBar,
-leftToolbar,
-viewport,
-rightPanel,
-bottomBar,
-}) {
-return (
-<div className="min-h-screen w-screen flex flex-col bg-gray-50">
-<div className="flex-shrink-0">{topBar}</div>
-<div className="flex-1 flex overflow-hidden">
-<div className="w-72 border-r bg-white overflow-auto">{leftToolbar}</div>
-<div className="flex-1 overflow-auto bg-gray-100 flex items-center justify-center">{viewport}</div>
-<div className="w-80 border-l bg-white overflow-auto">{rightPanel}</div>
-</div>
-<div className="flex-shrink-0">{bottomBar}</div>
-</div>
+const EditorShell = ({ topBar, leftToolbar, viewport, rightPanel, bottomBar }) => (
+  <Stack minHeight="100vh" width="100vw" bgcolor="grey.50">
+    <Box flexShrink={0}>{topBar}</Box>
+    <Stack direction="row" flex={1} overflow="hidden">
+      <Box width={288} borderRight={1} borderColor="divider" bgcolor="background.paper" overflow="auto">
+        {leftToolbar}
+      </Box>
+      <Box flex={1} overflow="auto" bgcolor="grey.100" display="flex" alignItems="center" justifyContent="center">
+        {viewport}
+      </Box>
+      <Box width={320} borderLeft={1} borderColor="divider" bgcolor="background.paper" overflow="auto">
+        {rightPanel}
+      </Box>
+    </Stack>
+    <Box flexShrink={0}>{bottomBar}</Box>
+  </Stack>
 );
-}
-EditorShell.propTypes = {
-topBar: PropTypes.node,
-leftToolbar: PropTypes.node,
-viewport: PropTypes.node,
-rightPanel: PropTypes.node,
-bottomBar: PropTypes.node,
-};
 
 export default EditorShell;

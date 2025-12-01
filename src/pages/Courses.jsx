@@ -1,12 +1,34 @@
-import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
-import toast, { Toaster } from 'react-hot-toast';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import * as XLSX from 'xlsx';
-import { Edit, Delete, Add, PictureAsPdf, FileDownload } from '@mui/icons-material';
-import BASE_URL from '../config';
-import { getThemeColor } from '../utils/storageUtils';
+import React, { useEffect, useRef, useState } from "react";
+import axios from "axios";
+import toast, { Toaster } from "react-hot-toast";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
+import {
+  Add,
+  Delete,
+  Edit,
+  FileDownload,
+  PictureAsPdf,
+} from "@mui/icons-material";
+import {
+  Box,
+  Button,
+  Card,
+  CardActions,
+  CardContent,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Grid,
+  IconButton,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
+import BASE_URL from "../config";
+import { getThemeColor } from "../utils/storageUtils";
 
 const Courses = () => {
   const [courses, setCourses] = useState([]);
@@ -53,7 +75,7 @@ const Courses = () => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    e?.preventDefault?.();
 
     const payload = { ...form };
 
@@ -133,80 +155,150 @@ const Courses = () => {
   };
 
   return (
-    <div className="min-h-screen p-2" style={{ backgroundColor: themeColor }}>
+    <Box minHeight="100vh" p={2} sx={{ backgroundColor: themeColor }}>
       <Toaster />
-      <div className="flex items-center gap-2 mb-4 w-full flex-wrap">
-        <input
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        spacing={1.5}
+        mb={3}
+        alignItems="center"
+        flexWrap="wrap"
+      >
+        <TextField
           placeholder="Search course"
           value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="border p-2 rounded flex-1 min-w-0 max-w-xs"
+          onChange={(e) => setSearch(e.target.value)}
+          size="small"
+          sx={{ minWidth: { xs: "100%", sm: 220 } }}
         />
-        <button onClick={exportPDF} className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700" title="Export PDF">
+        <IconButton color="error" onClick={exportPDF} title="Export PDF">
           <PictureAsPdf fontSize="small" />
-        </button>
-        <button onClick={exportExcel} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700" title="Export Excel">
+        </IconButton>
+        <IconButton color="success" onClick={exportExcel} title="Export Excel">
           <FileDownload fontSize="small" />
-        </button>
-        <button
-          onClick={() => { setForm({ name: '', description: '', courseFees: '', examFees: '', duration: '' }); setEditingId(null); setShowModal(true); }}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-          title="Add Course"
+        </IconButton>
+        <Button
+          variant="contained"
+          startIcon={<Add fontSize="small" />}
+          onClick={() => {
+            setForm({ name: "", description: "", courseFees: "", examFees: "", duration: "" });
+            setEditingId(null);
+            setShowModal(true);
+          }}
         >
-          <Add fontSize="small" />
-        </button>
-      </div>
+          Add Course
+        </Button>
+      </Stack>
 
       {loading ? (
-        <div className="text-center p-6">Loading courses...</div>
+        <Box textAlign="center" py={6}>
+          <Typography>Loading courses...</Typography>
+        </Box>
       ) : filteredCourses.length === 0 ? (
-        <div className="text-center p-6 text-gray-500">No courses found.</div>
+        <Box textAlign="center" py={6}>
+          <Typography color="text.secondary">No courses found.</Typography>
+        </Box>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-3">
+        <Grid container spacing={2}>
           {filteredCourses.map((c) => (
-            <div key={c._id} className="border rounded-lg p-3 shadow hover:shadow-md transition flex flex-col justify-between">
-              <div>
-                <h2 className="font-semibold text-lg text-gray-800">{c.name}</h2>
-                <p className="text-sm text-gray-600 mt-1">{c.description || <span className="italic text-gray-400">No description</span>}</p>
-                <div className="mt-2 text-sm text-gray-700">
-                  <div>Course Fees: <span className="font-medium">{c.courseFees || '-'}</span></div>
-                  <div>Exam Fees: <span className="font-medium">{c.examFees || '-'}</span></div>
-                  <div>Duration: <span className="font-medium">{c.duration || '-'}</span></div>
-                </div>
-              </div>
-              <div className="flex justify-end gap-2 mt-3">
-                <button onClick={() => handleEdit(c)} className="px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600" title="Edit">
-                  <Edit fontSize="small" />
-                </button>
-                <button onClick={() => handleDelete(c._id)} className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700" title="Delete">
-                  <Delete fontSize="small" />
-                </button>
-              </div>
-            </div>
+            <Grid item key={c._id} xs={12} sm={6} md={4} lg={3} xl={2}>
+              <Card elevation={3} sx={{ height: "100%" }}>
+                <CardContent sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
+                  <Typography variant="h6" fontWeight={600} gutterBottom>
+                    {c.name}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" mb={1}>
+                    {c.description || "No description"}
+                  </Typography>
+                  <Stack spacing={0.5} mt={1} mb={2}>
+                    <Typography variant="body2">
+                      Course Fees: <Typography component="span" fontWeight={600}>{c.courseFees || "-"}</Typography>
+                    </Typography>
+                    <Typography variant="body2">
+                      Exam Fees: <Typography component="span" fontWeight={600}>{c.examFees || "-"}</Typography>
+                    </Typography>
+                    <Typography variant="body2">
+                      Duration: <Typography component="span" fontWeight={600}>{c.duration || "-"}</Typography>
+                    </Typography>
+                  </Stack>
+                  <CardActions sx={{ mt: "auto", justifyContent: "flex-end", gap: 1 }}>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      color="warning"
+                      startIcon={<Edit fontSize="small" />}
+                      onClick={() => handleEdit(c)}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      color="error"
+                      startIcon={<Delete fontSize="small" />}
+                      onClick={() => handleDelete(c._id)}
+                    >
+                      Delete
+                    </Button>
+                  </CardActions>
+                </CardContent>
+              </Card>
+            </Grid>
           ))}
-        </div>
+        </Grid>
       )}
 
-      {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center p-4 overflow-y-auto z-[60]">
-          <div className="bg-white p-6 rounded-xl w-full max-w-md shadow-lg">
-            <h2 className="text-xl font-semibold mb-4">{editingId ? 'Edit Course' : 'Add New Course'}</h2>
-            <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4">
-              <input type="text" value={form.name} onChange={handleChange('name')} className="border p-2 w-full rounded" placeholder="Course Name" required />
-              <textarea value={form.description} onChange={handleChange('description')} className="border p-2 w-full rounded" placeholder="Description" rows={3} />
-              <input type="number" value={form.courseFees} onChange={handleChange('courseFees')} className="border p-2 w-full rounded" placeholder="Course Fees" />
-              <input type="number" value={form.examFees} onChange={handleChange('examFees')} className="border p-2 w-full rounded" placeholder="Exam Fees" />
-              <input type="text" value={form.duration} onChange={handleChange('duration')} className="border p-2 w-full rounded" placeholder="Duration (e.g., 6 months)" />
-              <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setShowModal(false)} className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">Cancel</button>
-                <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">{editingId ? 'Update' : 'Save'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
+      <Dialog open={showModal} onClose={() => setShowModal(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>{editingId ? "Edit Course" : "Add New Course"}</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} mt={1} component="form" onSubmit={handleSubmit}>
+            <TextField
+              label="Course Name"
+              value={form.name}
+              onChange={handleChange("name")}
+              required
+              fullWidth
+            />
+            <TextField
+              label="Description"
+              value={form.description}
+              onChange={handleChange("description")}
+              multiline
+              rows={3}
+              fullWidth
+            />
+            <TextField
+              label="Course Fees"
+              value={form.courseFees}
+              onChange={handleChange("courseFees")}
+              type="number"
+              fullWidth
+            />
+            <TextField
+              label="Exam Fees"
+              value={form.examFees}
+              onChange={handleChange("examFees")}
+              type="number"
+              fullWidth
+            />
+            <TextField
+              label="Duration (e.g., 6 months)"
+              value={form.duration}
+              onChange={handleChange("duration")}
+              fullWidth
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowModal(false)} color="inherit">
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} variant="contained">
+            {editingId ? "Update" : "Save"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 };
 

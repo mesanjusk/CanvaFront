@@ -1,6 +1,21 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import BASE_URL from '../config';
+import {
+  Box,
+  Card,
+  CardContent,
+  Divider,
+  Paper,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Typography,
+} from "@mui/material";
+import BASE_URL from "../config";
 
 export default function AllAttendance() {
   const [attendance, setAttendance] = useState([]);
@@ -107,66 +122,78 @@ export default function AllAttendance() {
   };
 
   return (
-    <div className="bg-white p-4 rounded-2xl shadow flex flex-col items-start">
-      {/* Desktop Table */}
-      <div className="overflow-x-auto w-full hidden md:block">
-        <table className="min-w-full text-sm text-center border">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="px-4 py-2 border">Name</th>
-              <th className="px-4 py-2 border">In</th>
-              <th className="px-4 py-2 border">Break</th>
-              <th className="px-4 py-2 border">Start</th>
-              <th className="px-4 py-2 border">Out</th>
-            </tr>
-          </thead>
-          <tbody>
+    <Card elevation={2} sx={{ borderRadius: 3 }}>
+      <CardContent>
+        <Stack spacing={3} alignItems="stretch">
+          <TableContainer component={Paper} sx={{ display: { xs: "none", md: "block" } }}>
+            <Table size="small" aria-label="Attendance table">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Name</TableCell>
+                  <TableCell>In</TableCell>
+                  <TableCell>Break</TableCell>
+                  <TableCell>Start</TableCell>
+                  <TableCell>Out</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {attendance.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} align="center">
+                      No attendance records found.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  attendance.map((record, idx) => (
+                    <TableRow key={idx} hover>
+                      <TableCell>{record.User_name}</TableCell>
+                      <TableCell>{record.In}</TableCell>
+                      <TableCell>{record.Break}</TableCell>
+                      <TableCell>{record.Start}</TableCell>
+                      <TableCell>{record.Out}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          <Stack spacing={2} sx={{ display: { xs: "flex", md: "none" } }}>
             {attendance.length === 0 ? (
-              <tr>
-                <td className="px-4 py-2 border" colSpan="6">No attendance records found.</td>
-              </tr>
+              <Typography align="center" color="text.secondary">
+                No attendance records found.
+              </Typography>
             ) : (
               attendance.map((record, idx) => (
-                <tr key={idx} className="hover:bg-gray-50 border-t">
-                  <td className="px-4 py-2 border">{record.User_name}</td>
-                  <td className="px-4 py-2 border truncate">{record.In}</td>
-                  <td className="px-4 py-2 border truncate">{record.Break}</td>
-                  <td className="px-4 py-2 border truncate">{record.Start}</td>
-                  <td className="px-4 py-2 border truncate">{record.Out}</td>
-                </tr>
+                <Paper key={idx} variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                  <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                    {record.User_name}
+                  </Typography>
+                  <Divider sx={{ mb: 1 }} />
+                  <Stack spacing={0.75}>
+                    <Box display="flex" justifyContent="space-between">
+                      <Typography color="text.secondary">In:</Typography>
+                      <Typography>{record.In}</Typography>
+                    </Box>
+                    <Box display="flex" justifyContent="space-between">
+                      <Typography color="text.secondary">Break:</Typography>
+                      <Typography>{record.Break}</Typography>
+                    </Box>
+                    <Box display="flex" justifyContent="space-between">
+                      <Typography color="text.secondary">Start:</Typography>
+                      <Typography>{record.Start}</Typography>
+                    </Box>
+                    <Box display="flex" justifyContent="space-between">
+                      <Typography color="text.secondary">Out:</Typography>
+                      <Typography>{record.Out}</Typography>
+                    </Box>
+                  </Stack>
+                </Paper>
               ))
             )}
-          </tbody>
-        </table>
-      </div>
-      {/* Mobile Card List */}
-      <div className="w-full flex flex-col gap-3 md:hidden">
-        {attendance.length === 0 ? (
-          <div className="text-center text-gray-500 py-4">No attendance records found.</div>
-        ) : (
-          attendance.map((record, idx) => (
-            <div key={idx} className="border rounded-xl shadow-sm px-3 py-3 flex flex-col gap-1 bg-gray-50">
-              <div className="font-semibold text-base text-gray-700 mb-1">{record.User_name}</div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">In:</span>
-                <span>{record.In}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Break:</span>
-                <span>{record.Break}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Start:</span>
-                <span>{record.Start}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Out:</span>
-                <span>{record.Out}</span>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </div>
+          </Stack>
+        </Stack>
+      </CardContent>
+    </Card>
   );
 }

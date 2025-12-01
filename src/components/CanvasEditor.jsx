@@ -11,8 +11,12 @@ import LeftToolbar from "../components/canvas/LeftToolbar";
 import Viewport from "../components/canvas/Viewport";
 import RightInspectorPanel from "../components/canvas/RightInspectorPanel";
 import BottomBar from "../components/canvas/Bottombar";
+import { useCanvasTools } from "../hooks/useCanvasTools";
+import { useCanvasEditor } from "../hooks/useCanvasEditor";
 
 const LOCAL_KEY = "localTemplates";
+const CANVAS_WIDTH = 800;
+const CANVAS_HEIGHT = 1120;
 
 export function CanvasEditor({
   useCanvasToolsHook = null, // pass in your existing hooks
@@ -26,57 +30,93 @@ export function CanvasEditor({
   const [showGrid, setShowGrid] = useState(false);
   const [snapObjects, setSnapObjects] = useState(true);
   const [showHelp, setShowHelp] = useState(false);
-  const [activeObj, setActiveObj] = useState(null);
   const [fabricCanvas, setFabricCanvas] = useState(null);
   const [templateTitle, setTemplateTitle] = useState("Template 1");
   const [loadingTemplate, setLoadingTemplate] = useState(false);
   const [loadError, setLoadError] = useState("");
 
-  const canvasRef = useRef(null);
+  const canvasElementRef = useRef(null);
+  const canvasTools = (useCanvasToolsHook || useCanvasTools)({
+    width: CANVAS_WIDTH,
+    height: CANVAS_HEIGHT,
+  });
+  const {
+    canvasRef,
+    addText,
+    addRect,
+    addCircle,
+    addImage: addImageToCanvas,
+    download,
+  } = canvasTools;
 
-  // stubbed operations: these should be replaced by your existing hooks
-  const addText = () => setActiveObj({ type: "text", text: "New text", fontSize: 20 });
-  const addRect = () => setActiveObj({ type: "rect", fill: "#ddd" });
-  const addCircle = () => setActiveObj({ type: "circle", fill: "#f00" });
-  const addImage = () => setActiveObj({ type: "image" });
-  const onImportImage = (e) => {
-    const f = e.target.files?.[0];
-    if (f) console.log("import", f.name);
+  const canvasEditor = (useCanvasEditorHook || useCanvasEditor)(
+    canvasRef,
+    CANVAS_WIDTH,
+    CANVAS_HEIGHT
+  );
+  const {
+    activeObj,
+    setActiveObj,
+    undo,
+    redo,
+    duplicateObject,
+    downloadPDF,
+    downloadHighRes,
+    saveHistory,
+    resetHistory,
+  } = canvasEditor;
+
+  const handleImportImage = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        addImageToCanvas(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
+    // Allow re-uploading the same file
+    e.target.value = "";
+  };
+
+  const handleAddImageByUrl = () => {
+    const url = window.prompt("Enter image URL");
+    if (url) addImageToCanvas(url);
   };
 
   const onSave = () => {
-    console.log("save");
+    downloadHighRes?.(CANVAS_WIDTH, CANVAS_HEIGHT, templateTitle || "canvas");
   };
-  const onDownload = () => {
-    console.log("download");
-  };
-  const onUndo = () => {
-    console.log("undo");
-  };
-  const onRedo = () => {
-    console.log("redo");
-  };
+  const onDownload = () => download?.();
+  const onUndo = () => undo?.();
+  const onRedo = () => redo?.();
   const onExport = (opts) => {
-    console.log("export", opts);
+    if (opts?.pdf) {
+      downloadPDF?.();
+    }
   };
 
   // Initialize the Fabric canvas once
   useEffect(() => {
-    if (!canvasRef.current) return undefined;
+    if (!canvasElementRef.current) return undefined;
 
-    const canvas = new fabric.Canvas(canvasRef.current, {
-      width: 800,
-      height: 1120,
+    const canvas = new fabric.Canvas(canvasElementRef.current, {
+      width: CANVAS_WIDTH,
+      height: CANVAS_HEIGHT,
       backgroundColor: "#fff",
       preserveObjectStacking: true,
     });
 
+    canvasRef.current = canvas;
     setFabricCanvas(canvas);
 
     return () => {
       canvas.dispose();
+      canvasRef.current = null;
     };
-  }, []);
+  }, [canvasRef]);
 
   // Load a template when navigating from the gallery or template list
   useEffect(() => {
@@ -86,6 +126,8 @@ export function CanvasEditor({
     const loadFromJson = (json, title) => {
       fabricCanvas.loadFromJSON(json, () => {
         fabricCanvas.renderAll();
+        resetHistory?.();
+        saveHistory?.();
       });
       if (title) setTemplateTitle(title);
     };
@@ -147,11 +189,11 @@ export function CanvasEditor({
         />
       }
 
-      leftToolbar={<LeftToolbar addText={addText} addRect={addRect} addCircle={addCircle} addImage={addImage} onImportImage={onImportImage} />}
+      leftToolbar={<LeftToolbar addText={addText} addRect={addRect} addCircle={addCircle} addImage={handleAddImageByUrl} onImportImage={handleImportImage} />}
 
       viewport={
-        <Viewport stageStyle={{ width: 800, height: 1120 }}>
-          <canvas ref={canvasRef} style={{ width: 800, height: 1120 }} />
+        <Viewport stageStyle={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}>
+          <canvas ref={canvasElementRef} style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }} />
           {loadingTemplate && (
             <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-white px-4 py-1 rounded shadow text-sm text-gray-600">
               Loading template...

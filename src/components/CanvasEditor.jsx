@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import PropTypes from "prop-types";
 import axios from "axios";
-import { Typography, Button } from "@mui/material";
+import { Typography, Button, useMediaQuery, useTheme } from "@mui/material";
 import { useParams } from "react-router-dom";
 import { fabric } from "fabric";
 
@@ -13,6 +13,7 @@ import RightInspectorPanel from "../components/canvas/RightInspectorPanel";
 import BottomBar from "../components/canvas/Bottombar";
 import { useCanvasTools } from "../hooks/useCanvasTools";
 import { useCanvasEditor } from "../hooks/useCanvasEditor";
+import LayersPanel from "./canvas/LayersPanel";
 
 const LOCAL_KEY = "localTemplates";
 const CANVAS_WIDTH = 800;
@@ -29,11 +30,14 @@ export function CanvasEditor({
   const [zoom, setZoom] = useState(100);
   const [showGrid, setShowGrid] = useState(false);
   const [snapObjects, setSnapObjects] = useState(true);
-  const [showHelp, setShowHelp] = useState(false);
   const [fabricCanvas, setFabricCanvas] = useState(null);
   const [templateTitle, setTemplateTitle] = useState("Template 1");
   const [loadingTemplate, setLoadingTemplate] = useState(false);
   const [loadError, setLoadError] = useState("");
+  const [showLeftPanel, setShowLeftPanel] = useState(false);
+  const [showRightPanel, setShowRightPanel] = useState(false);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("lg"));
 
   const canvasElementRef = useRef(null);
   const canvasTools = (useCanvasToolsHook || useCanvasTools)({
@@ -59,7 +63,6 @@ export function CanvasEditor({
     setActiveObj,
     undo,
     redo,
-    duplicateObject,
     downloadPDF,
     downloadHighRes,
     saveHistory,
@@ -84,6 +87,40 @@ export function CanvasEditor({
   const handleAddImageByUrl = () => {
     const url = window.prompt("Enter image URL");
     if (url) addImageToCanvas(url);
+  };
+
+  const handleInspectorUpdate = (patch) => {
+    if (!fabricCanvas) return;
+    const obj = fabricCanvas.getActiveObject();
+    if (!obj) return;
+
+    if (patch.action === "replace" || patch.action === "removeBg") {
+      // Placeholder for future actions
+      return;
+    }
+
+    Object.entries(patch).forEach(([key, value]) => {
+      obj.set(key, value);
+    });
+    fabricCanvas.requestRenderAll();
+    saveHistory?.();
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer?.files?.[0];
+    if (!file || !file.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        addImageToCanvas(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
   };
 
   const onSave = () => {
@@ -120,27 +157,32 @@ export function CanvasEditor({
 
   // Load a template when navigating from the gallery or template list
   useEffect(() => {
-    if (!fabricCanvas || !templateId) return;
+    if (!fabricCanvas || !templateId) return undefined;
     let cancelled = false;
 
-    const loadFromJson = (json, title) => {
-      fabricCanvas.loadFromJSON(json, () => {
-        fabricCanvas.renderAll();
-        resetHistory?.();
-        saveHistory?.();
+    const loadFromJson = (json, title) =>
+      new Promise((resolve) => {
+        fabricCanvas.loadFromJSON(json, () => {
+          fabricCanvas.renderAll();
+          resetHistory?.();
+          saveHistory?.();
+          resolve();
+        });
+
+        if (title) setTemplateTitle(title);
       });
-      if (title) setTemplateTitle(title);
-    };
 
     const loadTemplate = async () => {
       setLoadingTemplate(true);
       setLoadError("");
 
       try {
-        const res = await axios.get(`https://canvaback.onrender.com/api/template/${templateId}`);
+        const res = await axios.get(`https://canvaback.onrender.com/api/template/${templateId}`, {
+          timeout: 8000,
+        });
         const tpl = res.data?.result || res.data;
         if (tpl?.canvasJson && !cancelled) {
-          loadFromJson(tpl.canvasJson, tpl.title);
+          await loadFromJson(tpl.canvasJson, tpl.title);
           return;
         }
       } catch (err) {
@@ -151,7 +193,7 @@ export function CanvasEditor({
         const localTemplates = JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]");
         const cached = localTemplates.find((t) => t._id === templateId || t.id === templateId);
         if (cached?.canvasJson && !cancelled) {
-          loadFromJson(cached.canvasJson, cached.title);
+          await loadFromJson(cached.canvasJson, cached.title);
           return;
         }
       } catch (err) {
@@ -168,7 +210,7 @@ export function CanvasEditor({
     return () => {
       cancelled = true;
     };
-  }, [fabricCanvas, templateId]);
+  }, [fabricCanvas, resetHistory, saveHistory, templateId]);
 
   return (
     <EditorShell
@@ -181,33 +223,52 @@ export function CanvasEditor({
           onDownload={onDownload}
           onUndo={onUndo}
           onRedo={onRedo}
-          onToggleHelp={() => setShowHelp(true)}
+          onToggleHelp={() => {}}
           showGrid={showGrid}
           onToggleGrid={(v) => setShowGrid(v)}
           snapObjects={snapObjects}
           onToggleSnap={(v) => setSnapObjects(v)}
+          onToggleLeftPanel={() => setShowLeftPanel((v) => !v)}
+          onToggleRightPanel={() => setShowRightPanel((v) => !v)}
+          isMobile={isMobile}
         />
       }
 
-      leftToolbar={<LeftToolbar addText={addText} addRect={addRect} addCircle={addCircle} addImage={handleAddImageByUrl} onImportImage={handleImportImage} />}
-
-      viewport={
-        <Viewport stageStyle={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}>
-          <canvas ref={canvasElementRef} style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }} />
-          {loadingTemplate && (
-            <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-white px-4 py-1 rounded shadow text-sm text-gray-600">
-              Loading template...
-            </div>
-          )}
-          {loadError && (
-            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-red-100 text-red-700 px-3 py-2 rounded text-sm">
-              {loadError}
-            </div>
-          )}
-        </Viewport>
+      leftToolbar={
+        <LeftToolbar
+          addText={addText}
+          addRect={addRect}
+          addCircle={addCircle}
+          addImage={handleAddImageByUrl}
+          onImportImage={handleImportImage}
+        />
       }
 
-      rightPanel={<RightInspectorPanel activeObj={activeObj} onUpdate={(patch) => console.log("update", patch)} onClose={() => setActiveObj(null)} />}
+      viewport={
+        <div className="w-full h-full" onDrop={handleDrop} onDragOver={handleDragOver}>
+          <Viewport stageStyle={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}>
+            <canvas ref={canvasElementRef} style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }} />
+            {loadingTemplate && (
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-white px-4 py-1 rounded shadow text-sm text-gray-600">
+                Loading template...
+              </div>
+            )}
+            {loadError && (
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-red-100 text-red-700 px-3 py-2 rounded text-sm">
+                {loadError}
+              </div>
+            )}
+            <div className="absolute inset-0 pointer-events-none border border-dashed border-gray-300" />
+          </Viewport>
+        </div>
+      }
+
+      rightPanel={
+        <div className="flex flex-col h-full divide-y">
+          <LayersPanel canvas={fabricCanvas} onSelect={setActiveObj} saveHistory={saveHistory} />
+          <RightInspectorPanel activeObj={activeObj} onUpdate={handleInspectorUpdate} onClose={() => setActiveObj(null)} />
+        </div>
+      }
 
       bottomBar={
         <BottomBar>
@@ -222,6 +283,10 @@ export function CanvasEditor({
           </div>
         </BottomBar>
       }
+      mobileLeftOpen={showLeftPanel}
+      mobileRightOpen={showRightPanel}
+      onToggleLeft={() => setShowLeftPanel((v) => !v)}
+      onToggleRight={() => setShowRightPanel((v) => !v)}
     />
   );
 }

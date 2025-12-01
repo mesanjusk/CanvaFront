@@ -157,27 +157,37 @@ export function CanvasEditor({
 
   // Load a template when navigating from the gallery or template list
   useEffect(() => {
-    if (!fabricCanvas || !templateId) return;
+    if (!fabricCanvas || !templateId) return undefined;
     let cancelled = false;
 
-    const loadFromJson = (json, title) => {
-      fabricCanvas.loadFromJSON(json, () => {
-        fabricCanvas.renderAll();
-        resetHistory?.();
-        saveHistory?.();
+    const loadFromJson = (json, title) =>
+      new Promise((resolve, reject) => {
+        try {
+          fabricCanvas.clear();
+          fabricCanvas.loadFromJSON(json, () => {
+            fabricCanvas.renderAll();
+            resetHistory?.();
+            saveHistory?.();
+            resolve();
+          });
+
+          if (title) setTemplateTitle(title);
+        } catch (err) {
+          reject(err);
+        }
       });
-      if (title) setTemplateTitle(title);
-    };
 
     const loadTemplate = async () => {
       setLoadingTemplate(true);
       setLoadError("");
 
       try {
-        const res = await axios.get(`https://canvaback.onrender.com/api/template/${templateId}`);
+        const res = await axios.get(`https://canvaback.onrender.com/api/template/${templateId}`, {
+          timeout: 8000,
+        });
         const tpl = res.data?.result || res.data;
         if (tpl?.canvasJson && !cancelled) {
-          loadFromJson(tpl.canvasJson, tpl.title);
+          await loadFromJson(tpl.canvasJson, tpl.title);
           return;
         }
       } catch (err) {
@@ -188,19 +198,27 @@ export function CanvasEditor({
         const localTemplates = JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]");
         const cached = localTemplates.find((t) => t._id === templateId || t.id === templateId);
         if (cached?.canvasJson && !cancelled) {
-          loadFromJson(cached.canvasJson, cached.title);
+          await loadFromJson(cached.canvasJson, cached.title);
           return;
         }
       } catch (err) {
         console.error("Failed to load template from cache", err);
       }
 
-      if (!cancelled) setLoadError("Unable to load the selected template.");
+      if (!cancelled) {
+        setLoadError("Unable to load the selected template.");
+        fabricCanvas.renderAll();
+      }
     };
 
-    loadTemplate().finally(() => {
-      if (!cancelled) setLoadingTemplate(false);
-    });
+    loadTemplate()
+      .catch((err) => {
+        console.error("Failed to hydrate template", err);
+        if (!cancelled) setLoadError("Unable to load the selected template.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingTemplate(false);
+      });
 
     return () => {
       cancelled = true;

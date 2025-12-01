@@ -4,7 +4,32 @@ import toast, { Toaster } from 'react-hot-toast';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
-import { Edit, Delete, Add, PictureAsPdf, FileDownload } from '@mui/icons-material';
+import {
+  Add,
+  Delete,
+  Edit,
+  FileDownload,
+  PictureAsPdf
+} from '@mui/icons-material';
+import {
+  Box,
+  Button,
+  Card,
+  CardActions,
+  CardContent,
+  Container,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Grid,
+  IconButton,
+  Stack,
+  TextField,
+  Typography,
+  CircularProgress,
+  Chip
+} from '@mui/material';
 import BASE_URL from '../config';
 import { getThemeColor } from '../utils/storageUtils';
 
@@ -12,13 +37,13 @@ const Students = () => {
   const [students, setStudents] = useState([]);
   const [photos, setPhotos] = useState([]);
   const [form, setForm] = useState({
-   firstName: '',
-   middleName: '',
-  lastName: '',
+    firstName: '',
+    middleName: '',
+    lastName: '',
     dob: '',
-  gender: '',
-   mobileSelf: '',
-   institute_uuid: ''
+    gender: '',
+    mobileSelf: '',
+    institute_uuid: ''
   });
   const [editingId, setEditingId] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -27,9 +52,8 @@ const Students = () => {
   const [loading, setLoading] = useState(true);
   const searchTimeout = useRef();
   const themeColor = getThemeColor();
-  const institute_uuid = localStorage.getItem("institute_uuid");
+  const institute_uuid = localStorage.getItem('institute_uuid');
 
-  // Debounced search
   useEffect(() => {
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
     searchTimeout.current = setTimeout(() => setDebouncedSearch(search), 300);
@@ -40,8 +64,7 @@ const Students = () => {
     try {
       setLoading(true);
       const res = await axios.get(`${BASE_URL}/api/students`);
-setStudents(Array.isArray(res.data?.data) ? res.data.data : []);
-
+      setStudents(Array.isArray(res.data?.data) ? res.data.data : []);
     } catch {
       toast.error('Failed to fetch students');
     } finally {
@@ -57,55 +80,66 @@ setStudents(Array.isArray(res.data?.data) ? res.data.data : []);
     setForm({ ...form, [field]: e.target.value });
   };
 
-  const handleSubmit = async (e) => {
-  e.preventDefault();
-
-  const formData = new FormData();
-  formData.append('firstName', form.firstName);
-  formData.append('middleName', form.middleName);
-  formData.append('lastName', form.lastName);
-  formData.append('dob', form.dob);
-  formData.append('gender', form.gender);
-  formData.append('mobileSelf', form.mobileSelf);
-  formData.append('institute_uuid', institute_uuid);
-
-  photos.forEach((file) => {
-    formData.append('photos', file);
-  });
-
-  try {
-    if (editingId) {
-      if (!window.confirm('Update this student?')) return;
-      await axios.put(`${BASE_URL}/api/students/${editingId}`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      toast.success('Student updated');
-    } else {
-      await axios.post(`https://canvaback.onrender.com/api/students`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      toast.success('Student added');
-    }
-
-    setForm({ firstName: '', middleName: '', lastName: '', dob: '', gender: '', mobileSelf: '', institute_uuid });
+  const resetForm = () => {
+    setForm({
+      firstName: '',
+      middleName: '',
+      lastName: '',
+      dob: '',
+      gender: '',
+      mobileSelf: '',
+      institute_uuid
+    });
     setPhotos([]);
-    setEditingId(null);
-    setShowModal(false);
-    fetchStudents();
-  } catch {
-    toast.error('Failed to submit');
-  }
-};
+  };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    const formData = new FormData();
+    formData.append('firstName', form.firstName);
+    formData.append('middleName', form.middleName);
+    formData.append('lastName', form.lastName);
+    formData.append('dob', form.dob);
+    formData.append('gender', form.gender);
+    formData.append('mobileSelf', form.mobileSelf);
+    formData.append('institute_uuid', institute_uuid);
+
+    photos.forEach((file) => {
+      formData.append('photos', file);
+    });
+
+    try {
+      if (editingId) {
+        if (!window.confirm('Update this student?')) return;
+        await axios.put(`${BASE_URL}/api/students/${editingId}`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        toast.success('Student updated');
+      } else {
+        await axios.post(`https://canvaback.onrender.com/api/students`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        toast.success('Student added');
+      }
+
+      resetForm();
+      setEditingId(null);
+      setShowModal(false);
+      fetchStudents();
+    } catch {
+      toast.error('Failed to submit');
+    }
+  };
 
   const handleEdit = (student) => {
     setForm({
       firstName: student.firstName,
       middleName: student.middleName,
-      lastName: student.lastName, 
+      lastName: student.lastName,
       dob: student.dob,
       gender: student.gender,
-      mobileSelf: student.mobileSelf
+      mobileSelf: student.mobileSelf,
     });
     setEditingId(student._id);
     setShowModal(true);
@@ -122,7 +156,7 @@ setStudents(Array.isArray(res.data?.data) ? res.data.data : []);
     }
   };
 
-  const filteredStudents = students.filter(s =>
+  const filteredStudents = students.filter((s) =>
     s.firstName.toLowerCase().includes(debouncedSearch.toLowerCase())
   );
 
@@ -130,27 +164,27 @@ setStudents(Array.isArray(res.data?.data) ? res.data.data : []);
     const doc = new jsPDF();
     autoTable(doc, {
       head: [['FirstName', 'MiddleName', 'LastName', 'DOB', 'Gender', 'Mobile']],
-      body: filteredStudents.map(s => [
+      body: filteredStudents.map((s) => [
         s.firstName,
         s.middleName,
         s.lastName,
         s.dob,
         s.gender,
-        s.mobileSelf
-      ])
+        s.mobileSelf,
+      ]),
     });
     doc.save('students.pdf');
   };
 
   const exportExcel = () => {
     const worksheet = XLSX.utils.json_to_sheet(
-      filteredStudents.map(s => ({
+      filteredStudents.map((s) => ({
         'First Name': s.firstName,
         'Middle Name': s.middleName,
         'Last Name': s.lastName,
-        'DOB': s.dob,
-        'Gender': s.gender,
-        'Mobile': s.mobileSelf,
+        DOB: s.dob,
+        Gender: s.gender,
+        Mobile: s.mobileSelf,
       }))
     );
     const workbook = XLSX.utils.book_new();
@@ -159,100 +193,168 @@ setStudents(Array.isArray(res.data?.data) ? res.data.data : []);
   };
 
   return (
-    <div className="min-h-screen p-2" style={{ backgroundColor: themeColor }}>
+    <Box sx={{ minHeight: '100vh', bgcolor: themeColor, py: 2 }}>
       <Toaster />
-      <div className="flex items-center gap-2 mb-4 w-full flex-wrap">
-        <input
-          placeholder="Search student"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="border p-2 rounded flex-1 min-w-0 max-w-xs"
-        />
-        <button onClick={exportPDF} className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700" title="Export PDF">
-          <PictureAsPdf fontSize="small" />
-        </button>
-        <button onClick={exportExcel} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700" title="Export Excel">
-          <FileDownload fontSize="small" />
-        </button>
-        <button
-          onClick={() => { setForm({ firstName: '', middleName: '', lastName: '', dob: '', gender: '', mobileSelf: '' }); setEditingId(null); setShowModal(true); }}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-          title="Add Student"
-        >
-          <Add fontSize="small" />
-        </button>
-      </div>
+      <Container maxWidth="xl">
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center" mb={3}>
+          <TextField
+            placeholder="Search student"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            fullWidth
+            size="small"
+          />
+          <Stack direction="row" spacing={1}>
+            <IconButton color="error" onClick={exportPDF} title="Export PDF">
+              <PictureAsPdf fontSize="small" />
+            </IconButton>
+            <IconButton color="success" onClick={exportExcel} title="Export Excel">
+              <FileDownload fontSize="small" />
+            </IconButton>
+            <Button
+              variant="contained"
+              startIcon={<Add />}
+              onClick={() => {
+                resetForm();
+                setEditingId(null);
+                setShowModal(true);
+              }}
+            >
+              Add Student
+            </Button>
+          </Stack>
+        </Stack>
 
-      {loading ? (
-        <div className="text-center p-6">Loading students...</div>
-      ) : filteredStudents.length === 0 ? (
-        <div className="text-center p-6 text-gray-500">No students found.</div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-3">
-          {filteredStudents.map((s) => (
-            <div key={s._id} className="border rounded-lg p-3 shadow hover:shadow-md transition flex flex-col justify-between">
-              <div>
-                <h2 className="font-semibold text-lg text-gray-800">{s.firstName}{s.lastName}</h2>
-                <p className="text-sm text-gray-600 mt-1">{s.mobileSelf}</p>
-                <div className="mt-2 text-sm text-gray-700">
-                  <div>DOB: <span className="font-medium">{s.dob}</span></div>
-                  <div>Gender: <span className="font-medium">{s.gender}</span></div>
-                </div>
-              </div>
-              <div className="flex justify-end gap-2 mt-3">
-                <button onClick={() => handleEdit(s)} className="px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600" title="Edit">
-                  <Edit fontSize="small" />
-                </button>
-                <button onClick={() => handleDelete(s._id)} className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700" title="Delete">
-                  <Delete fontSize="small" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+        {loading ? (
+          <Stack alignItems="center" py={4}>
+            <CircularProgress />
+            <Typography variant="body2" color="text.secondary" mt={1}>
+              Loading students...
+            </Typography>
+          </Stack>
+        ) : filteredStudents.length === 0 ? (
+          <Typography align="center" color="text.secondary" py={4}>
+            No students found.
+          </Typography>
+        ) : (
+          <Grid container spacing={2}>
+            {filteredStudents.map((s) => (
+              <Grid item xs={12} sm={6} md={4} lg={3} xl={3} key={s._id}>
+                <Card elevation={3} sx={{ height: '100%' }}>
+                  <CardContent>
+                    <Typography variant="h6" fontWeight={700} gutterBottom>
+                      {s.firstName}
+                      {s.lastName}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Mobile: <Chip label={s.mobileSelf} size="small" sx={{ ml: 1 }} />
+                    </Typography>
+                    <Stack spacing={0.5} mt={2}>
+                      <Typography variant="body2">DOB: <strong>{s.dob}</strong></Typography>
+                      <Typography variant="body2">Gender: <strong>{s.gender}</strong></Typography>
+                    </Stack>
+                  </CardContent>
+                  <CardActions sx={{ justifyContent: 'flex-end', gap: 1, pb: 2, pr: 2 }}>
+                    <Button
+                      size="small"
+                      color="warning"
+                      startIcon={<Edit fontSize="small" />}
+                      onClick={() => handleEdit(s)}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      size="small"
+                      color="error"
+                      startIcon={<Delete fontSize="small" />}
+                      onClick={() => handleDelete(s._id)}
+                    >
+                      Delete
+                    </Button>
+                  </CardActions>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        )}
+      </Container>
 
-      {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center p-4 overflow-y-auto z-[60]">
-          <div className="bg-white p-6 rounded-xl w-full max-w-md shadow-lg">
-            <h2 className="text-xl font-semibold mb-4">{editingId ? 'Edit Student' : 'Add New Student'}</h2>
-            <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4">
-              <input type="text" value={form.firstName} onChange={handleChange('firstName')} className="border p-2 w-full rounded" placeholder="First Name" required />
-              <input type="text" value={form.middleName} onChange={handleChange('middleName')} className="border p-2 w-full rounded" placeholder="Middele Name" required />
-              <input type="text" value={form.lastName} onChange={handleChange('lastName')} className="border p-2 w-full rounded" placeholder="Last Name" required />
-              <input type="number" value={form.mobileSelf} onChange={handleChange('mobileSelf')} className="border p-2 w-full rounded" placeholder="Mobile number" />
-              <input type='date' value={form.dob} onChange={handleChange('dob')} className="border p-2 w-full rounded" placeholder="DOB" />
-              <input type="text" value={form.gender} onChange={handleChange('gender')} className="border p-2 w-full rounded" placeholder="Gender" />
+      <Dialog open={showModal} onClose={() => setShowModal(false)} fullWidth maxWidth="sm">
+        <DialogTitle>{editingId ? 'Edit Student' : 'Add New Student'}</DialogTitle>
+        <DialogContent>
+          <Stack component="form" onSubmit={handleSubmit} spacing={2} mt={1}>
+            <TextField
+              label="First Name"
+              value={form.firstName}
+              onChange={handleChange('firstName')}
+              required
+              fullWidth
+            />
+            <TextField
+              label="Middle Name"
+              value={form.middleName}
+              onChange={handleChange('middleName')}
+              required
+              fullWidth
+            />
+            <TextField
+              label="Last Name"
+              value={form.lastName}
+              onChange={handleChange('lastName')}
+              required
+              fullWidth
+            />
+            <TextField
+              label="Mobile number"
+              value={form.mobileSelf}
+              onChange={handleChange('mobileSelf')}
+              type="number"
+              fullWidth
+            />
+            <TextField
+              label="DOB"
+              type="date"
+              value={form.dob}
+              onChange={handleChange('dob')}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+            />
+            <TextField
+              label="Gender"
+              value={form.gender}
+              onChange={handleChange('gender')}
+              fullWidth
+            />
+            <Button variant="outlined" component="label">
+              Upload Photos
               <input
-  type="file"
-  multiple
-  accept="image/*"
-  onChange={(e) => setPhotos([...e.target.files])}
-  className="border p-2 w-full rounded"
-/>
-<div className="flex gap-2 flex-wrap">
-  {photos?.length > 0 &&
-    Array.from(photos).map((photo, idx) => (
-      <img
-        key={idx}
-        src={URL.createObjectURL(photo)}
-        alt="preview"
-        className="w-16 h-16 object-cover rounded border"
-      />
-    ))}
-</div>
-
-
-              <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setShowModal(false)} className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">Cancel</button>
-                <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">{editingId ? 'Update' : 'Save'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
+                hidden
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={(e) => setPhotos([...e.target.files])}
+              />
+            </Button>
+            <Stack direction="row" spacing={1} flexWrap="wrap">
+              {photos?.length > 0 &&
+                Array.from(photos).map((photo, idx) => (
+                  <Box
+                    key={idx}
+                    component="img"
+                    src={URL.createObjectURL(photo)}
+                    alt="preview"
+                    sx={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}
+                  />
+                ))}
+            </Stack>
+            <DialogActions sx={{ px: 0 }}>
+              <Button onClick={() => setShowModal(false)} color="inherit">Cancel</Button>
+              <Button type="submit" variant="contained">{editingId ? 'Update' : 'Save'}</Button>
+            </DialogActions>
+          </Stack>
+        </DialogContent>
+      </Dialog>
+    </Box>
   );
 };
 

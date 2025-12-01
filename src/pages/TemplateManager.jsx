@@ -1,9 +1,23 @@
 import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { fabric } from "fabric";
+import {
+  Box,
+  Button,
+  Card,
+  CardActionArea,
+  CardContent,
+  Container,
+  Grid,
+  MenuItem,
+  Paper,
+  Select,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
 
 const LOCAL_KEY = "localTemplates";
-
 
 const TemplateManager = () => {
   const canvasRef = useRef(null);
@@ -21,7 +35,6 @@ const TemplateManager = () => {
   const [imageFile, setImageFile] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Initialize Fabric.js canvas
   useEffect(() => {
     const newCanvas = new fabric.Canvas("template-canvas", {
       width: 600,
@@ -36,18 +49,15 @@ const TemplateManager = () => {
     };
   }, []);
 
-  // Fetch templates, categories, subcategories
   useEffect(() => {
     fetchTemplates();
     fetchCategories();
     fetchSubcategories();
   }, []);
 
-  // Filter subcategories based on selected category
   useEffect(() => {
     const filtered = subcategories.filter(
-      (sc) =>
-        sc.categoryId === category || sc.categoryId?.category_uuid === category
+      (sc) => sc.categoryId === category || sc.categoryId?.category_uuid === category
     );
     setFilteredSubcategories(filtered);
     setSubcategory("");
@@ -177,111 +187,127 @@ const TemplateManager = () => {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <h2 className="text-2xl font-bold">Template Manager</h2>
+    <Box sx={{ py: 4 }}>
+      <Container>
+        <Typography variant="h4" fontWeight={700} gutterBottom>
+          Template Manager
+        </Typography>
 
-      {/* Form */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 shadow rounded border">
-        <div className="space-y-3">
-          <input
-            type="text"
-            placeholder="Template Title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="w-full border px-3 py-2 rounded"
-          />
-
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className="w-full border px-3 py-2 rounded"
-          >
-            <option value="">Select Category</option>
-            {Array.isArray(categories) &&
-              categories.map((cat) => (
-                <option key={cat._id} value={cat.category_uuid}>
-                  {cat.name}
-                </option>
-              ))}
-          </select>
-
-          <select
-            value={subcategory}
-            onChange={(e) => setSubcategory(e.target.value)}
-            className="w-full border px-3 py-2 rounded"
-            disabled={!category}
-          >
-            <option value="">Select Subcategory</option>
-            {Array.isArray(filteredSubcategories) &&
-              filteredSubcategories.map((sub) => (
-                <option key={sub._id} value={sub._id}>
-                  {sub.name}
-                </option>
-              ))}
-          </select>
-
-          <input
-            type="number"
-            placeholder="Price"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            className="w-full border px-3 py-2 rounded"
-          />
-
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => setImageFile(e.target.files[0])}
-            className="w-full"
-          />
-
-          <button
-            onClick={handleSaveTemplate}
-            disabled={loading}
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-          >
-            {loading ? "Saving..." : "Save Template"}
-          </button>
-        </div>
-
-        <div>
-          <p className="text-sm text-gray-500 mb-1">Canvas Preview:</p>
-          <div className="border w-max shadow">
-            <canvas id="template-canvas" className="border" />
-          </div>
-        </div>
-      </div>
-
-      {/* Template list */}
-      <div>
-        <h3 className="text-lg font-semibold mb-2">Saved Templates</h3>
-        {Array.isArray(templates) && templates.length > 0 ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {templates.map((tpl) => (
-              <div
-                key={tpl.id}
-                className="bg-gray-100 p-3 rounded shadow hover:bg-gray-200 cursor-pointer"
-                onClick={() => loadTemplate(tpl.id)}
-              >
-                <div className="font-medium">{tpl.title}</div>
-                <div className="text-xs text-gray-500">
-                  {new Date(tpl.createdAt).toLocaleString()}
-                </div>
-                {tpl.image && (
-                  <img
-                    src={tpl.image}
-                    alt={tpl.title}
-                    className="mt-2 w-full h-24 object-cover rounded"
+        <Paper sx={{ p: 3, mb: 4 }} elevation={3}>
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <Stack spacing={2}>
+                <TextField
+                  label="Template Title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  fullWidth
+                />
+                <Select
+                  value={category}
+                  displayEmpty
+                  onChange={(e) => setCategory(e.target.value)}
+                  fullWidth
+                >
+                  <MenuItem value="">
+                    <em>Select Category</em>
+                  </MenuItem>
+                  {Array.isArray(categories) &&
+                    categories.map((cat) => (
+                      <MenuItem key={cat._id} value={cat.category_uuid}>
+                        {cat.name}
+                      </MenuItem>
+                    ))}
+                </Select>
+                <Select
+                  value={subcategory}
+                  displayEmpty
+                  onChange={(e) => setSubcategory(e.target.value)}
+                  fullWidth
+                  disabled={!category}
+                >
+                  <MenuItem value="">
+                    <em>Select Subcategory</em>
+                  </MenuItem>
+                  {Array.isArray(filteredSubcategories) &&
+                    filteredSubcategories.map((sub) => (
+                      <MenuItem key={sub._id} value={sub._id}>
+                        {sub.name}
+                      </MenuItem>
+                    ))}
+                </Select>
+                <TextField
+                  label="Price"
+                  type="number"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  fullWidth
+                />
+                <Button variant="outlined" component="label" fullWidth>
+                  {imageFile ? 'Change Image' : 'Upload Image'}
+                  <input
+                    hidden
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setImageFile(e.target.files[0])}
                   />
-                )}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-gray-500">No templates found.</p>
-        )}
-      </div>
-    </div>
+                </Button>
+                <Button
+                  variant="contained"
+                  onClick={handleSaveTemplate}
+                  disabled={loading}
+                  sx={{ alignSelf: 'flex-start' }}
+                >
+                  {loading ? 'Saving...' : 'Save Template'}
+                </Button>
+              </Stack>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Typography variant="body2" color="text.secondary" mb={1}>
+                Canvas Preview:
+              </Typography>
+              <Box sx={{ border: '1px solid', borderColor: 'divider', width: 'fit-content', boxShadow: 1 }}>
+                <canvas id="template-canvas" />
+              </Box>
+            </Grid>
+          </Grid>
+        </Paper>
+
+        <Box>
+          <Typography variant="h6" fontWeight={700} gutterBottom>
+            Saved Templates
+          </Typography>
+          {Array.isArray(templates) && templates.length > 0 ? (
+            <Grid container spacing={2}>
+              {templates.map((tpl) => (
+                <Grid item xs={12} sm={6} md={3} key={tpl.id}>
+                  <Card elevation={2}>
+                    <CardActionArea onClick={() => loadTemplate(tpl.id)}>
+                      <CardContent>
+                        <Typography fontWeight={600}>{tpl.title}</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {new Date(tpl.createdAt).toLocaleString()}
+                        </Typography>
+                        {tpl.image && (
+                          <Box
+                            component="img"
+                            src={tpl.image}
+                            alt={tpl.title}
+                            sx={{ mt: 2, width: '100%', height: 120, objectFit: 'cover', borderRadius: 1 }}
+                          />
+                        )}
+                      </CardContent>
+                    </CardActionArea>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          ) : (
+            <Typography color="text.secondary">No templates found.</Typography>
+          )}
+        </Box>
+      </Container>
+    </Box>
   );
 };
 

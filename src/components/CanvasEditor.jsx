@@ -118,6 +118,13 @@ export function CanvasEditor({
     };
   }, [canvasRef]);
 
+  useEffect(() => {
+    if (!fabricCanvas) return;
+    const scale = zoom / 100;
+    fabricCanvas.setViewportTransform([scale, 0, 0, scale, 0, 0]);
+    fabricCanvas.requestRenderAll();
+  }, [fabricCanvas, zoom]);
+
   // Load a template when navigating from the gallery or template list
   useEffect(() => {
     if (!fabricCanvas || !templateId) return;
@@ -193,7 +200,7 @@ export function CanvasEditor({
 
       viewport={
         <Viewport stageStyle={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}>
-          <canvas ref={canvasElementRef} style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }} />
+          <canvas ref={canvasElementRef} style={{ width: "100%", height: "100%" }} />
           {loadingTemplate && (
             <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-white px-4 py-1 rounded shadow text-sm text-gray-600">
               Loading template...

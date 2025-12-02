@@ -181,6 +181,8 @@ export function CanvasEditor({
       setLoadingTemplate(true);
       setLoadError("");
       let remoteError = "";
+      let remoteErrorLogger = null;
+      let remoteErrorObj = null;
       let loadedTemplate = false;
 
       try {
@@ -198,8 +200,8 @@ export function CanvasEditor({
         remoteError = isTimeout
           ? "Template request timed out."
           : "Failed to fetch template.";
-        const logger = isTimeout ? console.warn : console.error;
-        logger(`${remoteError} Falling back to cache.`, err);
+        remoteErrorLogger = isTimeout ? console.warn : console.error;
+        remoteErrorObj = err;
       }
 
       try {
@@ -208,17 +210,21 @@ export function CanvasEditor({
         if (cached?.canvasJson && !cancelled) {
           await loadFromJson(cached.canvasJson, cached.title);
           loadedTemplate = true;
+          if (remoteErrorLogger) {
+            remoteErrorLogger(`${remoteError} Loaded cached template instead.`, remoteErrorObj);
+          }
           return;
         }
       } catch (err) {
         console.error("Failed to load template from cache", err);
       }
 
-      if (!cancelled) {
-        if (!loadedTemplate) {
-          setLoadError(remoteError || "Unable to load the selected template.");
-          fabricCanvas.renderAll();
+      if (!cancelled && !loadedTemplate) {
+        if (remoteErrorLogger) {
+          remoteErrorLogger(`${remoteError} Falling back to cache.`, remoteErrorObj);
         }
+        setLoadError(remoteError || "Unable to load the selected template.");
+        fabricCanvas.renderAll();
       }
     };
 

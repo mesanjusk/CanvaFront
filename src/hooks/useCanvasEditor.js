@@ -136,7 +136,7 @@ export function useCanvasEditor(canvasRef, canvasWidth, canvasHeight) {
       canvasInstance.off("object:modified", saveHistory);
       canvasInstance.off("object:removed", saveHistory);
     };
-  }, [canvasRef, canvasRef?.current, saveHistory]);
+  }, [canvasRef, canvasRef?.current]);
 
   return {
     showSettings,

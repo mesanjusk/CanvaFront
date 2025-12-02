@@ -44,6 +44,7 @@ export function CanvasEditor({
     width: CANVAS_WIDTH,
     height: CANVAS_HEIGHT,
   });
+
   const {
     canvasRef,
     addText,
@@ -58,6 +59,7 @@ export function CanvasEditor({
     CANVAS_WIDTH,
     CANVAS_HEIGHT
   );
+
   const {
     activeObj,
     setActiveObj,
@@ -126,9 +128,11 @@ export function CanvasEditor({
   const onSave = () => {
     downloadHighRes?.(CANVAS_WIDTH, CANVAS_HEIGHT, templateTitle || "canvas");
   };
+
   const onDownload = () => download?.();
   const onUndo = () => undo?.();
   const onRedo = () => redo?.();
+
   const onExport = (opts) => {
     if (opts?.pdf) {
       downloadPDF?.();
@@ -180,33 +184,67 @@ export function CanvasEditor({
     const loadTemplate = async () => {
       setLoadingTemplate(true);
       setLoadError("");
+      let remoteError = "";
+      let remoteErrorLogger = null;
+      let remoteErrorObj = null;
+      let loadedTemplate = false;
 
+      // Try remote first
       try {
-        const res = await axios.get(`https://canvaback.onrender.com/api/template/${templateId}`, {
-          timeout: 8000,
-        });
+        const res = await axios.get(
+          `https://canvaback.onrender.com/api/template/${templateId}`,
+          {
+            timeout: 8000,
+          }
+        );
         const tpl = res.data?.result || res.data;
         if (tpl?.canvasJson && !cancelled) {
           await loadFromJson(tpl.canvasJson, tpl.title);
+          loadedTemplate = true;
           return;
         }
       } catch (err) {
-        console.error("Failed to fetch template, falling back to cache", err);
+        const isTimeout =
+          axios.isAxiosError(err) && err.code === "ECONNABORTED";
+        remoteError = isTimeout
+          ? "Template request timed out."
+          : "Failed to fetch template.";
+        remoteErrorLogger = isTimeout ? console.warn : console.error;
+        remoteErrorObj = err;
       }
 
+      // Fallback to local cache
       try {
-        const localTemplates = JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]");
-        const cached = localTemplates.find((t) => t._id === templateId || t.id === templateId);
+        const localTemplates = JSON.parse(
+          localStorage.getItem(LOCAL_KEY) || "[]"
+        );
+        const cached = localTemplates.find(
+          (t) => t._id === templateId || t.id === templateId
+        );
         if (cached?.canvasJson && !cancelled) {
           await loadFromJson(cached.canvasJson, cached.title);
+          loadedTemplate = true;
+          if (remoteErrorLogger) {
+            remoteErrorLogger(
+              `${remoteError} Loaded cached template instead.`,
+              remoteErrorObj
+            );
+          }
           return;
         }
       } catch (err) {
         console.error("Failed to load template from cache", err);
       }
 
-      if (!cancelled) {
-        setLoadError("Unable to load the selected template.");
+      // If nothing loaded
+      if (!cancelled && !loadedTemplate) {
+        if (remoteErrorLogger) {
+          remoteErrorLogger(
+            `${remoteError} Falling back to cache.`,
+            remoteErrorObj
+          );
+        }
+        setLoadError(remoteError || "Unable to load the selected template.");
         fabricCanvas.renderAll();
       }
     };
@@ -246,7 +284,6 @@ export function CanvasEditor({
           isMobile={isMobile}
         />
       }
-
       leftToolbar={
         <LeftToolbar
           addText={addText}
@@ -256,11 +293,17 @@ export function CanvasEditor({
           onImportImage={handleImportImage}
         />
       }
-
       viewport={
-        <div className="w-full h-full" onDrop={handleDrop} onDragOver={handleDragOver}>
+        <div
+          className="w-full h-full"
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+        >
           <Viewport stageStyle={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}>
-            <canvas ref={canvasElementRef} style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }} />
+            <canvas
+              ref={canvasElementRef}
+              style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}
+            />
             {loadingTemplate && (
               <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-white px-4 py-1 rounded shadow text-sm text-gray-600">
                 Loading template...
@@ -275,14 +318,20 @@ export function CanvasEditor({
           </Viewport>
         </div>
       }
-
       rightPanel={
         <div className="flex flex-col h-full divide-y">
-          <LayersPanel canvas={fabricCanvas} onSelect={setActiveObj} saveHistory={saveHistory} />
-          <RightInspectorPanel activeObj={activeObj} onUpdate={handleInspectorUpdate} onClose={() => setActiveObj(null)} />
+          <LayersPanel
+            canvas={fabricCanvas}
+            onSelect={setActiveObj}
+            saveHistory={saveHistory}
+          />
+          <RightInspectorPanel
+            activeObj={activeObj}
+            onUpdate={handleInspectorUpdate}
+            onClose={() => setActiveObj(null)}
+          />
         </div>
       }
-
       bottomBar={
         <BottomBar>
           <div className="flex items-center gap-2 w-full">

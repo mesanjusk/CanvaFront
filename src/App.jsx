@@ -1,14 +1,14 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAppContext } from './context/AppContext';
 import AppShell from './layouts/AppShell';
-import LoginPage from './pages/LoginPage';
-import DashboardPage from './pages/DashboardPage';
-import AdmissionsPage from './pages/AdmissionsPage';
-import IdCardsPage from './pages/IdCardsPage';
-import ReportCardsPage from './pages/ReportCardsPage';
-import MastersPage from './pages/MastersPage';
-import UsersPage from './pages/UsersPage';
-import SettingsPage from './pages/SettingsPage';
+import LoginPage from './Pages/LoginPage';
+import DashboardPage from './Pages/DashboardPage';
+import AdmissionsPage from './Pages/AdmissionsPage';
+import IdCardsPage from './Pages/IdCardsPage';
+import ReportCardsPage from './Pages/ReportCardsPage';
+import MastersPage from './Pages/MastersPage';
+import UsersPage from './Pages/UsersPage';
+import SettingsPage from './Pages/SettingsPage';
 
 function ProtectedRoute({ children }) {
   const { user } = useAppContext();

@@ -19,7 +19,14 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<LoginPage />} />
-      <Route path="/app" element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
+      <Route
+        path="/app"
+        element={
+          <ProtectedRoute>
+            <AppShell />
+          </ProtectedRoute>
+        }
+      >
         <Route index element={<DashboardPage />} />
         <Route path="admissions" element={<AdmissionsPage />} />
         <Route path="id-cards" element={<IdCardsPage />} />

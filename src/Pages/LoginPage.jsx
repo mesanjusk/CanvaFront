@@ -18,7 +18,7 @@ export default function LoginPage() {
       await login(form.username, form.password);
       navigate('/app');
     } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Login failed');
+      setError(err.response?.data?.message || err.message || 'Login fail');
     } finally {
       setLoading(false);
     }

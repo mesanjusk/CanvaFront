@@ -9,6 +9,7 @@ import ReportCardsPage from './Pages/ReportCardsPage';
 import MastersPage from './Pages/MastersPage';
 import UsersPage from './Pages/UsersPage';
 import SettingsPage from './Pages/SettingsPage';
+import PublicAccessPage from './Pages/PublicAccessPage';
 
 function ProtectedRoute({ children }) {
   const { user } = useAppContext();
@@ -19,6 +20,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<LoginPage />} />
+      <Route path="/public/:token" element={<PublicAccessPage />} />
       <Route
         path="/app"
         element={

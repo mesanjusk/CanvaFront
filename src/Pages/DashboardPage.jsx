@@ -1,41 +1,36 @@
-import { Card, CardContent, Grid, List, ListItem, ListItemText, Typography } from '@mui/material';
+import { Grid, Typography } from '@mui/material';
 import { useEffect, useState } from 'react';
 import api from '../services/api';
-import { useAppContext } from '../context/AppContext';
-import PageHeader from '../components/PageHeader';
-import StatCard from '../components/StatCard';
+import PageCard from '../components/PageCard';
 
 export default function DashboardPage() {
-  const { institute } = useAppContext();
-  const [summary, setSummary] = useState({ cards: [], recentAdmissions: [] });
+  const [summary, setSummary] = useState(null);
 
   useEffect(() => {
-    if (!institute?.institute_uuid) return;
-    api.get('/api/dashboard/summary', { params: { institute_uuid: institute.institute_uuid } })
-      .then((res) => setSummary(res.data.data))
-      .catch(console.error);
-  }, [institute?.institute_uuid]);
+    api.get('/api/dashboard/summary').then(({ data }) => setSummary(data.data));
+  }, []);
+
+  const cards = [
+    { label: 'Schools', value: summary?.schools ?? '-' },
+    { label: 'Users', value: summary?.users ?? '-' },
+    { label: 'Students', value: summary?.students ?? '-' },
+    { label: 'Templates', value: summary?.templates ?? '-' },
+    { label: 'Pending Corrections', value: summary?.pendingCorrections ?? '-' },
+    { label: 'Card Records', value: summary?.cardRecords ?? '-' },
+  ];
 
   return (
     <>
-      <PageHeader title="Dashboard" subtitle="Daily view for school admins, principals and team members." />
-      <Grid container spacing={2} sx={{ mb: 2 }}>
-        {summary.cards.map((card) => (
-          <Grid size={{ xs: 6, md: 4, lg: 2 }} key={card.label}><StatCard {...card} /></Grid>
+      <Typography variant="h4" sx={{ mb: 3, fontWeight: 700 }}>Dashboard</Typography>
+      <Grid container spacing={2}>
+        {cards.map((card) => (
+          <Grid item xs={12} sm={6} md={4} key={card.label}>
+            <PageCard title={card.label}>
+              <Typography variant="h3" fontWeight={700}>{card.value}</Typography>
+            </PageCard>
+          </Grid>
         ))}
       </Grid>
-      <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 1 }}>Recent admissions</Typography>
-          <List>
-            {summary.recentAdmissions?.length ? summary.recentAdmissions.map((item) => (
-              <ListItem key={item.uuid} divider>
-                <ListItemText primary={item.course || 'Admission'} secondary={`${item.className || '-'} ${item.section || ''} • ${new Date(item.createdAt).toLocaleDateString()}`} />
-              </ListItem>
-            )) : <Typography color="text.secondary">No recent admissions.</Typography>}
-          </List>
-        </CardContent>
-      </Card>
     </>
   );
 }

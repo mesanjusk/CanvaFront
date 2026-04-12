@@ -1,17 +1,17 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAppContext } from './context/AppContext';
-import AppShell from './layouts/AppShell';
-import LoginPage from './Pages/LoginPage';
-import DashboardPage from './Pages/DashboardPage';
-import AdmissionsPage from './Pages/AdmissionsPage';
-import IdCardsPage from './Pages/IdCardsPage';
-import ReportCardsPage from './Pages/ReportCardsPage';
-import MastersPage from './Pages/MastersPage';
-import UsersPage from './Pages/UsersPage';
-import SettingsPage from './Pages/SettingsPage';
-import PublicAccessPage from './Pages/PublicAccessPage';
+import AppLayout from './layouts/AppLayout';
+import LoginPage from './pages/LoginPage';
+import DashboardPage from './pages/DashboardPage';
+import SchoolsPage from './pages/SchoolsPage';
+import UsersPage from './pages/UsersPage';
+import StudentsPage from './pages/StudentsPage';
+import TemplatesPage from './pages/TemplatesPage';
+import IdCardsPage from './pages/IdCardsPage';
+import EditRequestsPage from './pages/EditRequestsPage';
+import PublicStudentEditPage from './pages/PublicStudentEditPage';
 
-function ProtectedRoute({ children }) {
+function PrivateRoute({ children }) {
   const { user } = useAppContext();
   return user ? children : <Navigate to="/" replace />;
 }
@@ -20,22 +20,22 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<LoginPage />} />
-      <Route path="/public/:token" element={<PublicAccessPage />} />
+      <Route path="/public/student-edit/:token" element={<PublicStudentEditPage />} />
       <Route
         path="/app"
         element={
-          <ProtectedRoute>
-            <AppShell />
-          </ProtectedRoute>
+          <PrivateRoute>
+            <AppLayout />
+          </PrivateRoute>
         }
       >
         <Route index element={<DashboardPage />} />
-        <Route path="admissions" element={<AdmissionsPage />} />
-        <Route path="id-cards" element={<IdCardsPage />} />
-        <Route path="report-cards" element={<ReportCardsPage />} />
-        <Route path="masters" element={<MastersPage />} />
+        <Route path="schools" element={<SchoolsPage />} />
         <Route path="users" element={<UsersPage />} />
-        <Route path="settings" element={<SettingsPage />} />
+        <Route path="students" element={<StudentsPage />} />
+        <Route path="templates" element={<TemplatesPage />} />
+        <Route path="id-cards" element={<IdCardsPage />} />
+        <Route path="edit-requests" element={<EditRequestsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

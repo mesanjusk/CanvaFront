@@ -1,31 +1,28 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
-import "./index.css";
-import App from "./App";
-import BrandingProvider from "./context/BrandingContext";
-import { AppProvider } from "./context/AppContext";
-import { ThemeProvider, createTheme } from "@mui/material/styles";
-import CssBaseline from "@mui/material/CssBaseline";
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+import { CssBaseline } from '@mui/material';
+import { ThemeProvider } from '@mui/material/styles';
+import App from './App';
+import { AppProvider, useAppContext } from './context/AppContext';
+import { getTheme } from './theme';
 
-const theme = createTheme({
-  palette: {
-    primary: { main: "#00c4cc" },
-    secondary: { main: "#ff4081" },
-  },
-});
+function Root() {
+  const { settings } = useAppContext();
+  return (
+    <ThemeProvider theme={getTheme(settings?.theme)}>
+      <CssBaseline />
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </ThemeProvider>
+  );
+}
 
-ReactDOM.createRoot(document.getElementById("root")).render(
+ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <AppProvider>
-          <BrandingProvider>
-            <App />
-          </BrandingProvider>
-        </AppProvider>
-      </ThemeProvider>
-    </BrowserRouter>
+    <AppProvider>
+      <Root />
+    </AppProvider>
   </React.StrictMode>
 );

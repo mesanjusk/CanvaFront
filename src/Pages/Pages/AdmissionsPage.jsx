@@ -55,7 +55,7 @@ export default function AdmissionsPage() {
         action={<Stack direction="row" spacing={1}><Button variant="outlined" startIcon={<AddRoundedIcon />} onClick={() => setStudentDialog(true)}>New student</Button><Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => setAdmissionDialog(true)}>New admission</Button></Stack>}
       />
       <Grid container spacing={2}>
-        <Grid item xs={12} md={6}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}><CardContent>
             <Typography variant="h6" sx={{ mb: 2 }}>Students</Typography>
             <Stack spacing={1.5}>{students.map((student) => (
@@ -67,7 +67,7 @@ export default function AdmissionsPage() {
             ))}</Stack>
           </CardContent></Card>
         </Grid>
-        <Grid item xs={12} md={6}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}><CardContent>
             <Typography variant="h6" sx={{ mb: 2 }}>Admissions</Typography>
             <Stack spacing={1.5}>{admissions.map((admission) => (

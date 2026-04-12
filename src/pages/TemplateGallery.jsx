@@ -17,7 +17,7 @@ const TemplateGallery = ({ onSelect }) => {
         </Typography>
         <Grid container spacing={2}>
           {templates.map((tpl) => (
-            <Grid item xs={12} sm={6} md={3} key={tpl.id}>
+            <Grid xs={12} sm={6} md={3} key={tpl.id}>
               <Card>
                 <CardActionArea onClick={() => onSelect?.(tpl)}>
                   <CardMedia component="img" height={140} image={tpl.image} alt={tpl.title} />

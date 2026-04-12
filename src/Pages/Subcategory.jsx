@@ -148,7 +148,7 @@ export default function Subcategory() {
           {allTemplates.length > 0 ? (
             <Grid container spacing={2} sx={{ pt: 2 }}>
               {allTemplates.map((temp) => (
-                <Grid item xs={6} sm={4} md={2} key={temp._id}>
+                <Grid xs={6} sm={4} md={2} key={temp._id}>
                   <Card
                     elevation={2}
                     sx={{

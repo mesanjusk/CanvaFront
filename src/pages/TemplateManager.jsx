@@ -195,7 +195,7 @@ const TemplateManager = () => {
 
         <Paper sx={{ p: 3, mb: 4 }} elevation={3}>
           <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
+            <Grid xs={12} md={6}>
               <Stack spacing={2}>
                 <TextField
                   label="Template Title"
@@ -262,7 +262,7 @@ const TemplateManager = () => {
                 </Button>
               </Stack>
             </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid xs={12} md={6}>
               <Typography variant="body2" color="text.secondary" mb={1}>
                 Canvas Preview:
               </Typography>
@@ -280,7 +280,7 @@ const TemplateManager = () => {
           {Array.isArray(templates) && templates.length > 0 ? (
             <Grid container spacing={2}>
               {templates.map((tpl) => (
-                <Grid item xs={12} sm={6} md={3} key={tpl.id}>
+                <Grid xs={12} sm={6} md={3} key={tpl.id}>
                   <Card elevation={2}>
                     <CardActionArea onClick={() => loadTemplate(tpl.id)}>
                       <CardContent>

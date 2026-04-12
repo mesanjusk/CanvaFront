@@ -29,7 +29,7 @@ export default function MastersPage() {
   return (
     <>
       <PageHeader title="Masters" subtitle="Classes, sections, academic years, exams, subjects and more — all editable from frontend." action={<Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => setDialog(true)}>Add master</Button>} />
-      <Grid container spacing={2}>{items.map((item) => <Grid item xs={12} sm={6} md={4} key={item.uuid}><Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}><CardContent>
+      <Grid container spacing={2}>{items.map((item) => <Grid size={{ xs: 12, sm: 6, md: 4 }} key={item.uuid}><Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}><CardContent>
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
           <Typography fontWeight={700}>{item.name}</Typography><Chip size="small" label={item.type} />
         </Stack>

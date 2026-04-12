@@ -124,7 +124,7 @@ const Dashboard = () => {
     loading ? skeleton : isMoney ? `₹${(val || 0).toLocaleString()}` : val || 0;
 
   const StatCard = ({ label, value, color, onClick }) => (
-    <Grid item xs={12} sm={6} md={4} lg={2}>
+    <Grid xs={12} sm={6} md={4} lg={2}>
       <CardActionArea onClick={onClick} sx={{ height: "100%" }}>
         <Card elevation={3} sx={{ height: "100%" }}>
           <CardContent>
@@ -185,7 +185,7 @@ const Dashboard = () => {
           </Grid>
 
           <Grid container spacing={2} mb={3}>
-            <Grid item xs={12} md={6}>
+            <Grid xs={12} md={6}>
               <Card elevation={3} sx={{ height: "100%" }}>
                 <CardContent sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
                   <Typography variant="body2" color="text.secondary" mb={1}>
@@ -207,7 +207,7 @@ const Dashboard = () => {
               </Card>
             </Grid>
 
-            <Grid item xs={12} md={6}>
+            <Grid xs={12} md={6}>
               <Card elevation={3} sx={{ height: "100%" }}>
                 <CardContent sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
                   <Typography variant="body2" color="text.secondary" mb={1}>

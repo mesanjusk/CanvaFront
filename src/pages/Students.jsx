@@ -239,7 +239,7 @@ const Students = () => {
         ) : (
           <Grid container spacing={2}>
             {filteredStudents.map((s) => (
-              <Grid item xs={12} sm={6} md={4} lg={3} xl={3} key={s._id}>
+              <Grid xs={12} sm={6} md={4} lg={3} xl={3} key={s._id}>
                 <Card elevation={3} sx={{ height: '100%' }}>
                   <CardContent>
                     <Typography variant="h6" fontWeight={700} gutterBottom>

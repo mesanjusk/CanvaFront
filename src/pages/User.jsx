@@ -218,7 +218,7 @@ const User = () => {
         ) : (
           <Grid container spacing={2}>
             {filteredUsers.map((item) => (
-              <Grid item xs={12} sm={6} md={4} lg={3} key={item._id}>
+              <Grid xs={12} sm={6} md={4} lg={3} key={item._id}>
                 <Card elevation={3} sx={{ height: '100%' }}>
                   <CardContent>
                     <Typography variant="h6" fontWeight={700} gutterBottom>

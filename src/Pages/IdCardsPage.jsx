@@ -37,7 +37,7 @@ export default function IdCardsPage() {
     <>
       <PageHeader title="ID Card Management" subtitle="Create reusable ID card templates and preview student-ready records." action={<Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => setDialog(true)}>Add template</Button>} />
       <Grid container spacing={2}>
-        <Grid item xs={12} md={5}>
+        <Grid size={{ xs: 12, md: 5 }}>
           <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}><CardContent>
             <Typography variant="h6" sx={{ mb: 2 }}>Templates</Typography>
             <Stack spacing={1.5}>{templates.map((item) => (
@@ -49,11 +49,11 @@ export default function IdCardsPage() {
             ))}</Stack>
           </CardContent></Card>
         </Grid>
-        <Grid item xs={12} md={7}>
+        <Grid size={{ xs: 12, md: 7 }}>
           <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}><CardContent>
             <Typography variant="h6" sx={{ mb: 2 }}>Students ready for print</Typography>
             <Grid container spacing={1.5}>{students.map((student) => (
-              <Grid item xs={12} sm={6} key={student.uuid}><Card variant="outlined"><CardContent>
+              <Grid size={{ xs: 12, sm: 6 }} key={student.uuid}><Card variant="outlined"><CardContent>
                 <Typography fontWeight={700}>{student.firstName} {student.lastName}</Typography>
                 <Typography variant="body2" color="text.secondary">{student.className || '-'} {student.section || ''} • Roll {student.rollNumber || '-'}</Typography>
                 <Typography variant="body2" color="text.secondary">Adm No: {student.admissionNo || '-'}</Typography>

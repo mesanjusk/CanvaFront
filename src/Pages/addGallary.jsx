@@ -197,7 +197,7 @@ const AddGallary = ({ onImageSelect }) => {
           {gallaries.map((g) => {
             const id = g._id || g.Gallary_uuid;
             return (
-              <Grid item xs={6} sm={4} md={3} key={id}>
+              <Grid xs={6} sm={4} md={3} key={id}>
                 <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                   <CardActionArea onClick={() => handleUseImage(g.image)} sx={{ flexGrow: 1 }}>
                     <CardMedia

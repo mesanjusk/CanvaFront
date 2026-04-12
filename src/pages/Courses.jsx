@@ -201,7 +201,7 @@ const Courses = () => {
       ) : (
         <Grid container spacing={2}>
           {filteredCourses.map((c) => (
-            <Grid item key={c._id} xs={12} sm={6} md={4} lg={3} xl={2}>
+            <Grid key={c._id} xs={12} sm={6} md={4} lg={3} xl={2}>
               <Card elevation={3} sx={{ height: "100%" }}>
                 <CardContent sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
                   <Typography variant="h6" fontWeight={600} gutterBottom>

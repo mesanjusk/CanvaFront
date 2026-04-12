@@ -29,7 +29,7 @@ export default function UsersPage() {
   return (
     <>
       <PageHeader title="Users & Team" subtitle="Create principal, teacher, admin and staff accounts from the app UI." action={<Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => setDialog(true)}>Add user</Button>} />
-      <Grid container spacing={2}>{users.map((user) => <Grid item xs={12} sm={6} md={4} key={user._id}><Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}><CardContent>
+      <Grid container spacing={2}>{users.map((user) => <Grid size={{ xs: 12, sm: 6, md: 4 }} key={user._id}><Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}><CardContent>
         <Typography fontWeight={700}>{user.name}</Typography>
         <Typography variant="body2" color="text.secondary">{user.role}</Typography>
         <Typography variant="body2" color="text.secondary">{user.mobile || user.login_username}</Typography>

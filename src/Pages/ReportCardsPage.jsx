@@ -47,7 +47,7 @@ export default function ReportCardsPage() {
     <>
       <PageHeader title="Report Card Management" subtitle="Setup exam templates and create report card records from the mobile dashboard." action={<Stack direction="row" spacing={1}><Button variant="outlined" startIcon={<AddRoundedIcon />} onClick={() => setTemplateDialog(true)}>Add template</Button><Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => setReportDialog(true)}>Add report</Button></Stack>} />
       <Grid container spacing={2}>
-        <Grid item xs={12} md={5}><Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}><CardContent>
+        <Grid size={{ xs: 12, md: 5 }}><Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}><CardContent>
           <Typography variant="h6" sx={{ mb: 2 }}>Templates</Typography>
           <Stack spacing={1.5}>{templates.map((item) => <Card key={item.uuid} variant="outlined"><CardContent>
             <Typography fontWeight={700}>{item.name}</Typography>
@@ -55,7 +55,7 @@ export default function ReportCardsPage() {
             <Typography variant="body2" color="text.secondary">Columns: {item.subjectColumns?.join(', ')}</Typography>
           </CardContent></Card>)}</Stack>
         </CardContent></Card></Grid>
-        <Grid item xs={12} md={7}><Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}><CardContent>
+        <Grid size={{ xs: 12, md: 7 }}><Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}><CardContent>
           <Typography variant="h6" sx={{ mb: 2 }}>Generated records</Typography>
           <Stack spacing={1.5}>{reports.map((item) => {
             const student = students.find((s) => s.uuid === item.student_uuid);

@@ -20,7 +20,7 @@ export default function SettingsPage() {
     <>
       <PageHeader title="School Settings" subtitle="Manage branding, modules and school profile from frontend only." action={<Button variant="contained" onClick={save}>Save settings</Button>} />
       <Grid container spacing={2}>
-        <Grid item xs={12} md={7}><Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}><CardContent>
+        <Grid size={{ xs: 12, md: 7 }}><Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}><CardContent>
           <Stack spacing={2}>
             <TextField label="School name" value={form.schoolName || ''} onChange={(e) => setForm((p) => ({ ...p, schoolName: e.target.value }))} />
             <TextField label="Short name" value={form.shortName || ''} onChange={(e) => setForm((p) => ({ ...p, shortName: e.target.value }))} />
@@ -35,7 +35,7 @@ export default function SettingsPage() {
             <TextField label="Signature URL" value={form.signatureUrl || ''} onChange={(e) => setForm((p) => ({ ...p, signatureUrl: e.target.value }))} />
           </Stack>
         </CardContent></Card></Grid>
-        <Grid item xs={12} md={5}><Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}><CardContent>
+        <Grid size={{ xs: 12, md: 5 }}><Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}><CardContent>
           <Typography variant="h6" sx={{ mb: 2 }}>Modules</Typography>
           <Stack spacing={1.5}>{Object.entries(form.modules || {}).map(([key, value]) => (
             <Stack key={key} direction="row" justifyContent="space-between" alignItems="center">

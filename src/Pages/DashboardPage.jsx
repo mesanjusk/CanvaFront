@@ -21,7 +21,7 @@ export default function DashboardPage() {
       <PageHeader title="Dashboard" subtitle="Daily view for school admins, principals and team members." />
       <Grid container spacing={2} sx={{ mb: 2 }}>
         {summary.cards.map((card) => (
-          <Grid item xs={6} md={4} lg={2.4} key={card.label}><StatCard {...card} /></Grid>
+          <Grid size={{ xs: 6, md: 4, lg: 2 }} key={card.label}><StatCard {...card} /></Grid>
         ))}
       </Grid>
       <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>

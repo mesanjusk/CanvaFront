@@ -1,15 +1,15 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAppContext } from './context/AppContext';
 import AppLayout from './layouts/AppLayout';
-import LoginPage from './pages/LoginPage';
-import DashboardPage from './pages/DashboardPage';
-import SchoolsPage from './pages/SchoolsPage';
-import UsersPage from './pages/UsersPage';
-import StudentsPage from './pages/StudentsPage';
-import TemplatesPage from './pages/TemplatesPage';
-import IdCardsPage from './pages/IdCardsPage';
-import EditRequestsPage from './pages/EditRequestsPage';
-import PublicStudentEditPage from './pages/PublicStudentEditPage';
+import LoginPage from './Pages/LoginPage';
+import DashboardPage from './Pages/DashboardPage';
+import SchoolsPage from './Pages/SchoolsPage';
+import UsersPage from './Pages/UsersPage';
+import StudentsPage from './Pages/StudentsPage';
+import TemplatesPage from './Pages/TemplatesPage';
+import IdCardsPage from './Pages/IdCardsPage';
+import EditRequestsPage from './Pages/EditRequestsPage';
+import PublicStudentEditPage from './Pages/PublicStudentEditPage';
 
 function PrivateRoute({ children }) {
   const { user } = useAppContext();

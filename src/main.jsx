@@ -1,29 +1,28 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
-import { CssBaseline, ThemeProvider, createTheme } from '@mui/material';
+import { CssBaseline } from '@mui/material';
+import { ThemeProvider } from '@mui/material/styles';
 import App from './App';
-import { AppProvider } from './context/AppContext';
-import './index.css';
+import { AppProvider, useAppContext } from './context/AppContext';
+import { getTheme } from './theme';
 
-const theme = createTheme({
-  palette: {
-    primary: { main: '#1565c0' },
-    secondary: { main: '#2e7d32' },
-    background: { default: '#f5f7fb' },
-  },
-  shape: { borderRadius: 14 },
-});
+function Root() {
+  const { settings } = useAppContext();
+  return (
+    <ThemeProvider theme={getTheme(settings?.theme)}>
+      <CssBaseline />
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </ThemeProvider>
+  );
+}
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <BrowserRouter>
-        <AppProvider>
-          <App />
-        </AppProvider>
-      </BrowserRouter>
-    </ThemeProvider>
+    <AppProvider>
+      <Root />
+    </AppProvider>
   </React.StrictMode>
 );

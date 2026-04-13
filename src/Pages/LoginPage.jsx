@@ -1,41 +1,45 @@
-import { Alert, Box, Button, Container, Paper, Stack, TextField, Typography } from '@mui/material';
 import { useState } from 'react';
+import { Alert, Box, Button, Card, CardContent, Stack, TextField, Typography } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 
 export default function LoginPage() {
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('admin');
-  const [error, setError] = useState('');
-  const { login, loading } = useAppContext();
+  const { login } = useAppContext();
   const navigate = useNavigate();
+  const [form, setForm] = useState({ username: '', password: '' });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const onSubmit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
     try {
-      await login(username, password);
+      await login(form.username, form.password);
       navigate('/app');
     } catch (err) {
-      setError(err?.response?.data?.message || 'Login failed');
+      setError(err.response?.data?.message || err.message || 'Login failed');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <Container maxWidth="sm" sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
-      <Paper elevation={4} sx={{ p: 4, width: '100%', borderRadius: 4 }}>
-        <Stack spacing={2} component="form" onSubmit={onSubmit}>
-          <Typography variant="h4" fontWeight={700}>School ID Platform</Typography>
-          <Typography color="text.secondary">Default super admin is admin / admin.</Typography>
-          {error ? <Alert severity="error">{error}</Alert> : null}
-          <TextField label="Username" value={username} onChange={(e) => setUsername(e.target.value)} fullWidth />
-          <TextField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} fullWidth />
-          <Button type="submit" variant="contained" size="large" disabled={loading}>Sign in</Button>
-          <Box sx={{ fontSize: 13, color: 'text.secondary' }}>
-            Use the super admin to create schools, school admins, principals, teachers, and students.
-          </Box>
-        </Stack>
-      </Paper>
-    </Container>
+    <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', p: 2, bgcolor: '#eff6ff' }}>
+      <Card sx={{ width: '100%', maxWidth: 420 }}>
+        <CardContent sx={{ p: 3 }}>
+          <Stack spacing={2} component="form" onSubmit={handleSubmit}>
+            <Box>
+              <Typography variant="h4">School ERP</Typography>
+              <Typography color="text.secondary">Mobile-first dashboard for admissions, ID cards and report cards.</Typography>
+            </Box>
+            {error ? <Alert severity="error">{error}</Alert> : null}
+            <TextField label="Username" value={form.username} onChange={(e) => setForm((p) => ({ ...p, username: e.target.value }))} />
+            <TextField label="Password" type="password" value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} />
+            <Button type="submit" variant="contained" disabled={loading}>{loading ? 'Signing in...' : 'Login'}</Button>
+          </Stack>
+        </CardContent>
+      </Card>
+    </Box>
   );
 }

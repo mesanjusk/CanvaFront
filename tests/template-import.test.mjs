@@ -41,3 +41,16 @@ test('rejects unsupported file extensions',async()=>{
   const file=Buffer.from('not editable');file.name='flat.png';file.size=file.length;
   await assert.rejects(()=>importTemplateFiles([file]),/Only editable/);
 });
+
+test('extensionless ZIP input is detected from its signature',async()=>{
+  const bytes=await archive('Magic ZIP').generateAsync({type:'uint8array'});
+  const fake={
+    name:'opaque-download-id',
+    size:bytes.length,
+    slice(start,end){return new Blob([bytes.slice(start,end)]);},
+    arrayBuffer(){return Promise.resolve(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength));}
+  };
+  const result=await importTemplateFiles([fake]);
+  assert.equal(result.templates.length,1);
+  assert.equal(result.templates[0].name,'Magic ZIP');
+});

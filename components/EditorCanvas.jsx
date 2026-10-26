@@ -158,11 +158,11 @@ export const EditorCanvas = forwardRef(function EditorCanvas(
         notifySelection(editor);
       };
       if(page.objects?.objects?.length){
-        editor.loadFromJSON(page.objects,finish);
+        editor.loadFromJSON(page.objects,()=>editor.setBackgroundColor(page.background||'#ffffff',finish));
       }else if(page.seed?.length){
         page.seed.forEach((item)=>{
           let o=null;
-          if(item.type==='text')o=new f.IText(item.value,{left:item.x,top:item.y,
+          if(item.type==='text')o=new f.Textbox(item.value,{left:item.x,top:item.y,
             width:item.width,fontSize:item.size,fontFamily:item.font||'Georgia',
             fontWeight:item.weight||'normal',fontStyle:item.italic?'italic':'normal',
             textAlign:item.align||'center',fill:item.color,originX:'left'});

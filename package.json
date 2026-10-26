@@ -16,7 +16,8 @@
     "fabric": "5.5.2",
     "lucide-react": "^0.468.0",
     "jspdf": "^3.0.3",
-    "idb-keyval": "^6.2.2"
+    "idb-keyval": "^6.2.2",
+    "jszip": "3.10.2"
   },
   "devDependencies": {
     "eslint": "^9.37.0",

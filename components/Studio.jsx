@@ -13,6 +13,9 @@ import { EditorCanvas } from '@/components/EditorCanvas';
 import { TEMPLATES, PRESETS, blankPage, newDesign, uid, parseCsv, fillPlaceholders, formatDate } from '@/lib/format.mjs';
 import { listDesigns, getDesign, putDesign, removeDesign, duplicateDesign } from '@/lib/storage';
 import { exportDocument, downloadBlob } from '@/lib/exporter';
+import { listCustomTemplates, addCustomTemplates } from '@/lib/template-storage';
+import { templateFromDesign, designFromTemplate, findDuplicateTemplates, TEMPLATE_CATEGORIES } from '@/lib/template-library.mjs';
+import { generateThumbnail } from '@/lib/template-import.mjs';
 
 const tools=[
   {id:'templates',icon:LayoutTemplate,label:'Templates'},
@@ -22,11 +25,13 @@ const tools=[
   {id:'layers',icon:Layers3,label:'Layers'},
   {id:'bulk',icon:WandSparkles,label:'Bulk Create'}
 ];
-const categories=['All','Wedding','Social','Certificate','Business','Labels','Blank'];
+const baseCategories=['All','Wedding','Social','Certificate','Business','Labels','Blank'];
 
 function getPreset(id){return PRESETS.find(p=>p.id===id)||PRESETS[0];}
 function initials(title){return (title||'SK').split(' ').slice(0,2).map(x=>x[0]).join('').toUpperCase();}
 function TemplateArt({template,compact=false}){
+  if(template.thumbnail)return <div className={'template-art uploaded-thumbnail '+(compact?'compact':'')}>
+    <img src={template.thumbnail} alt={template.name+' preview'}/></div>;
   return <div className={`template-art template-${template.tone} ${compact?'compact':''}`}
     style={{'--template-bg':template.bg,'--template-accent':template.accent}}>
     <div className="template-frame">
@@ -57,6 +62,7 @@ export default function Studio({initialDesignId}){
   const canvasRef=useRef(null);
   const uploadInput=useRef(null);const projectInput=useRef(null);const bulkInput=useRef(null);
   const [docs,setDocs]=useState([]);
+  const [customTemplates,setCustomTemplates]=useState([]);
   const [doc,setDoc]=useState(null);
   const [busy,setBusy]=useState(true);
   const [saveStatus,setSaveStatus]=useState('Saved');
@@ -77,8 +83,18 @@ export default function Studio({initialDesignId}){
   const [customWidth,setCustomWidth]=useState(5.5);
   const [customHeight,setCustomHeight]=useState(8.5);
   const [menuOpen,setMenuOpen]=useState(false);
+  const [templateName,setTemplateName]=useState('');
+  const [templateCategory,setTemplateCategory]=useState('Wedding');
+  const [templateDescription,setTemplateDescription]=useState('');
+  const [templatePublished,setTemplatePublished]=useState(false);
 
-  const refresh=useCallback(async()=>{try{setDocs((await listDesigns()).sort((a,b)=>new Date(b.updatedAt)-new Date(a.updatedAt)));}catch{setNotification('Browser storage is unavailable. Check private browsing settings.');}},[]);
+  const refresh=useCallback(async()=>{
+    try{
+      const [designs,templates]=await Promise.all([listDesigns(),listCustomTemplates()]);
+      setDocs(designs.sort((a,b)=>new Date(b.updatedAt)-new Date(a.updatedAt)));
+      setCustomTemplates(templates);
+    }catch{setNotification('Browser storage is unavailable. Check private browsing settings.');}
+  },[]);
   useEffect(()=>{
     let mounted=true;
     (async()=>{
@@ -135,7 +151,8 @@ export default function Studio({initialDesignId}){
 
   async function create(template='blank',preset){
     try{
-      const next=newDesign(template,preset);
+      const custom=customTemplates.find(t=>t.id===template);
+      const next=custom?designFromTemplate(custom):newDesign(template,preset);
       await putDesign(next);
       router.push('/editor/'+next.id);
     }catch{setNotification('Failed to create design. Please check browser storage.');}
@@ -269,8 +286,48 @@ export default function Studio({initialDesignId}){
     setNotification('Page size updated. Existing elements keep their positions.');
   }
 
-  const selectedTemplates=TEMPLATES.filter(t=>(category==='All'||t.category===category) &&
-    (t.name+' '+t.desc).toLowerCase().includes(search.toLowerCase()));
+  function openSaveTemplate(){
+    const linked=customTemplates.find(t=>t.id===doc?.templateId);
+    const starter=TEMPLATES.find(t=>t.id===doc?.templateId);
+    setTemplateName(linked?.name||doc?.title||'Untitled template');
+    setTemplateCategory(linked?.category||starter?.category||'Wedding');
+    setTemplateDescription(linked?.description||'');
+    setTemplatePublished(!!linked?.published);
+    setModal('save-template');
+  }
+  async function saveTemplate(){
+    if(!templateName.trim())return setNotification('Enter a template name.');
+    setModal('saving-template');
+    try{
+      const snapshot=applyCurrentCanvas(doc);
+      const template=templateFromDesign(snapshot,{name:templateName,category:templateCategory,
+        description:templateDescription,published:templatePublished});
+      const linked=customTemplates.find(t=>t.id===doc.templateId);
+      if(linked){
+        template.id=linked.id;
+        template.createdAt=linked.createdAt;
+      }else{
+        const {duplicates}=findDuplicateTemplates(customTemplates,[template]);
+        if(duplicates.length)throw new Error('This layout is already in your template library.');
+      }
+      template.thumbnail=await generateThumbnail(template);
+      await addCustomTemplates([template]);
+      await refresh();
+      if(!linked)updateDoc(d=>({...d,templateId:template.id}));
+      setNotification(linked?'Template updated successfully.':'Editable template saved to your local library.');
+      setModal('');
+    }catch(error){
+      setModal('save-template');
+      setNotification(error.message||'Unable to save template.');
+    }
+  }
+
+  const availableTemplates=[...TEMPLATES,...customTemplates.filter(t=>t.published).map(t=>({
+    ...t,desc:t.description||'Editable uploaded template',tone:'custom',bg:t.pages?.[0]?.background||'#f5f0ff',accent:'#7158c1'
+  }))];
+  const categories=[...new Set([...baseCategories,...availableTemplates.map(t=>t.category)])];
+  const selectedTemplates=availableTemplates.filter(t=>(category==='All'||t.category===category) &&
+    (t.name+' '+(t.desc||'')).toLowerCase().includes(search.toLowerCase()));
   const selectedDocs=docs.filter(d=>d.title.toLowerCase().includes(search.toLowerCase()));
 
   if(busy)return <div className="app-loading"><div className="loading-orbit"/><span>Preparing your studio…</span></div>;
@@ -284,6 +341,7 @@ export default function Studio({initialDesignId}){
           <button onClick={()=>document.querySelector('#projects')?.scrollIntoView({behavior:'smooth'})}><FolderOpen size={19}/> Your projects</button>
           <button onClick={()=>document.querySelector('#templates')?.scrollIntoView({behavior:'smooth'})}><LayoutTemplate size={19}/> Templates</button>
           <button onClick={()=>projectInput.current?.click()}><FileUp size={19}/> Import project</button>
+          <button onClick={()=>router.push('/admin/templates')}><LayoutTemplate size={19}/> Template Manager</button>
         </div>
         <div className="sidebar-info"><ShieldCheck size={18}/><div><strong>Local-first privacy</strong><p>Designs stay in this browser. Export backups for safekeeping.</p></div></div>
       </aside>
@@ -315,7 +373,8 @@ export default function Studio({initialDesignId}){
             <button className="secondary-btn" onClick={()=>setModal('create')}><Plus size={17}/> New design</button></div>}
         </section>
         <section id="templates" className="content-section">
-          <div className="section-heading"><div><span className="eyebrow">MADE TO INSPIRE</span><h2>Explore templates</h2></div><span className="muted-note">{selectedTemplates.length} starting points</span></div>
+          <div className="section-heading"><div><span className="eyebrow">MADE TO INSPIRE</span><h2>Explore templates</h2></div>
+            <button className="text-button" onClick={()=>router.push('/admin/templates')}><FileUp size={16}/> Bulk upload templates</button></div>
           <div className="category-tabs">{categories.map(c=><button key={c} className={category===c?'active':''} onClick={()=>setCategory(c)}>{c}</button>)}</div>
           <div className="template-grid">{selectedTemplates.map(t=><button className="template-card" key={t.id} onClick={()=>create(t.id)}>
             <TemplateArt template={t}/><strong>{t.name}</strong><small>{t.desc}</small></button>)}</div>
@@ -345,7 +404,8 @@ export default function Studio({initialDesignId}){
         <span className="brand-mark small">S</span><div className="title-input-wrap"><input value={doc.title} onChange={e=>updateDoc(d=>({...d,title:e.target.value}))} aria-label="Design title"/><small>{saveStatus}</small></div></div>
       <div className="editor-actions"><button className="icon-btn" title="Undo" disabled={!historyState.canUndo} onClick={()=>canvasRef.current?.action('undo')}><Undo2 size={19}/></button>
         <button className="icon-btn" title="Redo" disabled={!historyState.canRedo} onClick={()=>canvasRef.current?.action('redo')}><Redo2 size={19}/></button>
-        <span className="topbar-separator"/><button className="topbar-text-btn" onClick={makeVersion}><Save size={17}/><span>Save version</span></button>
+        <span className="topbar-separator"/><button className="topbar-text-btn" onClick={()=>openSaveTemplate()}><FilePlus2 size={17}/><span>Save template</span></button>
+        <button className="topbar-text-btn" onClick={makeVersion}><Save size={17}/><span>Save version</span></button>
         <button className="topbar-text-btn" onClick={()=>setModal('versions')}><RotateCcw size={17}/><span>History</span></button>
         <button className="primary-btn export-trigger" onClick={()=>setModal('export')}><Download size={17}/> Export</button></div>
     </header>
@@ -359,7 +419,7 @@ export default function Studio({initialDesignId}){
         <div className="panel-heading"><h3>{tools.find(t=>t.id===tool)?.label}</h3><button className="icon-btn" title="Close panel" onClick={()=>setPanelVisible(false)}><X size={17}/></button></div>
         {tool==='templates'&&<div className="panel-scroll">
           <p className="panel-subtitle">Change the visual starting point. Your current design stays safe in your saved project.</p>
-          <div className="sidebar-template-grid">{TEMPLATES.filter(t=>t.id!=='blank').map(t=><button key={t.id} className="sidebar-template" onClick={()=>setModal('replace-template')}>
+          <div className="sidebar-template-grid">{availableTemplates.filter(t=>t.id!=='blank').map(t=><button key={t.id} className="sidebar-template" onClick={()=>setModal('replace-template')}>
             <TemplateArt template={t} compact/><span>{t.name}</span></button>)}</div>
           <button className="sidebar-outline-btn" onClick={()=>{setModal('replace-template');}}>Use another template</button>
         </div>}
@@ -472,7 +532,8 @@ export default function Studio({initialDesignId}){
         <input type="checkbox" checked={!!doc.settings?.showMargin} onChange={e=>updateDoc(d=>({...d,settings:{...d.settings,showMargin:e.target.checked}}))}/></div>
       <div className="settings-toggle"><div><strong>Bleed guides</strong><p>Show approximately 3 mm trim reference</p></div>
         <input type="checkbox" checked={!!doc.settings?.showBleed} onChange={e=>updateDoc(d=>({...d,settings:{...d.settings,showBleed:e.target.checked}}))}/></div>
-      <div className="modal-divider"/><StarterButton icon={Download} label="Download project backup" onClick={backupProject}/>
+      <div className="modal-divider"/><StarterButton icon={FilePlus2} label="Save design as template" onClick={openSaveTemplate}/>
+      <StarterButton icon={Download} label="Download project backup" onClick={backupProject}/>
     </Modal>}
     {modal==='versions'&&<Modal title="Version history" onClose={()=>setModal('')}>
       <p className="modal-description">Manually saved checkpoints on this device. Up to 20 versions per project.</p>
@@ -482,9 +543,20 @@ export default function Studio({initialDesignId}){
           <button className="secondary-btn" onClick={()=>restoreVersion(v)}><RotateCcw size={16}/> Restore</button></div>):
         <p className="panel-hint">No checkpoints yet. Use “Save current version” to start.</p>}</div>
     </Modal>}
+    {modal==='save-template'&&<Modal title="Save editable template" onClose={()=>setModal('')}>
+      <p className="modal-description">Save the current pages as a reusable template. You can manage it in Template Manager.</p>
+      <div className="form-field"><label>Template name</label><input value={templateName} maxLength={100} onChange={e=>setTemplateName(e.target.value)}/></div>
+      <div className="form-field"><label>Category</label><select value={templateCategory} onChange={e=>setTemplateCategory(e.target.value)}>
+        {[...new Set([...TEMPLATE_CATEGORIES,...categories.filter(c=>c!=='All')])].map(c=><option key={c}>{c}</option>)}</select></div>
+      <div className="form-field"><label>Description</label><textarea value={templateDescription} onChange={e=>setTemplateDescription(e.target.value)} rows={3}/></div>
+      <label className="checkbox-field"><input type="checkbox" checked={templatePublished} onChange={e=>setTemplatePublished(e.target.checked)}/>Publish in this browser's template gallery</label>
+      <button className="primary-btn modal-primary" onClick={saveTemplate}><Save size={18}/> Save template</button>
+      <p className="panel-hint">Cloud sharing between devices is not enabled. Download a ZIP backup in Template Manager.</p>
+    </Modal>}
+    {modal==='saving-template'&&<Modal title="Saving template" onClose={()=>{}}><div className="working"><div className="loading-orbit"/><span>Generating editable template preview…</span></div></Modal>}
     {modal==='replace-template'&&<Modal title="Choose a new starting design" onClose={()=>setModal('')}>
       <p className="modal-description">A new design will be created from the selected template. The existing design stays saved.</p>
-      <div className="replace-grid">{TEMPLATES.filter(t=>t.id!=='blank').map(t=><button key={t.id} onClick={()=>{setModal('');create(t.id);}}>
+      <div className="replace-grid">{availableTemplates.filter(t=>t.id!=='blank').map(t=><button key={t.id} onClick={()=>{setModal('');create(t.id);}}>
         <TemplateArt template={t} compact/><strong>{t.name}</strong></button>)}</div>
     </Modal>}
     {notification&&<div className="toast"><Check size={17}/>{notification}</div>}
